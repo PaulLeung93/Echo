@@ -192,6 +192,9 @@ fun SignInScreen(
                         isLoading = true
                         try {
                             authViewModel.signInWithEmail(email, password)
+                            navController.navigate(Destinations.FEED) {
+                                popUpTo(Destinations.SIGN_IN) { inclusive = true }
+                            }
                         } catch (e: Exception) {
                             errorMessage = "Sign-In failed. Please check your credentials."
                         } finally {
@@ -282,6 +285,9 @@ fun SignInScreen(
             TextButton(
                 onClick = {
                     authViewModel.signInAsGuest()
+                    navController.navigate(Destinations.FEED) {
+                        popUpTo(Destinations.SIGN_IN) { inclusive = true }
+                    }
                 }
             ) {
                 Text("Continue as Guest", color = Color.White)

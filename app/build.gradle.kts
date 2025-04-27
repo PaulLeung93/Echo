@@ -66,5 +66,7 @@ dependencies {
     implementation(libs.firebase.firestore.ktx)
     implementation(libs.google.auth)
     implementation (libs.androidx.material.icons.extended)
+    implementation(libs.accompanist.swiperefresh)
+
 
 }

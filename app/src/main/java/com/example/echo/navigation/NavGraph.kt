@@ -8,12 +8,16 @@ import com.example.echo.ui.auth.SignInScreen
 import com.example.echo.ui.auth.SignUpScreen
 import com.example.echo.ui.auth.AuthViewModel
 import androidx.navigation.navArgument
+import com.example.echo.ui.create.CreatePostScreen
+import com.example.echo.ui.feed.FeedScreen
 
 
 object Destinations {
     const val SIGN_IN = "sign_in"
-    const val EMAIL_SIGN_IN = "email_sign_in"
     const val SIGN_UP = "sign_up"
+    const val FEED = "feed"
+    const val CREATE_POST = "create_post"
+
 }
 
 @Composable
@@ -43,8 +47,16 @@ fun AppNavGraph(
             )
         }
 
+        composable(Destinations.FEED) {
+            FeedScreen(navController = navController)
+        }
+
         composable(Destinations.SIGN_UP) {
             SignUpScreen(navController)
+        }
+
+        composable(Destinations.CREATE_POST) {
+            CreatePostScreen(navController)
         }
     }
 }
