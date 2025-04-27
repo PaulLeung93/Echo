@@ -1,51 +1,58 @@
 package com.example.echo.ui.auth
 
-import android.app.Application
+import android.app.Activity
 import android.content.Intent
-import android.util.Log
-import androidx.activity.result.ActivityResult
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
-import com.google.android.gms.auth.api.signin.GoogleSignIn
+import androidx.lifecycle.ViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 
-class AuthViewModel(application: Application) : AndroidViewModel(application) {
+class AuthViewModel : ViewModel() {
 
-    private val auth = FirebaseAuth.getInstance()
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 
-    private val _isSignedIn = MutableStateFlow(false)
+    // Track whether the user is signed in
+    private val _isSignedIn = MutableStateFlow(auth.currentUser != null)
     val isSignedIn: StateFlow<Boolean> = _isSignedIn
 
-    init {
-        // Check if user is already signed in
-        _isSignedIn.value = auth.currentUser != null
-    }
+    /**
+     * Handle Google Sign-In Result
+     */
+    fun handleGoogleSignInResult(result: androidx.activity.result.ActivityResult) {
+        val data = result.data ?: return
+        val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(data)
+        val account = task.result ?: return
 
-    fun handleGoogleSignInResult(result: ActivityResult) {
-        viewModelScope.launch {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            try {
-                val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
-                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-                auth.signInWithCredential(credential)
-                    .addOnCompleteListener { taskResult ->
-                        if (taskResult.isSuccessful) {
-                            Log.d("AuthViewModel", "Google sign-in successful")
-                            _isSignedIn.value = true
-                        } else {
-                            Log.e("AuthViewModel", "Google sign-in failed", taskResult.exception)
-                        }
-                    }
-            } catch (e: Exception) {
-                Log.e("AuthViewModel", "Google sign-in error", e)
-            }
+        val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+        auth.signInWithCredential(credential).addOnCompleteListener { taskResult ->
+            _isSignedIn.value = taskResult.isSuccessful
         }
     }
 
+    /**
+     * Email/Password Sign-In
+     */
+    fun signInWithEmail(email: String, password: String) {
+        auth.signInWithEmailAndPassword(email.trim(), password.trim())
+            .addOnCompleteListener { task ->
+                _isSignedIn.value = task.isSuccessful
+            }
+    }
+
+    /**
+     * Guest Sign-In (Anonymous)
+     */
+    fun signInAsGuest() {
+        auth.signInAnonymously()
+            .addOnCompleteListener { task ->
+                _isSignedIn.value = task.isSuccessful
+            }
+    }
+
+    /**
+     * Sign Out
+     */
     fun signOut() {
         auth.signOut()
         _isSignedIn.value = false
