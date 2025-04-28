@@ -21,6 +21,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.example.echo.R
 import com.example.echo.navigation.Destinations
+import com.example.echo.ui.common.TopSnackbarHost
 import com.example.echo.utils.isValidEmail
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
@@ -45,10 +46,7 @@ fun ForgotPasswordScreen(navController: NavHostController) {
             modifier = Modifier.fillMaxSize()
         )
 
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
+        TopSnackbarHost(snackbarHostState = snackbarHostState)
 
         Column(
             modifier = Modifier

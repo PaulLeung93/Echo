@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.echo.R
 import com.example.echo.navigation.Destinations
+import com.example.echo.ui.common.TopSnackbarHost
 import com.example.echo.utils.isStrongPassword
 import com.example.echo.utils.isValidEmail
 import kotlinx.coroutines.Job
@@ -56,10 +57,7 @@ fun SignUpScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
+        TopSnackbarHost(snackbarHostState = snackbarHostState)
 
         Column(
             modifier = Modifier
