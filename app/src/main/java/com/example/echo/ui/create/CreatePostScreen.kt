@@ -7,81 +7,87 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import com.example.echo.models.Post
+import com.example.echo.navigation.Destinations
+import com.example.echo.utils.Constants
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreatePostScreen(navController: NavHostController) {
-    var username by remember { mutableStateOf("") }
+fun CreatePostScreen(navController: NavHostController, viewModel: CreatePostViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
+
     var message by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
-    val db = FirebaseFirestore.getInstance()
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Create Post") }
+            )
+        },
+        snackbarHost = {
+            SnackbarHost(snackbarHostState)
+        }
+    ) { paddingValues ->
 
-    Scaffold { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(paddingValues)
                 .padding(24.dp),
-            verticalArrangement = Arrangement.Top,
-            horizontalAlignment = Alignment.CenterHorizontally
+            contentAlignment = Alignment.Center
         ) {
-            Text(text = "Create New Post", style = MaterialTheme.typography.headlineMedium)
-            Spacer(modifier = Modifier.height(24.dp))
 
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Username") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = message,
-                onValueChange = { message = it },
-                label = { Text("Message") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(150.dp)
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = {
-                    if (username.isNotBlank() && message.isNotBlank()) {
-                        isLoading = true
-                        val newPost = Post(
-                            username = username.trim(),
-                            message = message.trim(),
-                            timestamp = System.currentTimeMillis()
-                        )
-                        db.collection("posts")
-                            .add(newPost)
-                            .addOnSuccessListener {
-                                isLoading = false
-                                navController.popBackStack() // 👈 Go back to Feed
-                            }
-                            .addOnFailureListener {
-                                isLoading = false
-                                // TODO: Show error if you want
-                            }
-                    }
-                },
-                enabled = !isLoading,
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                } else {
-                    Text("Post")
+
+                errorMessage?.let { error ->
+                    LaunchedEffect(error) {
+                        snackbarHostState.showSnackbar(error)
+                        viewModel.clearError()
+                    }
+                }
+
+                // Text field for post message
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = { message = it },
+                    label = { Text("What's on your mind?") },
+                    maxLines = 5,
+                    singleLine = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Post button
+                Button(
+                    onClick = {
+                        viewModel.submitPost(message) {
+                            navController.navigate(Destinations.FEED) {
+                                popUpTo(Destinations.FEED) { inclusive = true }
+                            }
+                        }
+                    },
+                    enabled = !isLoading,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else {
+                        Text("Post")
+                    }
                 }
             }
         }

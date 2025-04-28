@@ -13,6 +13,8 @@ composeBom = "2025.04.01"
 googleAuth = "21.3.0"
 navigationRuntimeAndroid = "2.9.0-rc01"
 navigationCompose = "2.8.9"
+navigationTesting = "2.8.9"
+navigationTestingAndroid = "2.9.0-rc01"
 
 
 [libraries]
@@ -38,6 +40,8 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 google-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "googleAuth" }
 androidx-navigation-runtime-android = { group = "androidx.navigation", name = "navigation-runtime-android", version.ref = "navigationRuntimeAndroid" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+androidx-navigation-testing = { group = "androidx.navigation", name = "navigation-testing", version.ref = "navigationTesting" }
+androidx-navigation-testing-android = { group = "androidx.navigation", name = "navigation-testing-android", version.ref = "navigationTestingAndroid" }
 
 
 [plugins]

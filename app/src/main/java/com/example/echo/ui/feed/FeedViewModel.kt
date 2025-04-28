@@ -3,6 +3,7 @@ package com.example.echo.ui.feed
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.echo.models.Post
+import com.example.echo.utils.Constants
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,27 +16,44 @@ class FeedViewModel : ViewModel() {
     private val _posts = MutableStateFlow<List<Post>>(emptyList())
     val posts: StateFlow<List<Post>> = _posts
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing
+
     init {
         fetchPosts()
     }
 
-    private fun fetchPosts() {
-        db.collection("posts")
-            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-            .addSnapshotListener { snapshot, e ->
-                if (e != null || snapshot == null) {
-                    // Log error if you want
-                    return@addSnapshotListener
+    fun fetchPosts() {
+        db.collection(Constants.COLLECTION_POSTS)
+            .orderBy(Constants.FIELD_TIMESTAMP, com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val fetchedPosts = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(Post::class.java)
                 }
-
-                val postList = snapshot.toObjects(Post::class.java)
-                _posts.value = postList
+                _posts.value = fetchedPosts
+            }
+            .addOnFailureListener {
+                // Handle error if needed (optional: log it)
             }
     }
 
-    fun refreshPosts(onRefreshed: () -> Unit) {
-        fetchPosts()
-        onRefreshed()
+    fun refreshPosts() {
+        _isRefreshing.value = true
+        db.collection(Constants.COLLECTION_POSTS)
+            .orderBy(Constants.FIELD_TIMESTAMP, com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val refreshedPosts = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(Post::class.java)
+                }
+                _posts.value = refreshedPosts
+                _isRefreshing.value = false
+            }
+            .addOnFailureListener {
+                _isRefreshing.value = false
+                // Optional: log or show a toast/snackbar
+            }
     }
 
 }

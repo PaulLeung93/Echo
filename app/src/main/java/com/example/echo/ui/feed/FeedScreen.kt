@@ -1,16 +1,17 @@
 package com.example.echo.ui.feed
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,25 +22,54 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.echo.models.Post
 import com.example.echo.navigation.Destinations
+import com.example.echo.ui.auth.AuthViewModel
+import com.example.echo.utils.Constants
+import com.example.echo.utils.formatTimestamp
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
-import java.text.SimpleDateFormat
-import java.util.*
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeedScreen(
-    feedViewModel: FeedViewModel = viewModel(),
-    navController: NavHostController
+    navController: NavHostController,
+    authViewModel: AuthViewModel,
+    feedViewModel: FeedViewModel = viewModel()
 ) {
     val posts by feedViewModel.posts.collectAsState()
-    val isRefreshing = remember { mutableStateOf(false) }
+    val isRefreshing by feedViewModel.isRefreshing.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
+
+    var selectedTab by remember { mutableStateOf("feed") }
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Echo",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
+                actions = {
+                    IconButton(onClick = {
+                        // Sign out and return to SignInScreen
+                        authViewModel.signOut()
+                        navController.navigate(Destinations.SIGN_IN) {
+                            popUpTo(Destinations.FEED) { inclusive = true }
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = "Sign Out"
+                        )
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = {
-                    navController.navigate(Destinations.CREATE_POST)
-                },
+                onClick = { navController.navigate(Destinations.CREATE_POST) },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(
@@ -48,19 +78,30 @@ fun FeedScreen(
                     tint = Color.White
                 )
             }
-        }
-    ) { padding ->
-        SwipeRefresh(
-            state = rememberSwipeRefreshState(isRefreshing = isRefreshing.value),
-            onRefresh = {
-                isRefreshing.value = true
-                feedViewModel.refreshPosts {
-                    isRefreshing.value = false
+        },
+        bottomBar = {
+            BottomNavigationBar(selectedTab = selectedTab) { tab ->
+                selectedTab = tab
+                when (tab) {
+                    "feed" -> navController.navigate(Destinations.FEED) {
+                        popUpTo(Destinations.FEED) { inclusive = true }
+                    }
+                    "map" -> {
+                        // Placeholder for MapScreen
+                    }
+                    "profile" -> {
+                        // Placeholder for ProfileScreen
+                    }
                 }
             }
+        }
+    ) { paddingValues ->
+        SwipeRefresh(
+            state = rememberSwipeRefreshState(isRefreshing),
+            onRefresh = { feedViewModel.refreshPosts() }
         ) {
             LazyColumn(
-                contentPadding = padding,
+                contentPadding = paddingValues,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp)
@@ -83,7 +124,11 @@ fun FeedScreen(
                     }
                 } else {
                     items(posts) { post ->
-                        PostCard(post)
+                        PostCard(post = post) {
+                            post.id?.let { postId ->
+                                navController.navigate("${Constants.ROUTE_POST_DETAILS}/$postId")
+                            }
+                        }
                         Spacer(modifier = Modifier.height(12.dp))
                     }
                 }
@@ -92,19 +137,27 @@ fun FeedScreen(
     }
 }
 
-
 @Composable
-fun PostCard(post: Post) {
+fun PostCard(post: Post, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         elevation = CardDefaults.cardElevation(6.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            Text(text = post.username, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = post.username,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(text = post.message, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = post.message,
+                style = MaterialTheme.typography.bodyLarge
+            )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = formatTimestamp(post.timestamp),
@@ -115,21 +168,27 @@ fun PostCard(post: Post) {
     }
 }
 
-// Helper to format timestamp
-fun formatTimestamp(timestamp: Long): String {
-    val now = System.currentTimeMillis()
-    val diff = now - timestamp
-
-    val seconds = diff / 1000
-    val minutes = seconds / 60
-    val hours = minutes / 60
-    val days = hours / 24
-
-    return when {
-        seconds < 60 -> "Just now"
-        minutes < 60 -> "$minutes min ago"
-        hours < 24 -> "$hours hr ago"
-        else -> "$days day${if (days > 1) "s" else ""} ago"
+@Composable
+fun BottomNavigationBar(selectedTab: String, onTabSelected: (String) -> Unit) {
+    NavigationBar {
+        NavigationBarItem(
+            selected = selectedTab == "feed",
+            onClick = { onTabSelected("feed") },
+            icon = { Icon(Icons.Default.Home, contentDescription = "Feed") },
+            label = { Text("Feed") }
+        )
+        NavigationBarItem(
+            selected = selectedTab == "map",
+            onClick = { onTabSelected("map") },
+            icon = { Icon(Icons.Default.Map, contentDescription = "Map") },
+            label = { Text("Map") }
+        )
+        NavigationBarItem(
+            selected = selectedTab == "profile",
+            onClick = { onTabSelected("profile") },
+            icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
+            label = { Text("Profile") }
+        )
     }
 }
 
@@ -142,9 +201,11 @@ fun PreviewPostCard() {
             username = "preview_user",
             message = "This is a preview of a post in Echo.",
             timestamp = System.currentTimeMillis()
-        )
+        ),
+        onClick = {}
     )
 }
+
 
 @Preview(showBackground = true)
 @Composable
@@ -161,7 +222,7 @@ fun PreviewFeedScreen() {
                 Post(username = "john_doe", message = "Anyone else got cooked from that exam??", timestamp = System.currentTimeMillis() - 3600000)
             )
         ) { post ->
-            PostCard(post)
+            PostCard(post, onClick = {})
             Spacer(modifier = Modifier.height(12.dp))
         }
     }

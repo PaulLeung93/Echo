@@ -1,17 +1,12 @@
 package com.example.echo.ui.auth
 
-import android.util.Patterns
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,37 +14,51 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.echo.R
 import com.example.echo.navigation.Destinations
-import com.google.firebase.auth.FirebaseAuth
-import androidx.compose.material3.TextFieldDefaults
-
-
+import com.example.echo.utils.isStrongPassword
+import com.example.echo.utils.isValidEmail
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SignUpScreen(navController: NavHostController) {
-    val auth = remember { FirebaseAuth.getInstance() }
+fun SignUpScreen(
+    navController: NavHostController,
+    authViewModel: AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+) {
+    val coroutineScope = rememberCoroutineScope()
 
     var email by remember { mutableStateOf("") }
+    var emailError by remember { mutableStateOf<String?>(null) }
+
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Background Image
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    var isLoading by remember { mutableStateOf(false) }
+    var emailCheckJob by remember { mutableStateOf<Job?>(null) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
         Image(
             painter = painterResource(id = R.drawable.signup_background),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
+        )
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.TopCenter)
         )
 
         Column(
@@ -62,88 +71,147 @@ fun SignUpScreen(navController: NavHostController) {
             Text(text = "Create Account", style = MaterialTheme.typography.headlineMedium)
             Spacer(modifier = Modifier.height(24.dp))
 
-
-            // Email Input Field********************************************************************
+            // Email Input
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = {
+                    email = it
+                    emailError = null
+                    emailCheckJob?.cancel()
+                    emailCheckJob = coroutineScope.launch {
+                        delay(500)
+                        val trimmedEmail = email.trim()
+                        if (isValidEmail(trimmedEmail)) {
+                            val methods = authViewModel.fetchSignInMethods(trimmedEmail)
+                            if (!methods.isNullOrEmpty()) {
+                                emailError = "An account with this email already exists."
+                            }
+                        }
+                    }
+                },
                 label = { Text("Email") },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Next
                 ),
-                colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
+                isError = emailError != null,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White
+                ),
                 modifier = Modifier.fillMaxWidth()
-
             )
+
+            emailError?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.align(Alignment.Start).padding(top = 4.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Password Input Field*****************************************************************
+            // Password Input
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    val icon = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(imageVector = icon, contentDescription = null)
+                    }
+                },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Next
                 ),
-                visualTransformation = PasswordVisualTransformation(),
-                colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Confirm Password Input Field*********************************************************
+            // Confirm Password Input
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
                 label = { Text("Confirm Password") },
+                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    val icon = if (confirmPasswordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility
+                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                        Icon(imageVector = icon, contentDescription = null)
+                    }
+                },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Done
                 ),
-                visualTransformation = PasswordVisualTransformation(),
-                colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Sign Up Button***********************************************************************
+            // Sign Up Button
             Button(
                 onClick = {
-                    // Input validation before calling Firebase
-                    if (!isValidEmail(email)) {
-                        errorMessage = "Please enter a valid email address."
-                        return@Button
-                    }
-                    if (password.isBlank() || confirmPassword.isBlank()) {
-                        errorMessage = "Password fields cannot be empty."
-                        return@Button
-                    }
-                    if (password != confirmPassword) {
-                        errorMessage = "Passwords do not match."
-                        return@Button
-                    }
+                    coroutineScope.launch {
+                        val trimmedEmail = email.trim()
+                        val trimmedPassword = password.trim()
+                        val trimmedConfirmPassword = confirmPassword.trim()
 
-                    isLoading = true
-                    errorMessage = null
+                        if (!isValidEmail(trimmedEmail)) {
+                            snackbarHostState.showSnackbar("Please enter a valid email address.")
+                            return@launch
+                        }
+                        if (emailError != null) {
+                            snackbarHostState.showSnackbar(emailError!!)
+                            return@launch
+                        }
+                        if (trimmedPassword.isBlank() || trimmedConfirmPassword.isBlank()) {
+                            snackbarHostState.showSnackbar("Password fields cannot be empty.")
+                            return@launch
+                        }
+                        if (trimmedPassword.length < 6) {
+                            snackbarHostState.showSnackbar("Password must be at least 6 characters long.")
+                            return@launch
+                        }
+                        if (!isStrongPassword(trimmedPassword)) {
+                            snackbarHostState.showSnackbar("Password must contain uppercase, lowercase, number, and special character.")
+                            return@launch
+                        }
+                        if (trimmedPassword != trimmedConfirmPassword) {
+                            snackbarHostState.showSnackbar("Passwords do not match.")
+                            return@launch
+                        }
 
-                    // Create account with Firebase
-                    auth.createUserWithEmailAndPassword(email.trim(), password.trim())
-                        .addOnCompleteListener { task ->
-                            isLoading = false
-                            if (task.isSuccessful) {
-                                // Navigate back to login screen with a success message
-                                navController.navigate("${Destinations.SIGN_IN}?successMessage=Account created successfully! Please log in.") {
-                                    popUpTo(Destinations.SIGN_IN) { inclusive = true }
+                        isLoading = true
+
+                        when (val result = authViewModel.signUpWithEmail(trimmedEmail, trimmedPassword)) {
+                            is SignInResult.Success -> {
+                                snackbarHostState.showSnackbar("Account created successfully!")
+                                navController.navigate(Destinations.FEED) {
+                                    popUpTo(Destinations.SIGN_UP) { inclusive = true }
                                 }
-                            } else {
-                                errorMessage = mapFirebaseErrorMessage(task.exception?.localizedMessage)
+                            }
+                            is SignInResult.Error -> {
+                                snackbarHostState.showSnackbar(result.message)
                             }
                         }
+
+                        isLoading = false
+                    }
                 },
                 enabled = !isLoading,
                 modifier = Modifier.fillMaxWidth()
@@ -154,42 +222,15 @@ fun SignUpScreen(navController: NavHostController) {
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text(text = "Sign Up")
+                    Text("Sign Up")
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Navigate back to login if already have account***************************************
-            TextButton(
-                onClick = { navController.popBackStack() }
-            ) {
+            TextButton(onClick = { navController.popBackStack() }) {
                 Text(text = "Already have an account? Sign In")
-            }
-
-            // Show error message if sign up fails
-            errorMessage?.let { msg ->
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = msg,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium
-                )
             }
         }
     }
-}
-
-fun mapFirebaseErrorMessage(rawMessage: String?): String {
-    return when {
-        rawMessage?.contains("password is invalid", ignoreCase = true) == true -> "Incorrect password. Please try again."
-        rawMessage?.contains("no user record", ignoreCase = true) == true -> "No account found with that email."
-        rawMessage?.contains("email address is badly formatted", ignoreCase = true) == true -> "Invalid email address format."
-        rawMessage?.contains("already in use", ignoreCase = true) == true -> "An account with this email already exists."
-        else -> "Authentication failed. Please try again."
-    }
-}
-
-fun isValidEmail(email: String): Boolean {
-    return Patterns.EMAIL_ADDRESS.matcher(email).matches()
 }

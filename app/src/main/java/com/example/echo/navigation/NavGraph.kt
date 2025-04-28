@@ -4,20 +4,20 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.echo.ui.auth.SignInScreen
-import com.example.echo.ui.auth.SignUpScreen
-import com.example.echo.ui.auth.AuthViewModel
 import androidx.navigation.navArgument
+import com.example.echo.ui.auth.*
 import com.example.echo.ui.create.CreatePostScreen
 import com.example.echo.ui.feed.FeedScreen
-
+import com.example.echo.ui.postdetails.PostDetailScreen
+import com.example.echo.utils.Constants
 
 object Destinations {
-    const val SIGN_IN = "sign_in"
-    const val SIGN_UP = "sign_up"
-    const val FEED = "feed"
-    const val CREATE_POST = "create_post"
-
+    const val SIGN_IN = Constants.ROUTE_SIGN_IN
+    const val SIGN_UP = Constants.ROUTE_SIGN_UP
+    const val FEED = Constants.ROUTE_FEED
+    const val CREATE_POST = Constants.ROUTE_CREATE_POST
+    const val FORGOT_PASSWORD = Constants.ROUTE_FORGOT_PASSWORD
+    const val POST_DETAILS = Constants.ROUTE_POST_DETAILS
 }
 
 @Composable
@@ -30,12 +30,11 @@ fun AppNavGraph(
         navController = navController,
         startDestination = Destinations.SIGN_IN
     ) {
+        // Sign In Screen
         composable(
             route = "${Destinations.SIGN_IN}?successMessage={successMessage}",
             arguments = listOf(
-                navArgument("successMessage") {
-                    defaultValue = ""
-                }
+                navArgument("successMessage") { defaultValue = "" }
             )
         ) { backStackEntry ->
             val successMessage = backStackEntry.arguments?.getString("successMessage") ?: ""
@@ -47,16 +46,35 @@ fun AppNavGraph(
             )
         }
 
+        // Feed Screen
         composable(Destinations.FEED) {
-            FeedScreen(navController = navController)
+            FeedScreen(navController = navController, authViewModel = authViewModel)
         }
 
+        // Sign Up Screen
         composable(Destinations.SIGN_UP) {
-            SignUpScreen(navController)
+            SignUpScreen(navController = navController)
         }
 
+        // Create Post Screen
         composable(Destinations.CREATE_POST) {
-            CreatePostScreen(navController)
+            CreatePostScreen(navController = navController)
+        }
+
+        // Forgot Password Screen
+        composable(Destinations.FORGOT_PASSWORD) {
+            ForgotPasswordScreen(navController = navController)
+        }
+
+        // Post Detail Screen with postId
+        composable(
+            route = "${Destinations.POST_DETAILS}/{postId}",
+            arguments = listOf(
+                navArgument("postId") { defaultValue = "" }
+            )
+        ) { backStackEntry ->
+            val postId = backStackEntry.arguments?.getString("postId") ?: ""
+            PostDetailScreen(postId = postId, navController = navController)
         }
     }
 }

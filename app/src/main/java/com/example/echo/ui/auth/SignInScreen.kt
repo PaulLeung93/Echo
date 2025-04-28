@@ -1,6 +1,5 @@
 package com.example.echo.ui.auth
 
-import android.util.Patterns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -18,8 +17,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -32,8 +29,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavHostController
 import com.example.echo.R
 import com.example.echo.navigation.Destinations
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.example.echo.utils.isValidEmail
+import com.example.echo.utils.mapFirebaseErrorMessage
 import kotlinx.coroutines.launch
 
 @Composable
@@ -44,265 +41,202 @@ fun SignInScreen(
     successMessage: String = ""
 ) {
     val context = LocalContext.current
-    val isSignedIn by authViewModel.isSignedIn.collectAsState()
-    val NavyBlue = MaterialTheme.colorScheme.primary
-
     val coroutineScope = rememberCoroutineScope()
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Email/Password states
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
 
-    // Setup Google Sign-In Client
     val googleSignInClient = remember {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(webClientId)
-            .requestEmail()
-            .build()
-        GoogleSignIn.getClient(context, gso)
+        com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(
+            context,
+            com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+                com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
+            ).requestIdToken(webClientId)
+                .requestEmail()
+                .build()
+        )
     }
 
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        isLoading = true
         coroutineScope.launch {
+            isLoading = true
             try {
                 authViewModel.handleGoogleSignInResult(result)
+                snackbarHostState.showSnackbar("Signed in with Google!")
+                navController.navigate(Destinations.FEED) {
+                    popUpTo(Destinations.SIGN_IN) { inclusive = true }
+                }
             } catch (e: Exception) {
-                errorMessage = "Google Sign-In failed. Please try again."
+                snackbarHostState.showSnackbar("Google Sign-In failed. Please try again.")
             } finally {
                 isLoading = false
             }
         }
     }
 
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Background Image
-        Image(
-            painter = painterResource(id = R.drawable.login_background),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // Snackbar host
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
-
-        Column(
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Top,
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(padding)
         ) {
-
-            Spacer(modifier = Modifier.height(80.dp)) // Push below logo area
-
-            // Echo App Name************************************************************************
-            Text(
-                text = "Echo",
-                style = TextStyle(
-                    fontSize = 64.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = NavyBlue,
-                    letterSpacing = 1.sp,
-                    textAlign = TextAlign.Center
-                )
+            Image(
+                painter = painterResource(id = R.drawable.login_background),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            //Tagline*******************************************************************************
-            Text(
-                text = "Stay Connected, Locally.",
-                fontSize = 18.sp,
-                color = Color.White,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Email Input**************************************************************************
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                placeholder = { Text("Email") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email,
-                    imeAction = ImeAction.Next
-                ),
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .background(Color.White),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Echo", fontSize = 48.sp, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Stay Connected, Locally.", color = Color.White)
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Email
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(0.85f),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Next
+                    )
                 )
-            )
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Password Input***********************************************************************
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                placeholder = { Text("Password") },
-                singleLine = true,
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    val image = if (passwordVisible) {
-                        Icons.Filled.VisibilityOff
-                    } else {
-                        Icons.Filled.Visibility
-                    }
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(imageVector = image, contentDescription = null)
-                    }
-                },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
-                ),
-                modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .background(Color.White),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White
-                )
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Email/Password Login Button**********************************************************
-            Button(
-                onClick = {
-                    coroutineScope.launch {
-                        isLoading = true
-                        try {
-                            authViewModel.signInWithEmail(email, password)
-                            navController.navigate(Destinations.FEED) {
-                                popUpTo(Destinations.SIGN_IN) { inclusive = true }
-                            }
-                        } catch (e: Exception) {
-                            errorMessage = "Sign-In failed. Please check your credentials."
-                        } finally {
-                            isLoading = false
+                // Password
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    singleLine = true,
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        val icon = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(imageVector = icon, contentDescription = null)
                         }
-                    }
-                },
-                enabled = !isLoading,
-                modifier = Modifier
-                    .fillMaxWidth(0.75f)
-                    .height(50.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = NavyBlue,
-                    contentColor = Color.White
-                )
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(24.dp)
+                    },
+                    modifier = Modifier.fillMaxWidth(0.85f),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done
                     )
-                } else {
-                    Text("Login")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            //Forgot Password/Sign Up Button********************************************************
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth(0.85f),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(
-                    onClick = {
-                        // TODO: Navigate to Forgot Password
-                    }
-                ) {
-                    Text(
-                        "Forgot Password?",
-                        color = Color.White,
-                        textDecoration = TextDecoration.Underline)
-                }
-
-                TextButton(
-                    onClick = {
-                        navController.navigate(Destinations.SIGN_UP)
-                    }
-                ) {
-                    Text(
-                        text = "Sign Up",
-                        color = Color.White,
-                        textDecoration = TextDecoration.Underline
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Divider with "or"********************************************************************
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth(0.85f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White)
-                Text(
-                    text = "  OR  ",
-                    color = Color.White,
-                    fontSize = 14.sp
                 )
-                Divider(modifier = Modifier.weight(1f), color = Color.White)
-            }
+                Spacer(modifier = Modifier.height(24.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
+                // Login Button
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            isLoading = true
+                            try {
+                                if (isValidEmail(email) && password.isNotBlank()) {
+                                    when (val result = authViewModel.signInWithEmail(email, password)) {
+                                        is SignInResult.Success -> {
+                                            snackbarHostState.showSnackbar("Welcome back!")
+                                            navController.navigate(Destinations.FEED) {
+                                                popUpTo(Destinations.SIGN_IN) { inclusive = true }
+                                            }
+                                        }
+                                        is SignInResult.Error -> snackbarHostState.showSnackbar(
+                                            mapFirebaseErrorMessage(result.message)
+                                        )
+                                        //snackbarHostState.showSnackbar(mapFirebaseErrorMessage(e.message))
+                                    }
+                                } else {
+                                    snackbarHostState.showSnackbar("Please enter valid credentials.")
+                                }
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(0.75f)
+                ) {
+                    if (isLoading) CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    else Text("Login")
+                }
 
-            // Google Sign-In Button****************************************************************
-            GoogleSignInButton {
-                val signInIntent = googleSignInClient.signInIntent
-                googleSignInLauncher.launch(signInIntent)
-            }
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(8.dp))
+                // Forgot Password / Sign Up
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(0.85f)
+                ) {
+                    TextButton(onClick = { navController.navigate(Destinations.FORGOT_PASSWORD) }) {
+                        Text("Forgot Password?", textDecoration = TextDecoration.Underline, color = Color.White)
+                    }
+                    TextButton(onClick = { navController.navigate(Destinations.SIGN_UP) }) {
+                        Text("Sign Up", textDecoration = TextDecoration.Underline, color = Color.White)
+                    }
+                }
 
-            // Continue as Guest********************************************************************
-            TextButton(
-                onClick = {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Divider with OR
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(0.85f)
+                ) {
+                    Divider(Modifier.weight(1f), color = Color.White)
+                    Text("  OR  ", color = Color.White)
+                    Divider(Modifier.weight(1f), color = Color.White)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Google Sign-In Button
+                GoogleSignInButton { googleSignInLauncher.launch(googleSignInClient.signInIntent) }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextButton(onClick = {
                     authViewModel.signInAsGuest()
                     navController.navigate(Destinations.FEED) {
                         popUpTo(Destinations.SIGN_IN) { inclusive = true }
                     }
+                }) {
+                    Text("Continue as Guest", color = Color.White)
                 }
-            ) {
-                Text("Continue as Guest", color = Color.White)
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "By continuing, you agree to Echo's Terms of Service and Privacy Policy.",
+                    color = Color.White,
+                    fontSize = 8.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Terms and Privacy Policy Text (at the very bottom)***********************************
-            Text(
-                text = "By continuing, you agree to Echo's Terms of Service and Privacy Policy.",
-                color = Color.White,
-                fontSize = 8.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
         }
     }
 }
@@ -322,3 +256,4 @@ fun GoogleSignInButton(onClick: () -> Unit) {
             .height(50.dp)
     )
 }
+
