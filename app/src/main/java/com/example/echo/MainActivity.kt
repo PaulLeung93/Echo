@@ -11,6 +11,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.example.echo.navigation.AppNavGraph
+import com.example.echo.navigation.RootNavHost
 import com.example.echo.ui.auth.AuthViewModel
 import com.example.echo.ui.auth.SignInScreen
 import com.example.echo.ui.theme.EchoTheme
@@ -31,7 +32,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavGraph(
+                    RootNavHost(
                         navController = navController,
                         authViewModel = authViewModel,
                         webClientId = "YOUR_WEB_CLIENT_ID"

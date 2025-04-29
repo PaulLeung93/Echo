@@ -9,7 +9,7 @@ import com.example.echo.ui.auth.*
 import com.example.echo.ui.create.CreatePostScreen
 import com.example.echo.ui.feed.FeedScreen
 import com.example.echo.ui.map.MapScreen
-import com.example.echo.ui.postdetails.PostDetailScreen
+import com.example.echo.ui.post.PostDetailScreen
 import com.example.echo.utils.Constants
 
 object Destinations {
@@ -28,11 +28,12 @@ object Destinations {
 fun AppNavGraph(
     navController: NavHostController,
     authViewModel: AuthViewModel,
-    webClientId: String
+    webClientId: String,
+    startDestination: String
 ) {
     NavHost(
         navController = navController,
-        startDestination = Destinations.SIGN_IN
+        startDestination = startDestination
     ) {
         // Sign In Screen
         composable(

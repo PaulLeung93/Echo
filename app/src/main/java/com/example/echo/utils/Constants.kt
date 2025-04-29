@@ -3,6 +3,8 @@ package com.example.echo.utils
 object Constants {
     // Firestore Collections
     const val COLLECTION_POSTS = "posts"
+    const val COLLECTION_COMMENTS = "comments"
+
 
     // Firestore Fields
     const val FIELD_USERNAME = "username"

@@ -37,8 +37,8 @@ class CreatePostViewModel : ViewModel() {
         }
 
         val currentUser = auth.currentUser
-        if (currentUser == null) {
-            _errorMessage.value = "You must be signed in to post."
+        if (currentUser == null || currentUser.isAnonymous) {
+            _errorMessage.value = "You must be signed in to perform this action."
             return
         }
 

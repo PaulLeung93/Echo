@@ -52,6 +52,17 @@ fun SignInScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
 
+    val isSignedIn by authViewModel.isSignedIn.collectAsState()
+
+    //If user is already signed in, navigate to Feed Screen
+    LaunchedEffect(isSignedIn) {
+        if (isSignedIn) {
+            navController.navigate(Destinations.FEED) {
+                popUpTo(Destinations.SIGN_IN) { inclusive = true }
+            }
+        }
+    }
+
     val googleSignInClient = remember {
         com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(
             context,
