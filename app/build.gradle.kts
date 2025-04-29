@@ -2,12 +2,20 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.secrets)
     id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.example.echo"
     compileSdk = 35
+
+    secrets {
+
+        propertiesFileName = "secrets.properties"
+        defaultPropertiesFileName = "local.defaults.properties"
+    }
+
 
     defaultConfig {
         applicationId = "com.example.echo"
@@ -37,6 +45,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -61,6 +70,7 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    implementation(libs.accompanist.permissions)
 
     //Firebase
     implementation(platform(libs.firebase.bom))
@@ -69,6 +79,14 @@ dependencies {
     implementation(libs.google.auth)
     implementation (libs.androidx.material.icons.extended)
     implementation(libs.accompanist.swiperefresh)
+
+    //Google Maps
+    implementation(libs.play.services.maps)
+    implementation(libs.maps.compose)
+    implementation(libs.play.services.location)
+
+
+
 
 
 }

@@ -16,4 +16,7 @@ object Constants {
     const val ROUTE_CREATE_POST = "create_post"
     const val ROUTE_FORGOT_PASSWORD = "forgot_password"
     const val ROUTE_POST_DETAILS = "post_details"
+
+    const val ROUTE_MAP = "map"
+
 }

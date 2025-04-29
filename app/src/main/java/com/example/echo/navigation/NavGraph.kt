@@ -8,6 +8,7 @@ import androidx.navigation.navArgument
 import com.example.echo.ui.auth.*
 import com.example.echo.ui.create.CreatePostScreen
 import com.example.echo.ui.feed.FeedScreen
+import com.example.echo.ui.map.MapScreen
 import com.example.echo.ui.postdetails.PostDetailScreen
 import com.example.echo.utils.Constants
 
@@ -18,6 +19,9 @@ object Destinations {
     const val CREATE_POST = Constants.ROUTE_CREATE_POST
     const val FORGOT_PASSWORD = Constants.ROUTE_FORGOT_PASSWORD
     const val POST_DETAILS = Constants.ROUTE_POST_DETAILS
+
+    const val MAP = Constants.ROUTE_MAP
+
 }
 
 @Composable
@@ -76,5 +80,10 @@ fun AppNavGraph(
             val postId = backStackEntry.arguments?.getString("postId") ?: ""
             PostDetailScreen(postId = postId, navController = navController)
         }
+
+        composable(Destinations.MAP) {
+            MapScreen(navController = navController)
+        }
+
     }
 }

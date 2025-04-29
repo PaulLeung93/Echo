@@ -20,7 +20,15 @@ class CreatePostViewModel : ViewModel() {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
-    fun submitPost(message: String, onSuccess: () -> Unit) {
+
+    fun submitPost(
+        message: String,
+        includeLocation: Boolean,
+        userLatitude: Double? = null,
+        userLongitude: Double? = null,
+        onSuccess: () -> Unit
+    ) {
+
         val trimmedMessage = message.trim()
 
         if (trimmedMessage.isBlank()) {
@@ -44,7 +52,13 @@ class CreatePostViewModel : ViewModel() {
             Constants.FIELD_MESSAGE to trimmedMessage,
             Constants.FIELD_TIMESTAMP to System.currentTimeMillis(),
             "id" to newPostRef.id
-        )
+        ).toMutableMap()
+
+        // If the user wants to include location
+        if (includeLocation && userLatitude != null && userLongitude != null) {
+            post["latitude"] = userLatitude
+            post["longitude"] = userLongitude
+        }
 
         newPostRef.set(post)
             .addOnSuccessListener {
@@ -56,7 +70,6 @@ class CreatePostViewModel : ViewModel() {
                 _errorMessage.value = "Failed to post: ${e.message}"
             }
     }
-
 
     fun clearError() {
         _errorMessage.value = null

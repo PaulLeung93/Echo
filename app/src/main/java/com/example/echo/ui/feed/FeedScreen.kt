@@ -28,6 +28,8 @@ import com.example.echo.utils.formatTimestamp
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import kotlinx.coroutines.launch
+import com.example.echo.components.PostCard
+import com.example.echo.ui.common.BottomNavigationBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,11 +85,10 @@ fun FeedScreen(
             BottomNavigationBar(selectedTab = selectedTab) { tab ->
                 selectedTab = tab
                 when (tab) {
-                    "feed" -> navController.navigate(Destinations.FEED) {
+                    "map" -> navController.navigate(Destinations.MAP) {
                         popUpTo(Destinations.FEED) { inclusive = true }
-                    }
-                    "map" -> {
-                        // Placeholder for MapScreen
+                        launchSingleTop = true
+                        restoreState = true
                     }
                     "profile" -> {
                         // Placeholder for ProfileScreen
@@ -136,76 +137,6 @@ fun FeedScreen(
         }
     }
 }
-
-@Composable
-fun PostCard(post: Post, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        elevation = CardDefaults.cardElevation(6.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = post.username,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = post.message,
-                style = MaterialTheme.typography.bodyLarge
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = formatTimestamp(post.timestamp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-        }
-    }
-}
-
-@Composable
-fun BottomNavigationBar(selectedTab: String, onTabSelected: (String) -> Unit) {
-    NavigationBar {
-        NavigationBarItem(
-            selected = selectedTab == "feed",
-            onClick = { onTabSelected("feed") },
-            icon = { Icon(Icons.Default.Home, contentDescription = "Feed") },
-            label = { Text("Feed") }
-        )
-        NavigationBarItem(
-            selected = selectedTab == "map",
-            onClick = { onTabSelected("map") },
-            icon = { Icon(Icons.Default.Map, contentDescription = "Map") },
-            label = { Text("Map") }
-        )
-        NavigationBarItem(
-            selected = selectedTab == "profile",
-            onClick = { onTabSelected("profile") },
-            icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
-            label = { Text("Profile") }
-        )
-    }
-}
-
-
-@Preview(showBackground = true)
-@Composable
-fun PreviewPostCard() {
-    PostCard(
-        post = Post(
-            username = "preview_user",
-            message = "This is a preview of a post in Echo.",
-            timestamp = System.currentTimeMillis()
-        ),
-        onClick = {}
-    )
-}
-
 
 @Preview(showBackground = true)
 @Composable
