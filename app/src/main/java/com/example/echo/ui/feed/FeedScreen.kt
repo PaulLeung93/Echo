@@ -125,11 +125,24 @@ fun FeedScreen(
                     }
                 } else {
                     items(posts) { post ->
-                        PostCard(post = post) {
-                            post.id?.let { postId ->
-                                navController.navigate("${Constants.ROUTE_POST_DETAILS}/$postId")
+                        val postLikes by feedViewModel.postLikes.collectAsState()
+                        val userLikes by feedViewModel.userLikes.collectAsState()
+
+                        val isLiked = userLikes.contains(post.id)
+                        val likeCount = postLikes[post.id] ?: 0
+
+
+                        PostCard(
+                            post = post,
+                            isLiked = isLiked,
+                            likeCount = likeCount,
+                            onLikeClick = { post.id.let { feedViewModel.toggleLike(it) } },
+                            onClick = {
+                                post.id.let { postId ->
+                                    navController.navigate("${Constants.ROUTE_POST_DETAILS}/$postId")
+                                }
                             }
-                        }
+                        )
                         Spacer(modifier = Modifier.height(12.dp))
                     }
                 }
@@ -153,7 +166,7 @@ fun PreviewFeedScreen() {
                 Post(username = "john_doe", message = "Anyone else got cooked from that exam??", timestamp = System.currentTimeMillis() - 3600000)
             )
         ) { post ->
-            PostCard(post, onClick = {})
+            PostCard(post, isLiked = false, likeCount = 0, onLikeClick = {}, onClick = {})
             Spacer(modifier = Modifier.height(12.dp))
         }
     }

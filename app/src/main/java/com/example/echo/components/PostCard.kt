@@ -2,48 +2,83 @@ package com.example.echo.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.echo.models.Post
 import com.example.echo.utils.formatTimestamp
 
 @Composable
-fun PostCard(post: Post, onClick: () -> Unit) {
+fun PostCard(
+    post: Post,
+    isLiked: Boolean,
+    likeCount: Int,
+    onLikeClick: () -> Unit,
+    onClick: () -> Unit) {
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
         elevation = CardDefaults.cardElevation(6.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = post.username,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
+
             Spacer(modifier = Modifier.height(4.dp))
+
             Text(
                 text = post.message,
                 style = MaterialTheme.typography.bodyLarge
             )
+
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = formatTimestamp(post.timestamp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+                Text(
+                    text = formatTimestamp(post.timestamp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+
+                // Spacer to push everything else to the right
+                Spacer(modifier = Modifier.weight(1f))
+
+                IconButton(onClick = onLikeClick) {
+                    Icon(
+                        imageVector = Icons.Default.ThumbUp,
+                        contentDescription = if (isLiked) "Unlike" else "Like",
+                        tint = if (isLiked) MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                }
+
+                Text(text = "$likeCount likes")
+            }
         }
     }
 }
@@ -57,6 +92,9 @@ fun PreviewPostCard() {
             message = "This is a preview of a post in Echo.",
             timestamp = System.currentTimeMillis()
         ),
+        isLiked = true,
+        likeCount = 5,
+        onLikeClick = {},
         onClick = {}
     )
 }

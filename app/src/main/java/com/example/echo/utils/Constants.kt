@@ -21,4 +21,6 @@ object Constants {
 
     const val ROUTE_MAP = "map"
 
+    const val FIELD_LIKES = "likes"
+
 }
