@@ -1,8 +1,6 @@
 package com.example.echo.ui.feed
 
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.example.echo.models.Post
 import com.example.echo.utils.Constants
 import com.google.firebase.auth.FirebaseAuth
@@ -10,7 +8,6 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 
 class FeedViewModel : ViewModel() {
 
@@ -42,14 +39,16 @@ class FeedViewModel : ViewModel() {
             .get()
             .addOnSuccessListener { snapshot ->
                 val fetchedPosts = snapshot.documents.mapNotNull { doc ->
-                    doc.toObject(Post::class.java)//?.copy(id = doc.id)
+                    doc.toObject(Post::class.java)?.copy(
+                        id = doc.id,
+                        tags = doc.get("tags") as? List<String> ?: emptyList() // ✅ Ensures tags are populated
+                    )
                 }
                 _posts.value = fetchedPosts
                 fetchLikesAndComments(fetchedPosts.map { it.id })
-
             }
             .addOnFailureListener {
-                // Handle error if needed (optional: log it)
+                // Optional logging
             }
     }
 
@@ -60,14 +59,17 @@ class FeedViewModel : ViewModel() {
             .get()
             .addOnSuccessListener { snapshot ->
                 val refreshedPosts = snapshot.documents.mapNotNull { doc ->
-                    doc.toObject(Post::class.java)
+                    doc.toObject(Post::class.java)?.copy(
+                        id = doc.id,
+                        tags = doc.get("tags") as? List<String> ?: emptyList()
+                    )
                 }
                 _posts.value = refreshedPosts
                 _isRefreshing.value = false
+                fetchLikesAndComments(refreshedPosts.map { it.id })
             }
             .addOnFailureListener {
                 _isRefreshing.value = false
-                // Optional: log or show a toast/snackbar
             }
     }
 
@@ -98,7 +100,6 @@ class FeedViewModel : ViewModel() {
         }
     }
 
-
     fun toggleLike(postId: String) {
         val currentUserId = auth.currentUser?.uid ?: return
         val docRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
@@ -120,7 +121,4 @@ class FeedViewModel : ViewModel() {
         _userLikes.value = newUserLikes
         _postLikes.value = newPostLikes
     }
-
-
 }
-

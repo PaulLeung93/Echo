@@ -26,6 +26,7 @@ class CreatePostViewModel : ViewModel() {
         includeLocation: Boolean,
         userLatitude: Double? = null,
         userLongitude: Double? = null,
+        tags: List<String> = emptyList(),
         onSuccess: () -> Unit
     ) {
 
@@ -33,6 +34,16 @@ class CreatePostViewModel : ViewModel() {
 
         if (trimmedMessage.isBlank()) {
             _errorMessage.value = "Please enter a message."
+            return
+        }
+
+        if (tags.any { it.length > 15 }) {
+            _errorMessage.value = "Tags cannot be longer than 15 characters."
+            return
+        }
+
+        if (tags.size > 3) {
+            _errorMessage.value = "You can only add up to 3 tags."
             return
         }
 
@@ -51,7 +62,8 @@ class CreatePostViewModel : ViewModel() {
             Constants.FIELD_USERNAME to (currentUser.email ?: "anonymous"),
             Constants.FIELD_MESSAGE to trimmedMessage,
             Constants.FIELD_TIMESTAMP to System.currentTimeMillis(),
-            "id" to newPostRef.id
+            "id" to newPostRef.id,
+            Constants.FIELD_TAGS to tags.map { it.trim().lowercase() }
         ).toMutableMap()
 
         // If the user wants to include location

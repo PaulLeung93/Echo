@@ -1,7 +1,9 @@
 package com.example.echo.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -90,9 +93,24 @@ fun PostCard(
                 Spacer(Modifier.width(4.dp))
 
                 Text("$commentCount ${if (commentCount == 1) "comment" else "comments"}")
-
-
             }
+
+            if (post.tags.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    post.tags.forEach { tag ->
+                        AssistChip(
+                            onClick = {},
+                            label = { Text(text = "$tag") }
+                        )
+                    }
+                }
+            }
+
         }
     }
 }
@@ -104,7 +122,8 @@ fun PreviewPostCard() {
         post = Post(
             username = "preview_user",
             message = "This is a preview of a post in Echo.",
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            tags = listOf("cs101", "finals")
         ),
         isLiked = true,
         likeCount = 5,

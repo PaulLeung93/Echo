@@ -7,9 +7,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,10 +21,8 @@ import com.example.echo.models.Post
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.auth.AuthViewModel
 import com.example.echo.utils.Constants
-import com.example.echo.utils.formatTimestamp
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
-import kotlinx.coroutines.launch
 import com.example.echo.components.PostCard
 import com.example.echo.ui.common.BottomNavigationBar
 

@@ -4,11 +4,15 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -35,6 +39,10 @@ fun CreatePostScreen(
     var latitude by remember { mutableStateOf<Double?>(null) }
     var longitude by remember { mutableStateOf<Double?>(null) }
 
+    var newTag by remember { mutableStateOf("") }
+    val tags = remember { mutableStateListOf<String>() }
+    val maxTags = 3
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -54,7 +62,6 @@ fun CreatePostScreen(
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-
                 errorMessage?.let { error ->
                     LaunchedEffect(error) {
                         snackbarHostState.showSnackbar(error)
@@ -74,6 +81,53 @@ fun CreatePostScreen(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
+
+                // Tag input
+                OutlinedTextField(
+                    value = newTag,
+                    onValueChange = { newTag = it },
+                    label = { Text("Add a tag (max 3)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    tags.forEach { tag ->
+                        AssistChip(
+                            onClick = {},
+                            label = { Text(tag) },
+                            trailingIcon = {
+                                IconButton(onClick = { tags.remove(tag) }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove Tag")
+                                }
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = {
+                        val trimmed = newTag.trim()
+                        if (trimmed.isNotBlank() && trimmed.length <= 30 && !tags.contains(trimmed.lowercase())) {
+                            if (tags.size < maxTags) {
+                                tags.add(trimmed.lowercase())
+                                newTag = ""
+                            } else {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("You can only add up to 3 tags.")
+                                }
+                            }
+                        }
+                    },
+                    enabled = newTag.isNotBlank() && tags.size < maxTags
+                ) {
+                    Text("Add Tag")
+                }
 
                 // Include Location Checkbox
                 Row(
@@ -103,7 +157,7 @@ fun CreatePostScreen(
                                         }
                                     }
                                 }
-                                // If no permission, do nothing (don't crash)
+                                // If no permission, do nothing
                             } else {
                                 latitude = null
                                 longitude = null
@@ -124,6 +178,7 @@ fun CreatePostScreen(
                             includeLocation,
                             userLatitude = if (includeLocation) latitude else null,
                             userLongitude = if (includeLocation) longitude else null,
+                            tags = tags.toList()
                         ) {
                             navController.navigate(Destinations.FEED) {
                                 popUpTo(Destinations.FEED) { inclusive = true }

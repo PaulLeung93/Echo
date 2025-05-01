@@ -6,5 +6,6 @@ data class Post(
     val message: String = "",
     val timestamp: Long = 0L,
     val latitude: Double? = null,
-    val longitude: Double? = null
+    val longitude: Double? = null,
+    val tags: List<String> = emptyList()
 )

@@ -14,6 +14,8 @@ import androidx.navigation.NavHostController
 import com.example.echo.models.Comment
 import com.example.echo.ui.common.BottomNavigationBar
 import com.example.echo.utils.formatTimestamp
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,6 +31,14 @@ fun PostDetailScreen(
 
     var newComment by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf("feed") }
+
+    val commentTimestamps = remember { mutableStateListOf<Long>() }
+    val MAX_COMMENTS = 5
+    val WINDOW_MS = 30_000L // 30 seconds
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
 
     LaunchedEffect(postId) {
         viewModel.loadPostAndComments(postId)
@@ -60,7 +70,8 @@ fun PostDetailScreen(
                     }
                 }
             }
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
 
         Column(
@@ -148,13 +159,26 @@ fun PostDetailScreen(
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
+
                     Button(
                         onClick = {
-                            if (newComment.isNotBlank()) {
-                                viewModel.addComment(postId, newComment) {
-                                    newComment = ""
+
+                            val now = System.currentTimeMillis()
+                            val recent = commentTimestamps.filter { now - it < WINDOW_MS }
+
+                            if (recent.size >= MAX_COMMENTS) {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("You're commenting too fast. Please wait a bit.")
+                                }
+                            } else {
+                                commentTimestamps.add(now)
+                                if (newComment.isNotBlank()) {
+                                    viewModel.addComment(postId, newComment) {
+                                        newComment = ""
+                                    }
                                 }
                             }
+
                         },
                         enabled = newComment.isNotBlank()
                     ) {
