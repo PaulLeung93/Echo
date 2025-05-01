@@ -29,7 +29,8 @@ class FeedViewModel : ViewModel() {
     private val _userLikes = MutableStateFlow<Set<String>>(emptySet()) // postIds user liked
     val userLikes: StateFlow<Set<String>> = _userLikes
 
-
+    private val _commentLikes = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val commentLikes: StateFlow<Map<String, Int>> = _commentLikes
 
     init {
         fetchPosts()
@@ -44,7 +45,8 @@ class FeedViewModel : ViewModel() {
                     doc.toObject(Post::class.java)//?.copy(id = doc.id)
                 }
                 _posts.value = fetchedPosts
-                fetchLikesData(fetchedPosts.map { it.id })
+                fetchLikesAndComments(fetchedPosts.map { it.id })
+
             }
             .addOnFailureListener {
                 // Handle error if needed (optional: log it)
@@ -69,14 +71,16 @@ class FeedViewModel : ViewModel() {
             }
     }
 
-    private fun fetchLikesData(postIds: List<String>) {
+    fun fetchLikesAndComments(postIds: List<String>) {
         val currentUserId = auth.currentUser?.uid ?: return
         val updatedLikes = mutableMapOf<String, Int>()
         val likedPosts = mutableSetOf<String>()
+        val updatedCommentCounts = mutableMapOf<String, Int>()
 
         postIds.forEach { postId ->
-            val docRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
-            docRef.get().addOnSuccessListener { snapshot ->
+            val postRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
+
+            postRef.get().addOnSuccessListener { snapshot ->
                 val likes = snapshot.get(Constants.FIELD_LIKES) as? List<*>
                 updatedLikes[postId] = likes?.size ?: 0
                 if (likes?.contains(currentUserId) == true) {
@@ -85,8 +89,15 @@ class FeedViewModel : ViewModel() {
                 _postLikes.value = updatedLikes
                 _userLikes.value = likedPosts
             }
+
+            postRef.collection(Constants.COLLECTION_COMMENTS).get()
+                .addOnSuccessListener { commentSnapshot ->
+                    updatedCommentCounts[postId] = commentSnapshot.size()
+                    _commentLikes.value = updatedCommentCounts
+                }
         }
     }
+
 
     fun toggleLike(postId: String) {
         val currentUserId = auth.currentUser?.uid ?: return
@@ -110,4 +121,6 @@ class FeedViewModel : ViewModel() {
         _postLikes.value = newPostLikes
     }
 
+
 }
+

@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Comment
+import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -29,6 +32,7 @@ fun PostCard(
     post: Post,
     isLiked: Boolean,
     likeCount: Int,
+    commentCount: Int,
     onLikeClick: () -> Unit,
     onClick: () -> Unit) {
 
@@ -39,7 +43,7 @@ fun PostCard(
         elevation = CardDefaults.cardElevation(6.dp)
     ) {
 
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 text = post.username,
                 style = MaterialTheme.typography.titleMedium,
@@ -77,7 +81,17 @@ fun PostCard(
                     )
                 }
 
-                Text(text = "$likeCount likes")
+                Text("$likeCount ${if (likeCount == 1) "like" else "likes"}")
+
+                Spacer(Modifier.width(8.dp))
+
+                Icon(Icons.Default.Message, contentDescription = "Comments")
+
+                Spacer(Modifier.width(4.dp))
+
+                Text("$commentCount ${if (commentCount == 1) "comment" else "comments"}")
+
+
             }
         }
     }
@@ -94,6 +108,7 @@ fun PreviewPostCard() {
         ),
         isLiked = true,
         likeCount = 5,
+        commentCount = 2,
         onLikeClick = {},
         onClick = {}
     )

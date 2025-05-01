@@ -127,15 +127,17 @@ fun FeedScreen(
                     items(posts) { post ->
                         val postLikes by feedViewModel.postLikes.collectAsState()
                         val userLikes by feedViewModel.userLikes.collectAsState()
+                        val commentLikes by feedViewModel.commentLikes.collectAsState()
 
                         val isLiked = userLikes.contains(post.id)
                         val likeCount = postLikes[post.id] ?: 0
-
+                        val commentCount = commentLikes[post.id] ?: 0
 
                         PostCard(
                             post = post,
                             isLiked = isLiked,
                             likeCount = likeCount,
+                            commentCount = commentCount,
                             onLikeClick = { post.id.let { feedViewModel.toggleLike(it) } },
                             onClick = {
                                 post.id.let { postId ->
@@ -166,7 +168,7 @@ fun PreviewFeedScreen() {
                 Post(username = "john_doe", message = "Anyone else got cooked from that exam??", timestamp = System.currentTimeMillis() - 3600000)
             )
         ) { post ->
-            PostCard(post, isLiked = false, likeCount = 0, onLikeClick = {}, onClick = {})
+            PostCard(post, isLiked = false, likeCount = 0, commentCount = 2, onLikeClick = {}, onClick = {})
             Spacer(modifier = Modifier.height(12.dp))
         }
     }
