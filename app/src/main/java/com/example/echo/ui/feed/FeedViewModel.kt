@@ -16,56 +16,54 @@ class FeedViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    private val _posts = MutableStateFlow<List<Post>>(emptyList())
-    private val _filteredPosts = MutableStateFlow<List<Post>>(emptyList())
+    // ---UI state---
+    private val _posts = MutableStateFlow<List<Post>>(emptyList())              // All posts
+    private val _filteredPosts = MutableStateFlow<List<Post>>(emptyList())      // Filtered posts by tag
     val filteredPosts: StateFlow<List<Post>> = _filteredPosts
 
-    private val _isRefreshing = MutableStateFlow(false)
+    private val _isRefreshing = MutableStateFlow(false)                         // Swipe-to-refresh state
     val isRefreshing: StateFlow<Boolean> = _isRefreshing
 
-    private val _postLikes = MutableStateFlow<Map<String, Int>>(emptyMap())
+    private val _postLikes = MutableStateFlow<Map<String, Int>>(emptyMap())     // Post ID → like count
     val postLikes: StateFlow<Map<String, Int>> = _postLikes
 
-    private val _userLikes = MutableStateFlow<Set<String>>(emptySet())
+    private val _userLikes = MutableStateFlow<Set<String>>(emptySet())          // Posts liked by current user
     val userLikes: StateFlow<Set<String>> = _userLikes
 
-    private val _commentLikes = MutableStateFlow<Map<String, Int>>(emptyMap())
+    private val _commentLikes = MutableStateFlow<Map<String, Int>>(emptyMap())  // Post ID → comment count
     val commentLikes: StateFlow<Map<String, Int>> = _commentLikes
-
-    private var currentFilter: String? = null
 
     init {
         fetchPosts()
     }
 
+    /**
+     * Initial post fetch on ViewModel init.
+     */
     fun fetchPosts() {
         db.collection(Constants.COLLECTION_POSTS)
             .orderBy(Constants.FIELD_TIMESTAMP, com.google.firebase.firestore.Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snapshot ->
-                val fetchedPosts = snapshot.documents.mapNotNull { doc ->
-                    doc.toObject(Post::class.java)
-                }
+                val fetchedPosts = snapshot.documents.mapNotNull { it.toObject(Post::class.java) }
                 _posts.value = fetchedPosts
-                applyTagFilter()
+                _filteredPosts.value = fetchedPosts // show all by default
                 fetchLikesAndComments(fetchedPosts.map { it.id })
-            }
-            .addOnFailureListener {
-                // Handle error if needed
             }
     }
 
+    /**
+     * Handles swipe-to-refresh behavior.
+     */
     fun refreshPosts() {
         _isRefreshing.value = true
         db.collection(Constants.COLLECTION_POSTS)
             .orderBy(Constants.FIELD_TIMESTAMP, com.google.firebase.firestore.Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snapshot ->
-                val refreshedPosts = snapshot.documents.mapNotNull { doc ->
-                    doc.toObject(Post::class.java)
-                }
+                val refreshedPosts = snapshot.documents.mapNotNull { it.toObject(Post::class.java) }
                 _posts.value = refreshedPosts
-                applyTagFilter()
+                _filteredPosts.value = refreshedPosts
                 _isRefreshing.value = false
             }
             .addOnFailureListener {
@@ -73,6 +71,9 @@ class FeedViewModel : ViewModel() {
             }
     }
 
+    /**
+     * Fetch like and comment counts for all post IDs.
+     */
     fun fetchLikesAndComments(postIds: List<String>) {
         val currentUserId = auth.currentUser?.uid ?: return
         val updatedLikes = mutableMapOf<String, Int>()
@@ -82,6 +83,7 @@ class FeedViewModel : ViewModel() {
         postIds.forEach { postId ->
             val postRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
 
+            // Likes
             postRef.get().addOnSuccessListener { snapshot ->
                 val likes = snapshot.get(Constants.FIELD_LIKES) as? List<*>
                 updatedLikes[postId] = likes?.size ?: 0
@@ -92,6 +94,7 @@ class FeedViewModel : ViewModel() {
                 _userLikes.value = likedPosts
             }
 
+            // Comments
             postRef.collection(Constants.COLLECTION_COMMENTS).get()
                 .addOnSuccessListener { commentSnapshot ->
                     updatedCommentCounts[postId] = commentSnapshot.size()
@@ -100,6 +103,9 @@ class FeedViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Likes or unlikes a post based on current user state.
+     */
     fun toggleLike(postId: String) {
         val currentUserId = auth.currentUser?.uid ?: return
         val docRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
@@ -122,21 +128,20 @@ class FeedViewModel : ViewModel() {
         _postLikes.value = newPostLikes
     }
 
+    /**
+     * Applies a tag filter to the post list.
+     */
     fun setTagFilter(tag: String) {
-        currentFilter = tag
-        applyTagFilter()
-    }
-
-    fun clearTagFilter() {
-        currentFilter = null
-        _filteredPosts.value = _posts.value
-    }
-
-    private fun applyTagFilter() {
-        _filteredPosts.value = if (!currentFilter.isNullOrBlank()) {
-            _posts.value.filter { it.tags.any { tag -> tag.equals(currentFilter, ignoreCase = true) } }
-        } else {
-            _posts.value
+        val filtered = _posts.value.filter { post ->
+            post.tags.any { it.equals(tag, ignoreCase = true) }
         }
+        _filteredPosts.value = filtered
+    }
+
+    /**
+     * Clears the tag filter and shows all posts again.
+     */
+    fun clearTagFilter() {
+        _filteredPosts.value = _posts.value
     }
 }

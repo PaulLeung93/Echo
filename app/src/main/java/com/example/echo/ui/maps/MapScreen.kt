@@ -1,6 +1,8 @@
 package com.example.echo.ui.map
 
 import android.Manifest
+import android.util.Log
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Comment
@@ -10,18 +12,25 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import com.example.echo.models.Post
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.common.BottomNavigationBar
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
+import kotlinx.coroutines.tasks.await
+import androidx.compose.foundation.gestures.detectTapGestures
+import com.example.echo.ui.common.TopSnackbarHost
+
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -29,21 +38,75 @@ fun MapScreen(
     navController: NavHostController,
     mapViewModel: MapViewModel = viewModel()
 ) {
-    val locationPermissionState = rememberPermissionState(permission = Manifest.permission.ACCESS_FINE_LOCATION)
+    // --- Permissions and User Location ---
+    val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
+    val context = LocalContext.current
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var userLocation by remember { mutableStateOf<LatLng?>(null) }
+
+
+
+
+    // Fetch user's last known location from FusedLocationProviderClient
+    LaunchedEffect(Unit) {
+
+        //location permission before accessing location
+        val permissionGranted = locationPermissionState.status.isGranted
+
+        if (permissionGranted) {
+            try {
+                val location = fusedLocationClient.lastLocation.await()
+                if (location != null) {
+                    userLocation = LatLng(location.latitude, location.longitude)
+                }
+            } catch (e: SecurityException) {
+                Log.e("MapScreen", "SecurityException: Missing location permission.")
+            } catch (e: Exception) {
+                Log.e("MapScreen", "Failed to get user location: ${e.message}")
+            }
+        } else {
+            Log.w("MapScreen", "Location permission not granted.")
+        }
+    }
+
+
+    // --- UI State ---
+    val snackbarHostState = remember { SnackbarHostState() }
     val posts by mapViewModel.filteredPosts.collectAsState()
     val selectedPost by mapViewModel.selectedPost.collectAsState()
     val likesMap by mapViewModel.likesMap.collectAsState()
     val commentsMap by mapViewModel.commentsMap.collectAsState()
+    val poiMarkers by mapViewModel.poiMarkers.collectAsState()
 
-    val defaultLocation = LatLng(40.7128, -74.0060)
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(defaultLocation, 12f)
-    }
+
     var selectedTab by remember { mutableStateOf("map") }
     var showFilterDialog by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
+    var filterAttempted by remember { mutableStateOf(false) }
 
+    val defaultLocation = LatLng(40.7128, -74.0060) // NYC fallback
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(defaultLocation, 12f)
+    }
+
+    // Move camera to user location after it's available
+    LaunchedEffect(userLocation) {
+        userLocation?.let {
+            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(it, 14f))
+        }
+    }
+
+    LaunchedEffect(posts) {
+        if (filterAttempted && posts.isEmpty()) {
+            snackbarHostState.showSnackbar("No posts found for \"$tagInput\"")
+        }
+    }
+
+
+
+    // --- Scaffold Layout ---
     Scaffold(
+        snackbarHost = { TopSnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Map") },
@@ -63,7 +126,7 @@ fun MapScreen(
                         launchSingleTop = true
                         restoreState = true
                     }
-                    "profile" -> { /* Placeholder */ }
+                    "profile" -> { /* Coming soon */ }
                 }
             }
         }
@@ -73,28 +136,50 @@ fun MapScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // --- Google Map ---
             if (locationPermissionState.status.isGranted) {
                 GoogleMap(
                     modifier = Modifier.fillMaxSize(),
                     cameraPositionState = cameraPositionState,
                     uiSettings = MapUiSettings(zoomControlsEnabled = false),
-                    properties = MapProperties(isMyLocationEnabled = true)
+                    properties = MapProperties(isMyLocationEnabled = true),
+                    onMapClick = {
+                        mapViewModel.clearSelectedPost()
+                    }
                 ) {
+                    // Post markers
                     posts.filter { it.latitude != null && it.longitude != null }.forEach { post ->
                         Marker(
-                            state = rememberMarkerState(
-                                position = LatLng(post.latitude!!, post.longitude!!)
-                            ),
+                            state = MarkerState(LatLng(post.latitude!!, post.longitude!!)),
                             title = post.username,
                             snippet = post.message,
                             onClick = {
-                                mapViewModel.setSelectedPost(post)
-                                true // false allows default marker click behavior
+                                mapViewModel.setSelectedPost(post, cameraPositionState)
+                                true
                             }
                         )
                     }
+
+                    // POI markers (currently disabled, uncomment to re-enable)
+                    /*
+                    poiMarkers.forEach { poi ->
+                        Marker(
+                            state = rememberMarkerState(position = LatLng(poi.latitude, poi.longitude)),
+                            title = poi.name,
+                            icon = bitmapDescriptorFromVector(
+                                context = LocalContext.current,
+                                vectorResId = when (poi.type) {
+                                    "university" -> R.drawable.ic_school_marker
+                                    "park" -> R.drawable.ic_tree_marker
+                                    else -> R.drawable.ic_location_pin
+                                }
+                            )
+                        )
+                    }
+                    */
                 }
             } else {
+                // Permission rationale
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -103,7 +188,7 @@ fun MapScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Location permission required to show your current location.",
+                        text = "Location permission is required to show your current location.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -114,7 +199,7 @@ fun MapScreen(
                 }
             }
 
-            // Custom Info Panel
+            // --- Custom Info Panel ---
             selectedPost?.let { post ->
                 val likes = likesMap[post.id] ?: 0
                 val comments = commentsMap[post.id] ?: 0
@@ -123,7 +208,10 @@ fun MapScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(16.dp)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .clickable {
+                            navController.navigate("${Destinations.POST_DETAILS}/${post.id}")
+                        },
                     elevation = CardDefaults.cardElevation(8.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -140,12 +228,29 @@ fun MapScreen(
                             Spacer(Modifier.width(4.dp))
                             Text("$comments comments")
                         }
+                        if (post.tags.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                post.tags.forEach { tag ->
+                                    AssistChip(
+                                        onClick = {}, // optionally: trigger tag filter
+                                        label = { Text(tag) }
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
                     }
                 }
             }
         }
     }
 
+    // --- Filter Tag Dialog ---
     if (showFilterDialog) {
         AlertDialog(
             onDismissRequest = { showFilterDialog = false },
@@ -161,7 +266,12 @@ fun MapScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    mapViewModel.setTagFilter(tagInput.trim().lowercase())
+                    filterAttempted = true
+                    mapViewModel.setTagFilter(
+                        tag = tagInput.trim().lowercase(),
+                        userLocation = userLocation,
+                        camera = cameraPositionState
+                    )
                     showFilterDialog = false
                 }) {
                     Text("Apply")
