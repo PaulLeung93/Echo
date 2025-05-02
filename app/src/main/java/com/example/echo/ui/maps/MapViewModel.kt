@@ -10,39 +10,49 @@ import com.example.echo.utils.Constants
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.maps.android.compose.CameraPositionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
+// Data class to represent a group of nearby posts (i.e., a cluster)
+data class ClusterGroup(
+    val position: LatLng,
+    val posts: List<Post>
+)
+
 class MapViewModel : ViewModel() {
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    // ---UI State---
-    private val _posts = MutableStateFlow<List<Post>>(emptyList())          // All posts
-    private val _filteredPosts = MutableStateFlow<List<Post>>(emptyList())  // Posts matching the current filter
+    // --- UI State ---
+    private val _posts = MutableStateFlow<List<Post>>(emptyList())
+    private val _filteredPosts = MutableStateFlow<List<Post>>(emptyList())
     val filteredPosts: StateFlow<List<Post>> = _filteredPosts
 
     private val _currentTagFilter = MutableStateFlow<String?>(null)
     val currentTagFilter: StateFlow<String?> = _currentTagFilter
 
-    private val _selectedPost = MutableStateFlow<Post?>(null)               // Currently selected post (map tap)
+    private val _selectedPost = MutableStateFlow<Post?>(null)
     val selectedPost: StateFlow<Post?> = _selectedPost
 
-    private val _likesMap = MutableStateFlow<Map<String, Int>>(emptyMap())  // Post ID → like count
+    private val _likesMap = MutableStateFlow<Map<String, Int>>(emptyMap())
     val likesMap: StateFlow<Map<String, Int>> = _likesMap
 
-    private val _userLikes = MutableStateFlow<Set<String>>(emptySet()) // Post IDs user liked (for toggle)
+    private val _userLikes = MutableStateFlow<Set<String>>(emptySet())
     val userLikes: StateFlow<Set<String>> = _userLikes
 
-    private val _commentsMap = MutableStateFlow<Map<String, Int>>(emptyMap()) // Post ID → comment count
+    private val _commentsMap = MutableStateFlow<Map<String, Int>>(emptyMap())
     val commentsMap: StateFlow<Map<String, Int>> = _commentsMap
 
-    private val _poiMarkers = MutableStateFlow<List<POI>>(emptyList())      // Points of interest
+    private val _poiMarkers = MutableStateFlow<List<POI>>(emptyList())
     val poiMarkers: StateFlow<List<POI>> = _poiMarkers
+
+    private val _clusterGroups = MutableStateFlow<List<ClusterGroup>>(emptyList())
+    val clusterGroups: StateFlow<List<ClusterGroup>> = _clusterGroups
 
     init {
         fetchPostsWithLocation()
@@ -60,51 +70,64 @@ class MapViewModel : ViewModel() {
                     .filter { it.latitude != null && it.longitude != null }
 
                 _posts.value = fetched
-                _filteredPosts.value = fetched // show all by default
+                _filteredPosts.value = fetched
+                _clusterGroups.value = clusterPosts(fetched, zoom = 12f)
                 fetchLikesAndComments(fetched.map { it.id })
             }
     }
 
     /**
-     * Fetch like and comment counts for a list of post IDs.
+     * Create clusters by grouping posts within a certain radius (in meters).
+     * Radius adjusts based on zoom level. Zoom >= 17 disables clustering.
      */
-    private fun fetchLikesAndComments(postIds: List<String>) {
-        val likeCounts = mutableMapOf<String, Int>()
-        val commentCounts = mutableMapOf<String, Int>()
+    private fun clusterPosts(posts: List<Post>, zoom: Float): List<ClusterGroup> {
+        val radiusInMeters = when {
+            zoom >= 17 -> 0f
+            zoom >= 15 -> 60f
+            zoom >= 13 -> 120f
+            else -> 200f
+        }
 
-        postIds.forEach { postId ->
-            // Likes
-            val currentUserId = auth.currentUser?.uid
-            if (currentUserId != null) {
-                db.collection(Constants.COLLECTION_POSTS).document(postId)
-                    .get()
-                    .addOnSuccessListener { doc ->
-                        val likes = doc.get(Constants.FIELD_LIKES) as? List<*>
-                        likeCounts[postId] = likes?.size ?: 0
+        if (radiusInMeters == 0f) {
+            return posts.map {
+                ClusterGroup(LatLng(it.latitude!!, it.longitude!!), listOf(it))
+            }
+        }
 
-                        // Track if current user liked this post
-                        if (likes?.contains(currentUserId) == true) {
-                            _userLikes.value = _userLikes.value + postId
-                        }
+        val clusters = mutableListOf<ClusterGroup>()
+        val used = mutableSetOf<Post>()
 
-                        _likesMap.value = likeCounts
-                    }
+        for (post in posts) {
+            if (post in used || post.latitude == null || post.longitude == null) continue
+
+            val cluster = mutableListOf(post)
+            val latLng = LatLng(post.latitude!!, post.longitude!!)
+            used.add(post)
+
+            for (other in posts) {
+                if (other in used || other.latitude == null || other.longitude == null) continue
+                val otherLatLng = LatLng(other.latitude!!, other.longitude!!)
+                if (distanceBetween(latLng, otherLatLng) <= radiusInMeters) {
+                    cluster.add(other)
+                    used.add(other)
+                }
             }
 
-            // Comments
-            db.collection(Constants.COLLECTION_POSTS)
-                .document(postId)
-                .collection(Constants.COLLECTION_COMMENTS)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    commentCounts[postId] = snapshot.size()
-                    _commentsMap.value = commentCounts
-                }
+            clusters.add(ClusterGroup(position = latLng, posts = cluster))
         }
+
+        return clusters
     }
 
     /**
-     * Triggered when a marker is tapped. Sets selected post and centers camera on it.
+     * Recompute cluster groups based on zoom level and given posts.
+     */
+    fun refreshClusters(zoomLevel: Float, posts: List<Post>) {
+        _clusterGroups.value = clusterPosts(posts, zoomLevel)
+    }
+
+    /**
+     * Triggered when a marker is tapped. Sets selected post and centers camera.
      */
     fun setSelectedPost(post: Post, camera: CameraPositionState) {
         _selectedPost.value = post
@@ -112,32 +135,30 @@ class MapViewModel : ViewModel() {
         if (post.latitude != null && post.longitude != null) {
             val target = LatLng(post.latitude, post.longitude)
             viewModelScope.launch {
-                camera.animate(CameraUpdateFactory.newLatLngZoom(target, 14f))
+                camera.animate(CameraUpdateFactory.newLatLng(target))
             }
         }
     }
 
-    // For clearing selection
+    /** Clears the selected post. */
     fun clearSelectedPost() {
         _selectedPost.value = null
     }
 
-
     /**
-     * Applies a tag filter and re-centers map on nearest matching marker to user.
+     * Applies a tag filter and re-centers map on nearest matching marker.
      */
     fun setTagFilter(tag: String, userLocation: LatLng?, camera: CameraPositionState?) {
         _selectedPost.value = null
         _currentTagFilter.value = tag
 
-        // Filter posts matching the tag (case-insensitive)
         val filtered = _posts.value.filter { post ->
             post.tags.any { it.equals(tag, ignoreCase = true) }
         }
 
         _filteredPosts.value = filtered
+        _clusterGroups.value = clusterPosts(filtered, 12f)
 
-        // Recenter to nearest post if location is available
         if (camera != null && userLocation != null && filtered.isNotEmpty()) {
             val nearest = filtered.minByOrNull { post ->
                 val postLoc = LatLng(post.latitude!!, post.longitude!!)
@@ -159,11 +180,12 @@ class MapViewModel : ViewModel() {
     fun clearTagFilter() {
         _selectedPost.value = null
         _filteredPosts.value = _posts.value
+        _clusterGroups.value = clusterPosts(_posts.value, 12f)
         _currentTagFilter.value = null
     }
 
     /**
-     * Calculates the distance between two LatLng points in meters.
+     * Calculates distance between two LatLng points in meters.
      */
     private fun distanceBetween(a: LatLng, b: LatLng): Float {
         val results = FloatArray(1)
@@ -172,7 +194,7 @@ class MapViewModel : ViewModel() {
     }
 
     /**
-     * Fetches all POI markers from Firestore.
+     * Fetch POI markers from Firestore.
      */
     fun fetchPOIMarkers() {
         db.collection("points_of_interest")
@@ -183,6 +205,9 @@ class MapViewModel : ViewModel() {
             }
     }
 
+    /**
+     * Toggle like for a post.
+     */
     fun toggleLike(postId: String) {
         val currentUserId = auth.currentUser?.uid ?: return
         val docRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
@@ -192,11 +217,11 @@ class MapViewModel : ViewModel() {
         val updatedUserLikes = _userLikes.value.toMutableSet()
 
         if (currentlyLiked) {
-            docRef.update(Constants.FIELD_LIKES, com.google.firebase.firestore.FieldValue.arrayRemove(currentUserId))
+            docRef.update(Constants.FIELD_LIKES, FieldValue.arrayRemove(currentUserId))
             updatedLikes[postId] = (updatedLikes[postId] ?: 1) - 1
             updatedUserLikes.remove(postId)
         } else {
-            docRef.update(Constants.FIELD_LIKES, com.google.firebase.firestore.FieldValue.arrayUnion(currentUserId))
+            docRef.update(Constants.FIELD_LIKES, FieldValue.arrayUnion(currentUserId))
             updatedLikes[postId] = (updatedLikes[postId] ?: 0) + 1
             updatedUserLikes.add(postId)
         }
@@ -205,4 +230,39 @@ class MapViewModel : ViewModel() {
         _userLikes.value = updatedUserLikes
     }
 
+    /**
+     * Fetch like and comment counts for each post.
+     */
+    private fun fetchLikesAndComments(postIds: List<String>) {
+        val likeCounts = mutableMapOf<String, Int>()
+        val commentCounts = mutableMapOf<String, Int>()
+
+        val currentUserId = auth.currentUser?.uid
+
+        postIds.forEach { postId ->
+            if (currentUserId != null) {
+                db.collection(Constants.COLLECTION_POSTS).document(postId)
+                    .get()
+                    .addOnSuccessListener { doc ->
+                        val likes = doc.get(Constants.FIELD_LIKES) as? List<*>
+                        likeCounts[postId] = likes?.size ?: 0
+
+                        if (likes?.contains(currentUserId) == true) {
+                            _userLikes.value = _userLikes.value + postId
+                        }
+
+                        _likesMap.value = likeCounts
+                    }
+            }
+
+            db.collection(Constants.COLLECTION_POSTS)
+                .document(postId)
+                .collection(Constants.COLLECTION_COMMENTS)
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    commentCounts[postId] = snapshot.size()
+                    _commentsMap.value = commentCounts
+                }
+        }
+    }
 }

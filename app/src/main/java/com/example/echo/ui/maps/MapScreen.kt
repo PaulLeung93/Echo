@@ -1,37 +1,40 @@
 package com.example.echo.ui.map
 
 import android.Manifest
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.util.Log
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Comment
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.example.echo.components.PostCard
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.common.BottomNavigationBar
+import com.example.echo.ui.common.TopSnackbarHost
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.tasks.await
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.material.icons.filled.Close
-import com.example.echo.components.PostCard
-import com.example.echo.ui.common.TopSnackbarHost
+import kotlinx.coroutines.launch
 
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
@@ -40,22 +43,15 @@ fun MapScreen(
     navController: NavHostController,
     mapViewModel: MapViewModel = viewModel()
 ) {
-    // --- Permissions and User Location ---
+    // --- Permissions and Location ---
     val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
 
-
-
-
-    // Fetch user's last known location from FusedLocationProviderClient
+    // Fetch user's last known location
     LaunchedEffect(Unit) {
-
-        //location permission before accessing location
-        val permissionGranted = locationPermissionState.status.isGranted
-
-        if (permissionGranted) {
+        if (locationPermissionState.status.isGranted) {
             try {
                 val location = fusedLocationClient.lastLocation.await()
                 if (location != null) {
@@ -66,19 +62,15 @@ fun MapScreen(
             } catch (e: Exception) {
                 Log.e("MapScreen", "Failed to get user location: ${e.message}")
             }
-        } else {
-            Log.w("MapScreen", "Location permission not granted.")
         }
     }
 
-
     // --- UI State ---
     val snackbarHostState = remember { SnackbarHostState() }
-    val posts by mapViewModel.filteredPosts.collectAsState()
+    val clusters by mapViewModel.clusterGroups.collectAsState()
     val selectedPost by mapViewModel.selectedPost.collectAsState()
     val likesMap by mapViewModel.likesMap.collectAsState()
     val commentsMap by mapViewModel.commentsMap.collectAsState()
-    val poiMarkers by mapViewModel.poiMarkers.collectAsState()
     val userLikes by mapViewModel.userLikes.collectAsState()
     val activeTag by mapViewModel.currentTagFilter.collectAsState()
 
@@ -91,22 +83,29 @@ fun MapScreen(
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(defaultLocation, 12f)
     }
+    val filteredPosts by mapViewModel.filteredPosts.collectAsState()
 
 
+    val coroutineScope = rememberCoroutineScope()
 
-
-    // Move camera to user location after it's available
+    // Move camera to user location once available
     LaunchedEffect(userLocation) {
         userLocation?.let {
             cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(it, 14f))
         }
     }
 
-    LaunchedEffect(posts) {
-        if (filterAttempted && posts.isEmpty()) {
+    // Show snackbar if filtering yields no results
+    LaunchedEffect(clusters) {
+        if (filterAttempted && clusters.all { it.posts.isEmpty() }) {
             snackbarHostState.showSnackbar("No posts found for \"$tagInput\"")
         }
     }
+
+    LaunchedEffect(cameraPositionState.position.zoom, filteredPosts) {
+        mapViewModel.refreshClusters(cameraPositionState.position.zoom, filteredPosts)
+    }
+
 
     // --- Scaffold Layout ---
     Scaffold(
@@ -121,7 +120,6 @@ fun MapScreen(
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                           // Spacer(modifier = Modifier.width(4.dp))
                             IconButton(onClick = {
                                 mapViewModel.clearTagFilter()
                                 tagInput = ""
@@ -139,19 +137,16 @@ fun MapScreen(
                     }
                 }
             )
-
         },
-
         bottomBar = {
             BottomNavigationBar(selectedTab = selectedTab) { tab ->
                 selectedTab = tab
-                when (tab) {
-                    "feed" -> navController.navigate(Destinations.FEED) {
+                if (tab == "feed") {
+                    navController.navigate(Destinations.FEED) {
                         popUpTo(Destinations.FEED) { inclusive = true }
                         launchSingleTop = true
                         restoreState = true
                     }
-                    "profile" -> { /* Coming soon */ }
                 }
             }
         }
@@ -172,36 +167,36 @@ fun MapScreen(
                         mapViewModel.clearSelectedPost()
                     }
                 ) {
-                    // Post markers
-                    posts.filter { it.latitude != null && it.longitude != null }.forEach { post ->
+                    // Render clustered or individual post markers
+                    clusters.forEach { cluster ->
+                        val count = cluster.posts.size
+                        val icon = if (count > 1) {
+                            BitmapDescriptorFactory.fromBitmap(createClusterIcon(context, count))
+                        } else null
+
                         Marker(
-                            state = MarkerState(LatLng(post.latitude!!, post.longitude!!)),
-                            title = post.username,
-                            snippet = post.message,
+                            state = MarkerState(cluster.position),
+                            title = if (count == 1) cluster.posts.first().username else "$count posts",
+                            snippet = if (count == 1) cluster.posts.first().message else null,
+                            icon = icon,
                             onClick = {
-                                mapViewModel.setSelectedPost(post, cameraPositionState)
+                                if (count == 1) {
+                                    mapViewModel.setSelectedPost(cluster.posts.first(), cameraPositionState)
+                                } else {
+                                    coroutineScope.launch {
+                                        cameraPositionState.animate(
+                                            CameraUpdateFactory.newLatLngZoom(
+                                                cluster.position,
+                                                cameraPositionState.position.zoom + 2
+                                            )
+                                        )
+                                    }
+                                }
                                 true
                             }
-                        )
-                    }
 
-                    // POI markers (currently disabled, uncomment to re-enable)
-                    /*
-                    poiMarkers.forEach { poi ->
-                        Marker(
-                            state = rememberMarkerState(position = LatLng(poi.latitude, poi.longitude)),
-                            title = poi.name,
-                            icon = bitmapDescriptorFromVector(
-                                context = LocalContext.current,
-                                vectorResId = when (poi.type) {
-                                    "university" -> R.drawable.ic_school_marker
-                                    "park" -> R.drawable.ic_tree_marker
-                                    else -> R.drawable.ic_location_pin
-                                }
-                            )
                         )
                     }
-                    */
                 }
             } else {
                 // Permission rationale
@@ -224,7 +219,7 @@ fun MapScreen(
                 }
             }
 
-            // --- Custom Info Panel ---
+            // --- Info Panel for Selected Post ---
             selectedPost?.let { post ->
                 PostCard(
                     post = post,
@@ -287,4 +282,26 @@ fun MapScreen(
             }
         )
     }
+}
+
+// --- Cluster Icon Drawing Helper ---
+fun createClusterIcon(context: android.content.Context, count: Int): Bitmap {
+    val radius = 40f
+    val bitmap = Bitmap.createBitmap((radius * 2).toInt(), (radius * 2).toInt(), Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(66, 133, 244) // Cluster circle color (Google blue)
+    }
+    canvas.drawCircle(radius, radius, radius, paint)
+
+    paint.apply {
+        color = Color.WHITE
+        textSize = 36f
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+    val y = radius - ((paint.descent() + paint.ascent()) / 2)
+    canvas.drawText(count.toString(), radius, y, paint)
+
+    return bitmap
 }
