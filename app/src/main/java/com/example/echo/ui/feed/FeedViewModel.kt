@@ -1,6 +1,7 @@
 package com.example.echo.ui.feed
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.echo.models.Post
 import com.example.echo.utils.Constants
 import com.google.firebase.auth.FirebaseAuth
@@ -8,6 +9,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 class FeedViewModel : ViewModel() {
 
@@ -15,7 +17,8 @@ class FeedViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
 
     private val _posts = MutableStateFlow<List<Post>>(emptyList())
-    val posts: StateFlow<List<Post>> = _posts
+    private val _filteredPosts = MutableStateFlow<List<Post>>(emptyList())
+    val filteredPosts: StateFlow<List<Post>> = _filteredPosts
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing
@@ -23,11 +26,13 @@ class FeedViewModel : ViewModel() {
     private val _postLikes = MutableStateFlow<Map<String, Int>>(emptyMap())
     val postLikes: StateFlow<Map<String, Int>> = _postLikes
 
-    private val _userLikes = MutableStateFlow<Set<String>>(emptySet()) // postIds user liked
+    private val _userLikes = MutableStateFlow<Set<String>>(emptySet())
     val userLikes: StateFlow<Set<String>> = _userLikes
 
     private val _commentLikes = MutableStateFlow<Map<String, Int>>(emptyMap())
     val commentLikes: StateFlow<Map<String, Int>> = _commentLikes
+
+    private var currentFilter: String? = null
 
     init {
         fetchPosts()
@@ -39,16 +44,14 @@ class FeedViewModel : ViewModel() {
             .get()
             .addOnSuccessListener { snapshot ->
                 val fetchedPosts = snapshot.documents.mapNotNull { doc ->
-                    doc.toObject(Post::class.java)?.copy(
-                        id = doc.id,
-                        tags = doc.get("tags") as? List<String> ?: emptyList() // ✅ Ensures tags are populated
-                    )
+                    doc.toObject(Post::class.java)
                 }
                 _posts.value = fetchedPosts
+                applyTagFilter()
                 fetchLikesAndComments(fetchedPosts.map { it.id })
             }
             .addOnFailureListener {
-                // Optional logging
+                // Handle error if needed
             }
     }
 
@@ -59,14 +62,11 @@ class FeedViewModel : ViewModel() {
             .get()
             .addOnSuccessListener { snapshot ->
                 val refreshedPosts = snapshot.documents.mapNotNull { doc ->
-                    doc.toObject(Post::class.java)?.copy(
-                        id = doc.id,
-                        tags = doc.get("tags") as? List<String> ?: emptyList()
-                    )
+                    doc.toObject(Post::class.java)
                 }
                 _posts.value = refreshedPosts
+                applyTagFilter()
                 _isRefreshing.value = false
-                fetchLikesAndComments(refreshedPosts.map { it.id })
             }
             .addOnFailureListener {
                 _isRefreshing.value = false
@@ -120,5 +120,23 @@ class FeedViewModel : ViewModel() {
 
         _userLikes.value = newUserLikes
         _postLikes.value = newPostLikes
+    }
+
+    fun setTagFilter(tag: String) {
+        currentFilter = tag
+        applyTagFilter()
+    }
+
+    fun clearTagFilter() {
+        currentFilter = null
+        _filteredPosts.value = _posts.value
+    }
+
+    private fun applyTagFilter() {
+        _filteredPosts.value = if (!currentFilter.isNullOrBlank()) {
+            _posts.value.filter { it.tags.any { tag -> tag.equals(currentFilter, ignoreCase = true) } }
+        } else {
+            _posts.value
+        }
     }
 }

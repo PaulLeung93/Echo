@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,11 +34,19 @@ fun FeedScreen(
     authViewModel: AuthViewModel,
     feedViewModel: FeedViewModel = viewModel()
 ) {
-    val posts by feedViewModel.posts.collectAsState()
+    val posts by feedViewModel.filteredPosts.collectAsState()
     val isRefreshing by feedViewModel.isRefreshing.collectAsState()
     val coroutineScope = rememberCoroutineScope()
 
     var selectedTab by remember { mutableStateOf("feed") }
+
+    var showFilterDialog by remember { mutableStateOf(false) }
+    var tagInput by remember { mutableStateOf("") }
+
+    val userLikes by feedViewModel.userLikes.collectAsState()
+    val postLikes by feedViewModel.postLikes.collectAsState()
+    val commentLikes by feedViewModel.commentLikes.collectAsState()
+
 
     Scaffold(
         topBar = {
@@ -49,6 +58,9 @@ fun FeedScreen(
                     )
                 },
                 actions = {
+                    IconButton(onClick = { showFilterDialog = true }) {
+                        Icon(Icons.Default.FilterList, contentDescription = "Filter by Tag")
+                    }
                     IconButton(onClick = {
                         // Sign out and return to SignInScreen
                         authViewModel.signOut()
@@ -120,10 +132,6 @@ fun FeedScreen(
                     }
                 } else {
                     items(posts) { post ->
-                        val postLikes by feedViewModel.postLikes.collectAsState()
-                        val userLikes by feedViewModel.userLikes.collectAsState()
-                        val commentLikes by feedViewModel.commentLikes.collectAsState()
-
                         val isLiked = userLikes.contains(post.id)
                         val likeCount = postLikes[post.id] ?: 0
                         val commentCount = commentLikes[post.id] ?: 0
@@ -146,6 +154,40 @@ fun FeedScreen(
             }
         }
     }
+    // Tag Filter Dialog
+    if (showFilterDialog) {
+        AlertDialog(
+            onDismissRequest = { showFilterDialog = false },
+            title = { Text("Filter Posts by Tag") },
+            text = {
+                OutlinedTextField(
+                    value = tagInput,
+                    onValueChange = { tagInput = it },
+                    label = { Text("Enter tag") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    feedViewModel.setTagFilter(tagInput.trim().lowercase())
+                    showFilterDialog = false
+                }) {
+                    Text("Apply")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    feedViewModel.clearTagFilter()
+                    tagInput = ""
+                    showFilterDialog = false
+                }) {
+                    Text("Clear")
+                }
+            }
+        )
+    }
+
 }
 
 @Preview(showBackground = true)
@@ -158,7 +200,7 @@ fun PreviewFeedScreen() {
     ) {
         items(
             listOf(
-                Post(username = "paul_dev", message = "Excited to launch Echo!", timestamp = System.currentTimeMillis()),
+                Post(username = "paul_dev", message = "Excited to launch Echo!", timestamp = System.currentTimeMillis(), tags = listOf("cs101", "finals")),
                 Post(username = "jane_doe", message = "Loving the local vibes!", timestamp = System.currentTimeMillis() - 60000),
                 Post(username = "john_doe", message = "Anyone else got cooked from that exam??", timestamp = System.currentTimeMillis() - 3600000)
             )
