@@ -9,6 +9,7 @@ import com.example.echo.models.Post
 import com.example.echo.utils.Constants
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.maps.android.compose.CameraPositionState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,17 +19,24 @@ import kotlinx.coroutines.launch
 class MapViewModel : ViewModel() {
 
     private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
 
     // ---UI State---
     private val _posts = MutableStateFlow<List<Post>>(emptyList())          // All posts
     private val _filteredPosts = MutableStateFlow<List<Post>>(emptyList())  // Posts matching the current filter
     val filteredPosts: StateFlow<List<Post>> = _filteredPosts
 
+    private val _currentTagFilter = MutableStateFlow<String?>(null)
+    val currentTagFilter: StateFlow<String?> = _currentTagFilter
+
     private val _selectedPost = MutableStateFlow<Post?>(null)               // Currently selected post (map tap)
     val selectedPost: StateFlow<Post?> = _selectedPost
 
     private val _likesMap = MutableStateFlow<Map<String, Int>>(emptyMap())  // Post ID → like count
     val likesMap: StateFlow<Map<String, Int>> = _likesMap
+
+    private val _userLikes = MutableStateFlow<Set<String>>(emptySet()) // Post IDs user liked (for toggle)
+    val userLikes: StateFlow<Set<String>> = _userLikes
 
     private val _commentsMap = MutableStateFlow<Map<String, Int>>(emptyMap()) // Post ID → comment count
     val commentsMap: StateFlow<Map<String, Int>> = _commentsMap
@@ -66,13 +74,22 @@ class MapViewModel : ViewModel() {
 
         postIds.forEach { postId ->
             // Likes
-            db.collection(Constants.COLLECTION_POSTS).document(postId)
-                .get()
-                .addOnSuccessListener { doc ->
-                    val likes = doc.get(Constants.FIELD_LIKES) as? List<*>
-                    likeCounts[postId] = likes?.size ?: 0
-                    _likesMap.value = likeCounts
-                }
+            val currentUserId = auth.currentUser?.uid
+            if (currentUserId != null) {
+                db.collection(Constants.COLLECTION_POSTS).document(postId)
+                    .get()
+                    .addOnSuccessListener { doc ->
+                        val likes = doc.get(Constants.FIELD_LIKES) as? List<*>
+                        likeCounts[postId] = likes?.size ?: 0
+
+                        // Track if current user liked this post
+                        if (likes?.contains(currentUserId) == true) {
+                            _userLikes.value = _userLikes.value + postId
+                        }
+
+                        _likesMap.value = likeCounts
+                    }
+            }
 
             // Comments
             db.collection(Constants.COLLECTION_POSTS)
@@ -111,6 +128,7 @@ class MapViewModel : ViewModel() {
      */
     fun setTagFilter(tag: String, userLocation: LatLng?, camera: CameraPositionState?) {
         _selectedPost.value = null
+        _currentTagFilter.value = tag
 
         // Filter posts matching the tag (case-insensitive)
         val filtered = _posts.value.filter { post ->
@@ -141,6 +159,7 @@ class MapViewModel : ViewModel() {
     fun clearTagFilter() {
         _selectedPost.value = null
         _filteredPosts.value = _posts.value
+        _currentTagFilter.value = null
     }
 
     /**
@@ -163,4 +182,27 @@ class MapViewModel : ViewModel() {
                 _poiMarkers.value = pois
             }
     }
+
+    fun toggleLike(postId: String) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        val docRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
+
+        val currentlyLiked = _userLikes.value.contains(postId)
+        val updatedLikes = _likesMap.value.toMutableMap()
+        val updatedUserLikes = _userLikes.value.toMutableSet()
+
+        if (currentlyLiked) {
+            docRef.update(Constants.FIELD_LIKES, com.google.firebase.firestore.FieldValue.arrayRemove(currentUserId))
+            updatedLikes[postId] = (updatedLikes[postId] ?: 1) - 1
+            updatedUserLikes.remove(postId)
+        } else {
+            docRef.update(Constants.FIELD_LIKES, com.google.firebase.firestore.FieldValue.arrayUnion(currentUserId))
+            updatedLikes[postId] = (updatedLikes[postId] ?: 0) + 1
+            updatedUserLikes.add(postId)
+        }
+
+        _likesMap.value = updatedLikes
+        _userLikes.value = updatedUserLikes
+    }
+
 }

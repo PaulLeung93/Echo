@@ -37,10 +37,12 @@ fun PostCard(
     likeCount: Int,
     commentCount: Int,
     onLikeClick: () -> Unit,
-    onClick: () -> Unit) {
+    onClick: () -> Unit,
+    onTagClick: ((String) -> Unit)? = null,
+    modifier: Modifier = Modifier) {
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable { onClick() },
         elevation = CardDefaults.cardElevation(6.dp)
@@ -104,7 +106,9 @@ fun PostCard(
                 ) {
                     post.tags.forEach { tag ->
                         AssistChip(
-                            onClick = {},
+                            onClick = {
+                                onTagClick?.invoke(tag)
+                            },
                             label = { Text(text = "$tag") }
                         )
                     }

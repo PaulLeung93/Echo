@@ -4,9 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.echo.models.Post
 import com.example.echo.utils.Constants
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.maps.android.compose.CameraPositionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -32,6 +35,9 @@ class FeedViewModel : ViewModel() {
 
     private val _commentLikes = MutableStateFlow<Map<String, Int>>(emptyMap())  // Post ID → comment count
     val commentLikes: StateFlow<Map<String, Int>> = _commentLikes
+
+    private val _currentTagFilter = MutableStateFlow<String?>(null)
+    val currentTagFilter: StateFlow<String?> = _currentTagFilter
 
     init {
         fetchPosts()
@@ -132,6 +138,7 @@ class FeedViewModel : ViewModel() {
      * Applies a tag filter to the post list.
      */
     fun setTagFilter(tag: String) {
+        _currentTagFilter.value = tag
         val filtered = _posts.value.filter { post ->
             post.tags.any { it.equals(tag, ignoreCase = true) }
         }
@@ -143,5 +150,7 @@ class FeedViewModel : ViewModel() {
      */
     fun clearTagFilter() {
         _filteredPosts.value = _posts.value
+        _currentTagFilter.value = null
     }
+
 }

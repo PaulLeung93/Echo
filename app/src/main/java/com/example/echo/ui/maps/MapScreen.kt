@@ -29,6 +29,8 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.tasks.await
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material.icons.filled.Close
+import com.example.echo.components.PostCard
 import com.example.echo.ui.common.TopSnackbarHost
 
 
@@ -77,7 +79,8 @@ fun MapScreen(
     val likesMap by mapViewModel.likesMap.collectAsState()
     val commentsMap by mapViewModel.commentsMap.collectAsState()
     val poiMarkers by mapViewModel.poiMarkers.collectAsState()
-
+    val userLikes by mapViewModel.userLikes.collectAsState()
+    val activeTag by mapViewModel.currentTagFilter.collectAsState()
 
     var selectedTab by remember { mutableStateOf("map") }
     var showFilterDialog by remember { mutableStateOf(false) }
@@ -88,6 +91,9 @@ fun MapScreen(
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(defaultLocation, 12f)
     }
+
+
+
 
     // Move camera to user location after it's available
     LaunchedEffect(userLocation) {
@@ -102,21 +108,40 @@ fun MapScreen(
         }
     }
 
-
-
     // --- Scaffold Layout ---
     Scaffold(
         snackbarHost = { TopSnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Map") },
+                title = {
+                    if (activeTag != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Filtered: #$activeTag",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                           // Spacer(modifier = Modifier.width(4.dp))
+                            IconButton(onClick = {
+                                mapViewModel.clearTagFilter()
+                                tagInput = ""
+                            }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear Filter")
+                            }
+                        }
+                    } else {
+                        Text("Map")
+                    }
+                },
                 actions = {
                     IconButton(onClick = { showFilterDialog = true }) {
                         Icon(Icons.Default.FilterList, contentDescription = "Filter by Tag")
                     }
                 }
             )
+
         },
+
         bottomBar = {
             BottomNavigationBar(selectedTab = selectedTab) { tab ->
                 selectedTab = tab
@@ -201,51 +226,25 @@ fun MapScreen(
 
             // --- Custom Info Panel ---
             selectedPost?.let { post ->
-                val likes = likesMap[post.id] ?: 0
-                val comments = commentsMap[post.id] ?: 0
-
-                Card(
+                PostCard(
+                    post = post,
+                    isLiked = userLikes.contains(post.id),
+                    likeCount = likesMap[post.id] ?: 0,
+                    commentCount = commentsMap[post.id] ?: 0,
+                    onLikeClick = {
+                        mapViewModel.toggleLike(post.id)
+                    },
+                    onClick = {
+                        navController.navigate("${Destinations.POST_DETAILS}/${post.id}")
+                    },
+                    onTagClick = { tag ->
+                        tagInput = tag
+                        mapViewModel.setTagFilter(tag, userLocation, cameraPositionState)
+                    },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(16.dp)
-                        .fillMaxWidth()
-                        .clickable {
-                            navController.navigate("${Destinations.POST_DETAILS}/${post.id}")
-                        },
-                    elevation = CardDefaults.cardElevation(8.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(post.username, style = MaterialTheme.typography.titleMedium)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(post.message, style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row {
-                            Icon(Icons.Default.ThumbUp, contentDescription = "Likes")
-                            Spacer(Modifier.width(4.dp))
-                            Text("$likes likes")
-                            Spacer(Modifier.width(16.dp))
-                            Icon(Icons.Default.Comment, contentDescription = "Comments")
-                            Spacer(Modifier.width(4.dp))
-                            Text("$comments comments")
-                        }
-                        if (post.tags.isNotEmpty()) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                post.tags.forEach { tag ->
-                                    AssistChip(
-                                        onClick = {}, // optionally: trigger tag filter
-                                        label = { Text(tag) }
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-
-                    }
-                }
+                )
             }
         }
     }

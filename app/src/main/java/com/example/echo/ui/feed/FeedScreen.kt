@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.*
@@ -36,42 +37,54 @@ fun FeedScreen(
 ) {
     val posts by feedViewModel.filteredPosts.collectAsState()
     val isRefreshing by feedViewModel.isRefreshing.collectAsState()
-    val coroutineScope = rememberCoroutineScope()
 
     var selectedTab by remember { mutableStateOf("feed") }
-
+    var filterAttempted by remember { mutableStateOf(false) }
     var showFilterDialog by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
 
+    // --- Post engagement state ---
     val userLikes by feedViewModel.userLikes.collectAsState()
     val postLikes by feedViewModel.postLikes.collectAsState()
     val commentLikes by feedViewModel.commentLikes.collectAsState()
-
+    val activeTag by feedViewModel.currentTagFilter.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "Echo",
-                        style = MaterialTheme.typography.titleLarge
-                    )
+                    if (activeTag != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Filtered: #$activeTag",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            IconButton(onClick = {
+                                feedViewModel.clearTagFilter()
+                                tagInput = ""
+                            }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear Filter")
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "Echo",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
                 },
                 actions = {
                     IconButton(onClick = { showFilterDialog = true }) {
                         Icon(Icons.Default.FilterList, contentDescription = "Filter by Tag")
                     }
                     IconButton(onClick = {
-                        // Sign out and return to SignInScreen
                         authViewModel.signOut()
                         navController.navigate(Destinations.SIGN_IN) {
                             popUpTo(Destinations.FEED) { inclusive = true }
                         }
                     }) {
-                        Icon(
-                            imageVector = Icons.Default.ExitToApp,
-                            contentDescription = "Sign Out"
-                        )
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
                     }
                 }
             )
@@ -97,9 +110,7 @@ fun FeedScreen(
                         launchSingleTop = true
                         restoreState = true
                     }
-                    "profile" -> {
-                        // Placeholder for ProfileScreen
-                    }
+                    "profile" -> { }
                 }
             }
         }
@@ -141,11 +152,13 @@ fun FeedScreen(
                             isLiked = isLiked,
                             likeCount = likeCount,
                             commentCount = commentCount,
-                            onLikeClick = { post.id.let { feedViewModel.toggleLike(it) } },
+                            onLikeClick = { feedViewModel.toggleLike(post.id) },
                             onClick = {
-                                post.id.let { postId ->
-                                    navController.navigate("${Constants.ROUTE_POST_DETAILS}/$postId")
-                                }
+                                navController.navigate("${Constants.ROUTE_POST_DETAILS}/${post.id}")
+                            },
+                            onTagClick = { tag ->
+                                tagInput = tag
+                                feedViewModel.setTagFilter(tag)
                             }
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -154,7 +167,7 @@ fun FeedScreen(
             }
         }
     }
-    // Tag Filter Dialog
+
     if (showFilterDialog) {
         AlertDialog(
             onDismissRequest = { showFilterDialog = false },
@@ -187,7 +200,6 @@ fun FeedScreen(
             }
         )
     }
-
 }
 
 @Preview(showBackground = true)
