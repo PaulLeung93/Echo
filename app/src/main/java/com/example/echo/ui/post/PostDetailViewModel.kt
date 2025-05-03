@@ -56,7 +56,14 @@ class PostDetailViewModel : ViewModel() {
                     .await()
 
                 if (postDoc.exists()) {
-                    _post.value = postDoc.toObject(Post::class.java)?.copy(id = postDoc.id)
+                    val post = postDoc.toObject(Post::class.java)?.copy(id = postDoc.id)
+                    _post.value = post
+
+                    val likes = postDoc.get(Constants.FIELD_LIKES) as? List<*> ?: emptyList<Any>()
+                    _likeCount.value = likes.size
+
+                    val currentUserId = auth.currentUser?.uid
+                    _isLikedByUser.value = currentUserId != null && likes.contains(currentUserId)
                 } else {
                     _errorMessage.value = "Post not found."
                     return@launch

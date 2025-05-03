@@ -43,11 +43,11 @@ fun FeedScreen(
             TopAppBar(
                 title = {
                     val state = uiState
-                    if (state is FeedUiState.Success && state.currentTagFilter != null) {
+                    if (state is FeedUiState.Success && state.currentTag != null) {
                         // Show filtered tag in top bar with option to clear
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "Filtered: #${state.currentTagFilter}",
+                                text = "Filtered: #${state.currentTag}",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -156,7 +156,7 @@ fun FeedScreen(
                             items(state.filteredPosts) { post ->
                                 val isLiked = state.userLikes.contains(post.id)
                                 val likeCount = state.postLikes[post.id] ?: 0
-                                val commentCount = state.commentLikes[post.id] ?: 0
+                                val commentCount = state.commentCount[post.id] ?: 0
 
                                 PostCard(
                                     post = post,

@@ -37,7 +37,7 @@ class FeedViewModel : ViewModel() {
 
             try {
                 val snapshot = db.collection(Constants.COLLECTION_POSTS)
-                    .orderBy(Constants.FIELD_TIMESTAMP)
+                    .orderBy(Constants.FIELD_TIMESTAMP, com.google.firebase.firestore.Query.Direction.DESCENDING)
                     .get()
                     .await()
 
@@ -51,8 +51,8 @@ class FeedViewModel : ViewModel() {
                         filteredPosts = posts,
                         postLikes = likes,
                         userLikes = userLiked,
-                        commentLikes = commentCounts,
-                        currentTagFilter = null,
+                        commentCount = commentCounts,
+                        currentTag = null,
                         isRefreshing = false
                     )
                 }
@@ -66,12 +66,12 @@ class FeedViewModel : ViewModel() {
      * Refresh post data (used for pull-to-refresh).
      */
     fun refreshPosts() {
-        val currentTag = (_uiState.value as? FeedUiState.Success)?.currentTagFilter
+        val currentTag = (_uiState.value as? FeedUiState.Success)?.currentTag
 
         viewModelScope.launch {
             try {
                 val snapshot = db.collection(Constants.COLLECTION_POSTS)
-                    .orderBy(Constants.FIELD_TIMESTAMP)
+                    .orderBy(Constants.FIELD_TIMESTAMP, com.google.firebase.firestore.Query.Direction.DESCENDING)
                     .get()
                     .await()
 
@@ -94,8 +94,8 @@ class FeedViewModel : ViewModel() {
                         filteredPosts = filtered,
                         postLikes = likes,
                         userLikes = userLiked,
-                        commentLikes = commentCounts,
-                        currentTagFilter = currentTag,
+                        commentCount = commentCounts,
+                        currentTag = currentTag,
                         isRefreshing = false
                     )
                 }
@@ -116,7 +116,7 @@ class FeedViewModel : ViewModel() {
             }
             _uiState.value = currentState.copy(
                 filteredPosts = filtered,
-                currentTagFilter = tag
+                currentTag = tag
             )
         }
     }
@@ -129,7 +129,7 @@ class FeedViewModel : ViewModel() {
         if (currentState is FeedUiState.Success) {
             _uiState.value = currentState.copy(
                 filteredPosts = allPosts,
-                currentTagFilter = null
+                currentTag = null
             )
         }
     }

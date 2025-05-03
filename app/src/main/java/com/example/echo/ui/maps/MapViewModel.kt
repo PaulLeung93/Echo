@@ -1,11 +1,11 @@
 package com.example.echo.ui.map
 
-import android.location.Location
 import android.location.Location.distanceBetween
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.echo.models.POI
 import com.example.echo.models.Post
+import com.example.echo.ui.map.MapUiState.*
 import com.example.echo.utils.Constants
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
@@ -16,6 +16,7 @@ import com.google.maps.android.compose.CameraPositionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 // Data class to represent a group of nearby posts (i.e., a cluster)
 data class ClusterGroup(
@@ -29,24 +30,14 @@ class MapViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
 
     // --- UI State ---
-    private val _posts = MutableStateFlow<List<Post>>(emptyList())
-    private val _filteredPosts = MutableStateFlow<List<Post>>(emptyList())
-    val filteredPosts: StateFlow<List<Post>> = _filteredPosts
+    private val _uiState = MutableStateFlow<MapUiState>(Loading)
+    val uiState: StateFlow<MapUiState> = _uiState
 
-    private val _currentTagFilter = MutableStateFlow<String?>(null)
-    val currentTagFilter: StateFlow<String?> = _currentTagFilter
+    // All posts from Firestore
+    private var allPosts = emptyList<Post>()
 
     private val _selectedPost = MutableStateFlow<Post?>(null)
     val selectedPost: StateFlow<Post?> = _selectedPost
-
-    private val _likesMap = MutableStateFlow<Map<String, Int>>(emptyMap())
-    val likesMap: StateFlow<Map<String, Int>> = _likesMap
-
-    private val _userLikes = MutableStateFlow<Set<String>>(emptySet())
-    val userLikes: StateFlow<Set<String>> = _userLikes
-
-    private val _commentsMap = MutableStateFlow<Map<String, Int>>(emptyMap())
-    val commentsMap: StateFlow<Map<String, Int>> = _commentsMap
 
     private val _poiMarkers = MutableStateFlow<List<POI>>(emptyList())
     val poiMarkers: StateFlow<List<POI>> = _poiMarkers
@@ -60,38 +51,51 @@ class MapViewModel : ViewModel() {
     }
 
     /**
-     * Fetch all posts from Firestore with valid lat/lng.
+     * Fetch all posts from Firestore that have valid lat/lng.
+     * Also fetch likes/comments and initialize cluster groups.
      */
     private fun fetchPostsWithLocation() {
-        db.collection(Constants.COLLECTION_POSTS)
-            .get()
-            .addOnSuccessListener { snapshot ->
+        viewModelScope.launch {
+            _uiState.value = Loading
+            try {
+                val snapshot = db.collection(Constants.COLLECTION_POSTS).get().await()
                 val fetched = snapshot.documents.mapNotNull { it.toObject(Post::class.java) }
                     .filter { it.latitude != null && it.longitude != null }
 
-                _posts.value = fetched
-                _filteredPosts.value = fetched
+                allPosts = fetched
+                val postIds = fetched.map { it.id }
+
+                val (likes, liked, comments) = fetchLikesAndComments(postIds)
+
+                _uiState.value = Success(
+                    posts = fetched,
+                    filteredPosts = fetched,
+                    postLikes = likes,
+                    userLikes = liked,
+                    commentCount = comments
+                )
+
                 _clusterGroups.value = clusterPosts(fetched, zoom = 12f)
-                fetchLikesAndComments(fetched.map { it.id })
+
+            } catch (e: Exception) {
+                _uiState.value = Error("Failed to load posts: ${e.message}")
             }
+        }
     }
 
     /**
-     * Create clusters by grouping posts within a certain radius (in meters).
-     * Radius adjusts based on zoom level. Zoom >= 17 disables clustering.
+     * Create clusters by grouping posts that are nearby, based on zoom level.
      */
     private fun clusterPosts(posts: List<Post>, zoom: Float): List<ClusterGroup> {
-        val radiusInMeters = when {
+        val radius = when {
             zoom >= 17 -> 0f
             zoom >= 15 -> 60f
             zoom >= 13 -> 120f
             else -> 200f
         }
 
-        if (radiusInMeters == 0f) {
-            return posts.map {
-                ClusterGroup(LatLng(it.latitude!!, it.longitude!!), listOf(it))
-            }
+        if (radius == 0f) {
+            return posts.map { ClusterGroup(LatLng(it.latitude!!, it.longitude!!), listOf(it)) }
         }
 
         val clusters = mutableListOf<ClusterGroup>()
@@ -101,100 +105,97 @@ class MapViewModel : ViewModel() {
             if (post in used || post.latitude == null || post.longitude == null) continue
 
             val cluster = mutableListOf(post)
-            val latLng = LatLng(post.latitude!!, post.longitude!!)
+            val latLng = LatLng(post.latitude, post.longitude)
             used.add(post)
 
             for (other in posts) {
                 if (other in used || other.latitude == null || other.longitude == null) continue
-                val otherLatLng = LatLng(other.latitude!!, other.longitude!!)
-                if (distanceBetween(latLng, otherLatLng) <= radiusInMeters) {
+                val otherLatLng = LatLng(other.latitude, other.longitude)
+                if (distanceBetween(latLng, otherLatLng) <= radius) {
                     cluster.add(other)
                     used.add(other)
                 }
             }
 
-            clusters.add(ClusterGroup(position = latLng, posts = cluster))
+            clusters.add(ClusterGroup(latLng, cluster))
         }
 
         return clusters
     }
 
     /**
-     * Recompute cluster groups based on zoom level and given posts.
+     * Refresh clusters when zoom level changes.
      */
-    fun refreshClusters(zoomLevel: Float, posts: List<Post>) {
-        _clusterGroups.value = clusterPosts(posts, zoomLevel)
+    fun refreshClusters(zoom: Float, posts: List<Post>) {
+        _clusterGroups.value = clusterPosts(posts, zoom)
     }
 
     /**
-     * Triggered when a marker is tapped. Sets selected post and centers camera.
+     * Triggered when a marker is tapped. Sets the selected post and moves the camera to it.
      */
     fun setSelectedPost(post: Post, camera: CameraPositionState) {
         _selectedPost.value = post
-
-        if (post.latitude != null && post.longitude != null) {
-            val target = LatLng(post.latitude, post.longitude)
-            viewModelScope.launch {
-                camera.animate(CameraUpdateFactory.newLatLng(target))
-            }
+        val latLng = LatLng(post.latitude ?: return, post.longitude ?: return)
+        viewModelScope.launch {
+            camera.animate(CameraUpdateFactory.newLatLng(latLng))
         }
     }
 
-    /** Clears the selected post. */
+    /** Clears the selected post from state. */
     fun clearSelectedPost() {
         _selectedPost.value = null
     }
 
     /**
-     * Applies a tag filter and re-centers map on nearest matching marker.
+     * Filters posts by a specific tag and optionally recenters on the nearest one.
      */
     fun setTagFilter(tag: String, userLocation: LatLng?, camera: CameraPositionState?) {
         _selectedPost.value = null
-        _currentTagFilter.value = tag
-
-        val filtered = _posts.value.filter { post ->
+        val filtered = allPosts.filter { post ->
             post.tags.any { it.equals(tag, ignoreCase = true) }
         }
 
-        _filteredPosts.value = filtered
-        _clusterGroups.value = clusterPosts(filtered, 12f)
+        viewModelScope.launch {
+            val (likes, liked, comments) = fetchLikesAndComments(filtered.map { it.id })
 
-        if (camera != null && userLocation != null && filtered.isNotEmpty()) {
-            val nearest = filtered.minByOrNull { post ->
-                val postLoc = LatLng(post.latitude!!, post.longitude!!)
-                distanceBetween(userLocation, postLoc)
-            }
+            _uiState.value = Success(
+                posts = allPosts,
+                filteredPosts = filtered,
+                postLikes = likes,
+                userLikes = liked,
+                commentCount = comments,
+                currentTag = tag
+            )
+            _clusterGroups.value = clusterPosts(filtered, 12f)
 
-            nearest?.let {
-                val target = LatLng(it.latitude!!, it.longitude!!)
-                viewModelScope.launch {
-                    camera.animate(CameraUpdateFactory.newLatLngZoom(target, 13f))
+            if (userLocation != null && camera != null && filtered.isNotEmpty()) {
+                val nearest = filtered.minByOrNull {
+                    distanceBetween(userLocation, LatLng(it.latitude!!, it.longitude!!))
+                }
+
+                nearest?.let {
+                    camera.animate(CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude!!, it.longitude!!), 13f))
                 }
             }
         }
     }
 
     /**
-     * Clears any applied tag filter.
+     * Clears any tag filter and resets the full map state.
      */
     fun clearTagFilter() {
         _selectedPost.value = null
-        _filteredPosts.value = _posts.value
-        _clusterGroups.value = clusterPosts(_posts.value, 12f)
-        _currentTagFilter.value = null
+        (_uiState.value as? Success)?.let { current ->
+            _uiState.value = current.copy(
+                filteredPosts = allPosts,
+                currentTag = null
+            )
+            _clusterGroups.value = clusterPosts(allPosts, 12f)
+        }
     }
 
     /**
-     * Calculates distance between two LatLng points in meters.
-     */
-    private fun distanceBetween(a: LatLng, b: LatLng): Float {
-        val results = FloatArray(1)
-        distanceBetween(a.latitude, a.longitude, b.latitude, b.longitude, results)
-        return results[0]
-    }
-
-    /**
-     * Fetch POI markers from Firestore.
+     * Loads point-of-interest (POI) markers for static locations on the map.
      */
     fun fetchPOIMarkers() {
         db.collection("points_of_interest")
@@ -206,63 +207,67 @@ class MapViewModel : ViewModel() {
     }
 
     /**
-     * Toggle like for a post.
+     * Toggles like on a post and updates both Firestore and local state.
      */
     fun toggleLike(postId: String) {
-        val currentUserId = auth.currentUser?.uid ?: return
+        val userId = auth.currentUser?.uid ?: return
         val docRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
+        val current = _uiState.value as? Success ?: return
 
-        val currentlyLiked = _userLikes.value.contains(postId)
-        val updatedLikes = _likesMap.value.toMutableMap()
-        val updatedUserLikes = _userLikes.value.toMutableSet()
+        val isLiked = current.userLikes.contains(postId)
+        val updatedLikes = current.postLikes.toMutableMap()
+        val updatedUserLikes = current.userLikes.toMutableSet()
 
-        if (currentlyLiked) {
-            docRef.update(Constants.FIELD_LIKES, FieldValue.arrayRemove(currentUserId))
+        if (isLiked) {
+            docRef.update(Constants.FIELD_LIKES, FieldValue.arrayRemove(userId))
             updatedLikes[postId] = (updatedLikes[postId] ?: 1) - 1
             updatedUserLikes.remove(postId)
         } else {
-            docRef.update(Constants.FIELD_LIKES, FieldValue.arrayUnion(currentUserId))
+            docRef.update(Constants.FIELD_LIKES, FieldValue.arrayUnion(userId))
             updatedLikes[postId] = (updatedLikes[postId] ?: 0) + 1
             updatedUserLikes.add(postId)
         }
 
-        _likesMap.value = updatedLikes
-        _userLikes.value = updatedUserLikes
+        _uiState.value = current.copy(
+            postLikes = updatedLikes,
+            userLikes = updatedUserLikes
+        )
     }
 
     /**
-     * Fetch like and comment counts for each post.
+     * Utility: Calculates the distance in meters between two LatLng points.
      */
-    private fun fetchLikesAndComments(postIds: List<String>) {
-        val likeCounts = mutableMapOf<String, Int>()
-        val commentCounts = mutableMapOf<String, Int>()
+    private fun distanceBetween(a: LatLng, b: LatLng): Float {
+        val results = FloatArray(1)
+        distanceBetween(a.latitude, a.longitude, b.latitude, b.longitude, results)
+        return results[0]
+    }
 
-        val currentUserId = auth.currentUser?.uid
+    /**
+     * Utility: Fetches like counts, comment counts, and user-liked posts.
+     */
+    private suspend fun fetchLikesAndComments(
+        postIds: List<String>
+    ): Triple<Map<String, Int>, Set<String>, Map<String, Int>> {
+        val likesMap = mutableMapOf<String, Int>()
+        val commentMap = mutableMapOf<String, Int>()
+        val userLiked = mutableSetOf<String>()
+        val userId = auth.currentUser?.uid
 
         postIds.forEach { postId ->
-            if (currentUserId != null) {
-                db.collection(Constants.COLLECTION_POSTS).document(postId)
-                    .get()
-                    .addOnSuccessListener { doc ->
-                        val likes = doc.get(Constants.FIELD_LIKES) as? List<*>
-                        likeCounts[postId] = likes?.size ?: 0
+            val postRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
+            val snapshot = postRef.get().await()
 
-                        if (likes?.contains(currentUserId) == true) {
-                            _userLikes.value = _userLikes.value + postId
-                        }
-
-                        _likesMap.value = likeCounts
-                    }
+            val likes = snapshot.get(Constants.FIELD_LIKES) as? List<*> ?: emptyList<Any>()
+            likesMap[postId] = likes.size
+            if (userId != null && likes.contains(userId)) {
+                userLiked.add(postId)
             }
 
-            db.collection(Constants.COLLECTION_POSTS)
-                .document(postId)
-                .collection(Constants.COLLECTION_COMMENTS)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    commentCounts[postId] = snapshot.size()
-                    _commentsMap.value = commentCounts
-                }
+            val commentSnap = postRef.collection(Constants.COLLECTION_COMMENTS).get().await()
+            commentMap[postId] = commentSnap.size()
         }
+
+        return Triple(likesMap, userLiked, commentMap)
     }
 }

@@ -1,9 +1,9 @@
-package com.example.echo.ui.feed
+package com.example.echo.ui.map
 
 import com.example.echo.models.Post
 
-sealed class FeedUiState {
-    object Loading : FeedUiState()
+sealed class MapUiState {
+    object Loading : MapUiState()
 
     data class Success(
         val posts: List<Post>,
@@ -11,9 +11,9 @@ sealed class FeedUiState {
         val postLikes: Map<String, Int>,
         val userLikes: Set<String>,
         val commentCount: Map<String, Int>,
-        val currentTag: String?,
+        val currentTag: String? = null,
         val isRefreshing: Boolean = false
-    ) : FeedUiState()
+    ) : MapUiState()
 
-    data class Error(val message: String) : FeedUiState()
+    data class Error(val message: String) : MapUiState()
 }
