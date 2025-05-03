@@ -104,4 +104,17 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    fun checkUserSession() {
+        val user = auth.currentUser
+        if (user != null) {
+            user.reload()
+                .addOnCompleteListener {
+                    _isSignedIn.value = it.isSuccessful && !user.isAnonymous
+                }
+        } else {
+            _isSignedIn.value = false
+        }
+    }
+
+
 }

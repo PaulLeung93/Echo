@@ -11,10 +11,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.example.echo.components.PostCard
 import com.example.echo.models.Comment
+import com.example.echo.navigation.Destinations
 import com.example.echo.ui.common.BottomNavigationBar
 import com.example.echo.utils.formatTimestamp
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -24,10 +25,14 @@ fun PostDetailScreen(
     navController: NavHostController,
     viewModel: PostDetailViewModel = viewModel()
 ) {
+    // --- UI State ---
     val post by viewModel.post.collectAsState()
     val comments by viewModel.comments.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val isLiked by viewModel.isLikedByUser.collectAsState()
+    val likeCount by viewModel.likeCount.collectAsState()
+    val commentCount by viewModel.commentCount.collectAsState()
 
     var newComment by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf("feed") }
@@ -39,16 +44,13 @@ fun PostDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-
     LaunchedEffect(postId) {
         viewModel.loadPostAndComments(postId)
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Post Details") }
-            )
+            TopAppBar(title = { Text("Post Details") })
         },
         bottomBar = {
             BottomNavigationBar(selectedTab = selectedTab) { tab ->
@@ -59,21 +61,16 @@ fun PostDetailScreen(
                         launchSingleTop = true
                         restoreState = true
                     }
-                    "map" -> {
-                        navController.navigate("map") {
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                    "map" -> navController.navigate("map") {
+                        launchSingleTop = true
+                        restoreState = true
                     }
-                    "profile" -> {
-                        // Profile placeholder
-                    }
+                    "profile" -> { /* No-op */ }
                 }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -99,25 +96,17 @@ fun PostDetailScreen(
                         .fillMaxWidth()
                 ) {
                     item {
-                        // Post Details
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                text = post!!.username,
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = post!!.message,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = formatTimestamp(post!!.timestamp),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(24.dp))
+                        // --- Reused PostCard composable (consistent with Feed & Map) ---
+                        PostCard(
+                            post = post!!,
+                            isLiked = isLiked,
+                            likeCount = likeCount,
+                            commentCount = commentCount,
+                            onLikeClick = { viewModel.toggleLike(postId) },
+                            onClick = {},
+                            onTagClick = {}, // Tag filtering not needed here
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
 
                         Text(
                             text = "Comments",
@@ -137,8 +126,9 @@ fun PostDetailScreen(
                             )
                         }
                     } else {
-                        items(comments) { comment ->
-                            CommentCard(comment)
+                        items(comments, key = { it.id ?: it.hashCode() }) { comment ->
+
+                        CommentCard(comment)
                             Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
@@ -146,6 +136,7 @@ fun PostDetailScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // --- Add Comment Input ---
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -155,14 +146,13 @@ fun PostDetailScreen(
                     OutlinedTextField(
                         value = newComment,
                         onValueChange = { newComment = it },
-                        placeholder = { Text("Write a comment...") },
+                        placeholder = { Text("Write a comment.") },
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Button(
                         onClick = {
-
                             val now = System.currentTimeMillis()
                             val recent = commentTimestamps.filter { now - it < WINDOW_MS }
 
@@ -174,11 +164,10 @@ fun PostDetailScreen(
                                 commentTimestamps.add(now)
                                 if (newComment.isNotBlank()) {
                                     viewModel.addComment(postId, newComment) {
-                                        newComment = ""
+                                        newComment = "" // ✅ This ensures the input clears immediately
                                     }
                                 }
                             }
-
                         },
                         enabled = newComment.isNotBlank()
                     ) {
@@ -196,9 +185,7 @@ fun CommentCard(comment: Comment) {
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp)
-        ) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 text = comment.username,
                 style = MaterialTheme.typography.titleSmall
