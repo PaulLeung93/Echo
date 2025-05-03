@@ -10,6 +10,10 @@ object Constants {
     const val FIELD_USERNAME = "username"
     const val FIELD_MESSAGE = "message"
     const val FIELD_TIMESTAMP = "timestamp"
+    const val FIELD_LIKES = "likes"
+    const val FIELD_TAGS = "tags"
+    const val FIELD_COMMENT_COUNT = "commentCount"
+
 
     // Navigation Routes
     const val ROUTE_FEED = "feed"
@@ -18,10 +22,6 @@ object Constants {
     const val ROUTE_CREATE_POST = "create_post"
     const val ROUTE_FORGOT_PASSWORD = "forgot_password"
     const val ROUTE_POST_DETAILS = "post_details"
-
     const val ROUTE_MAP = "map"
-
-    const val FIELD_LIKES = "likes"
-    const val FIELD_TAGS = "tags"
-
+    const val ROUTE_PROFILE = "profile"
 }

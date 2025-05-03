@@ -10,6 +10,7 @@ import com.example.echo.ui.create.CreatePostScreen
 import com.example.echo.ui.feed.FeedScreen
 import com.example.echo.ui.map.MapScreen
 import com.example.echo.ui.post.PostDetailScreen
+import com.example.echo.ui.profile.ProfileScreen
 import com.example.echo.utils.Constants
 
 object Destinations {
@@ -19,8 +20,8 @@ object Destinations {
     const val CREATE_POST = Constants.ROUTE_CREATE_POST
     const val FORGOT_PASSWORD = Constants.ROUTE_FORGOT_PASSWORD
     const val POST_DETAILS = Constants.ROUTE_POST_DETAILS
-
     const val MAP = Constants.ROUTE_MAP
+    const val PROFILE = Constants.ROUTE_PROFILE
 
 }
 
@@ -82,8 +83,14 @@ fun AppNavGraph(
             PostDetailScreen(postId = postId, navController = navController)
         }
 
+        //Msp Screen
         composable(Destinations.MAP) {
             MapScreen(navController = navController)
+        }
+
+        // Profile Screen
+        composable(Destinations.PROFILE) {
+            ProfileScreen(navController = navController, authViewModel = authViewModel)
         }
 
     }

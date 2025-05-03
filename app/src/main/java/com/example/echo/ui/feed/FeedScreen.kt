@@ -88,14 +88,31 @@ fun FeedScreen(
         bottomBar = {
             BottomNavigationBar(selectedTab = selectedTab) { tab ->
                 selectedTab = tab
-                if (tab == "map") {
-                    navController.navigate(Destinations.MAP) {
-                        popUpTo(Destinations.FEED) { inclusive = true }
-                        launchSingleTop = true
-                        restoreState = true
+                when (tab) {
+                    "feed" -> {
+                        navController.navigate(Destinations.FEED) {
+                            popUpTo(Destinations.FEED) { inclusive = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                    "map" -> {
+                        navController.navigate(Destinations.MAP) {
+                            popUpTo(Destinations.FEED) { inclusive = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                    "profile" -> {
+                        navController.navigate(Destinations.PROFILE) {
+                            popUpTo(Destinations.FEED) { inclusive = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 }
             }
+
         }
     ) { paddingValues ->
         when (val state = uiState) {
