@@ -53,14 +53,14 @@ class ProfileViewModel : ViewModel() {
      * Also computes total likes and comments.
      */
     private fun fetchUserPosts() {
-        val currentUserId = auth.currentUser?.uid ?: return
+        val email = auth.currentUser?.email ?: return
 
         viewModelScope.launch {
             _isLoading.value = true
             try {
                 val snapshot = db.collection(Constants.COLLECTION_POSTS)
-                    .whereEqualTo("userId", currentUserId)
-                    .orderBy(Constants.FIELD_TIMESTAMP, com.google.firebase.firestore.Query.Direction.DESCENDING)
+                    .whereEqualTo("username", email)
+                    //.orderBy(Constants.FIELD_TIMESTAMP, com.google.firebase.firestore.Query.Direction.DESCENDING)
                     .get()
                     .await()
 
@@ -69,19 +69,26 @@ class ProfileViewModel : ViewModel() {
                 }
                 _userPosts.value = posts
 
-                // Extract like/comment counts into maps and compute totals
                 val likesMap = mutableMapOf<String, Int>()
                 val commentsMap = mutableMapOf<String, Int>()
                 var likeSum = 0
                 var commentSum = 0
 
                 for (doc in snapshot.documents) {
-                    val id = doc.id
+                    val postId = doc.id
                     val likes = (doc.get(Constants.FIELD_LIKES) as? List<*>)?.size ?: 0
-                    val commentCount = doc.getLong(Constants.FIELD_COMMENT_COUNT)?.toInt() ?: 0
-                    likesMap[id] = likes
-                    commentsMap[id] = commentCount
+                    likesMap[postId] = likes
                     likeSum += likes
+
+                    // Fetch number of comments from subcollection
+                    val commentSnapshot = db.collection(Constants.COLLECTION_POSTS)
+                        .document(postId)
+                        .collection(Constants.COLLECTION_COMMENTS)
+                        .get()
+                        .await()
+
+                    val commentCount = commentSnapshot.size()
+                    commentsMap[postId] = commentCount
                     commentSum += commentCount
                 }
 
