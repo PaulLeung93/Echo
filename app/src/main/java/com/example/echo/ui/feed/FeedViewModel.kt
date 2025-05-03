@@ -4,153 +4,213 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.echo.models.Post
 import com.example.echo.utils.Constants
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.maps.android.compose.CameraPositionState
+import com.google.firebase.firestore.FieldValue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class FeedViewModel : ViewModel() {
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    // ---UI state---
-    private val _posts = MutableStateFlow<List<Post>>(emptyList())              // All posts
-    private val _filteredPosts = MutableStateFlow<List<Post>>(emptyList())      // Filtered posts by tag
-    val filteredPosts: StateFlow<List<Post>> = _filteredPosts
+    //UI State
+    private val _uiState = MutableStateFlow<FeedUiState>(FeedUiState.Loading)
+    val uiState: StateFlow<FeedUiState> = _uiState
 
-    private val _isRefreshing = MutableStateFlow(false)                         // Swipe-to-refresh state
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing
-
-    private val _postLikes = MutableStateFlow<Map<String, Int>>(emptyMap())     // Post ID → like count
-    val postLikes: StateFlow<Map<String, Int>> = _postLikes
-
-    private val _userLikes = MutableStateFlow<Set<String>>(emptySet())          // Posts liked by current user
-    val userLikes: StateFlow<Set<String>> = _userLikes
-
-    private val _commentLikes = MutableStateFlow<Map<String, Int>>(emptyMap())  // Post ID → comment count
-    val commentLikes: StateFlow<Map<String, Int>> = _commentLikes
-
-    private val _currentTagFilter = MutableStateFlow<String?>(null)
-    val currentTagFilter: StateFlow<String?> = _currentTagFilter
+    // Single Source of Truth
+    private var allPosts: List<Post> = emptyList()
 
     init {
         fetchPosts()
     }
 
     /**
-     * Initial post fetch on ViewModel init.
+     * Fetch all posts from Firestore and update UI state.
      */
     fun fetchPosts() {
-        db.collection(Constants.COLLECTION_POSTS)
-            .orderBy(Constants.FIELD_TIMESTAMP, com.google.firebase.firestore.Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val fetchedPosts = snapshot.documents.mapNotNull { it.toObject(Post::class.java) }
-                _posts.value = fetchedPosts
-                _filteredPosts.value = fetchedPosts // show all by default
-                fetchLikesAndComments(fetchedPosts.map { it.id })
+        viewModelScope.launch {
+            _uiState.value = FeedUiState.Loading
+
+            try {
+                val snapshot = db.collection(Constants.COLLECTION_POSTS)
+                    .orderBy(Constants.FIELD_TIMESTAMP)
+                    .get()
+                    .await()
+
+                val posts = snapshot.documents.mapNotNull { it.toObject(Post::class.java) }
+                allPosts = posts
+                val postIds = posts.map { it.id }
+
+                fetchLikesAndCommentsAsync(postIds) { likes, userLiked, commentCounts ->
+                    _uiState.value = FeedUiState.Success(
+                        posts = posts,
+                        filteredPosts = posts,
+                        postLikes = likes,
+                        userLikes = userLiked,
+                        commentLikes = commentCounts,
+                        currentTagFilter = null,
+                        isRefreshing = false
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = FeedUiState.Error("Failed to fetch posts: ${e.message}")
             }
+        }
     }
 
     /**
-     * Handles swipe-to-refresh behavior.
+     * Refresh post data (used for pull-to-refresh).
      */
     fun refreshPosts() {
-        _isRefreshing.value = true
-        db.collection(Constants.COLLECTION_POSTS)
-            .orderBy(Constants.FIELD_TIMESTAMP, com.google.firebase.firestore.Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener { snapshot ->
+        val currentTag = (_uiState.value as? FeedUiState.Success)?.currentTagFilter
+
+        viewModelScope.launch {
+            try {
+                val snapshot = db.collection(Constants.COLLECTION_POSTS)
+                    .orderBy(Constants.FIELD_TIMESTAMP)
+                    .get()
+                    .await()
+
                 val refreshedPosts = snapshot.documents.mapNotNull { it.toObject(Post::class.java) }
-                _posts.value = refreshedPosts
-                _filteredPosts.value = refreshedPosts
-                _isRefreshing.value = false
+                allPosts = refreshedPosts
+
+                val filtered = if (currentTag != null) {
+                    refreshedPosts.filter { post ->
+                        post.tags.any { it.equals(currentTag, ignoreCase = true) }
+                    }
+                } else {
+                    refreshedPosts
+                }
+
+                val postIds = refreshedPosts.map { it.id }
+
+                fetchLikesAndCommentsAsync(postIds) { likes, userLiked, commentCounts ->
+                    _uiState.value = FeedUiState.Success(
+                        posts = refreshedPosts,
+                        filteredPosts = filtered,
+                        postLikes = likes,
+                        userLikes = userLiked,
+                        commentLikes = commentCounts,
+                        currentTagFilter = currentTag,
+                        isRefreshing = false
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = FeedUiState.Error("Failed to refresh posts: ${e.message}")
             }
-            .addOnFailureListener {
-                _isRefreshing.value = false
+        }
+    }
+
+    /**
+     * Filter posts by tag.
+     */
+    fun setTagFilter(tag: String) {
+        val currentState = _uiState.value
+        if (currentState is FeedUiState.Success) {
+            val filtered = allPosts.filter { post ->
+                post.tags.any { it.equals(tag, ignoreCase = true) }
             }
+            _uiState.value = currentState.copy(
+                filteredPosts = filtered,
+                currentTagFilter = tag
+            )
+        }
+    }
+
+    /**
+     * Clear tag filter and show all posts.
+     */
+    fun clearTagFilter() {
+        val currentState = _uiState.value
+        if (currentState is FeedUiState.Success) {
+            _uiState.value = currentState.copy(
+                filteredPosts = allPosts,
+                currentTagFilter = null
+            )
+        }
+    }
+
+    /**
+     * Toggle like/unlike on a post.
+     */
+    fun toggleLike(postId: String) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        val currentState = _uiState.value
+
+        if (currentState !is FeedUiState.Success) return
+
+        val isLiked = currentState.userLikes.contains(postId)
+        val docRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
+
+        viewModelScope.launch {
+            try {
+                if (isLiked) {
+                    docRef.update(Constants.FIELD_LIKES, FieldValue.arrayRemove(currentUserId)).await()
+                } else {
+                    docRef.update(Constants.FIELD_LIKES, FieldValue.arrayUnion(currentUserId)).await()
+                }
+
+                // Update UI optimistically
+                val updatedLikes = currentState.postLikes.toMutableMap()
+                updatedLikes[postId] = (updatedLikes[postId] ?: 0) + if (isLiked) -1 else 1
+
+                val updatedUserLikes = currentState.userLikes.toMutableSet().apply {
+                    if (isLiked) remove(postId) else add(postId)
+                }
+
+                _uiState.value = currentState.copy(
+                    postLikes = updatedLikes,
+                    userLikes = updatedUserLikes
+                )
+            } catch (e: Exception) {
+                // Optional: handle like failure
+            }
+        }
     }
 
     /**
      * Fetch like and comment counts for all post IDs.
+     * likesMap tracks how many likes each post has.
+     * userLikesSet tracks which posts the current user liked.
+     * commentMap tracks how many comments each post has.
      */
-    fun fetchLikesAndComments(postIds: List<String>) {
+    private fun fetchLikesAndCommentsAsync(
+        postIds: List<String>,
+        onComplete: (likes: Map<String, Int>, userLikes: Set<String>, comments: Map<String, Int>) -> Unit
+    ) {
         val currentUserId = auth.currentUser?.uid ?: return
-        val updatedLikes = mutableMapOf<String, Int>()
-        val likedPosts = mutableSetOf<String>()
-        val updatedCommentCounts = mutableMapOf<String, Int>()
+
+        val likesMap = mutableMapOf<String, Int>()
+        val userLikedSet = mutableSetOf<String>()
+        val commentsMap = mutableMapOf<String, Int>()
+
+        var completed = 0
+        val total = postIds.size
 
         postIds.forEach { postId ->
-            val postRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
+            val docRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
 
-            // Likes
-            postRef.get().addOnSuccessListener { snapshot ->
-                val likes = snapshot.get(Constants.FIELD_LIKES) as? List<*>
-                updatedLikes[postId] = likes?.size ?: 0
-                if (likes?.contains(currentUserId) == true) {
-                    likedPosts.add(postId)
+            docRef.get().addOnSuccessListener { doc ->
+                val likes = doc.get(Constants.FIELD_LIKES) as? List<*> ?: emptyList<Any>()
+                likesMap[postId] = likes.size
+                if (likes.contains(currentUserId)) {
+                    userLikedSet.add(postId)
                 }
-                _postLikes.value = updatedLikes
-                _userLikes.value = likedPosts
+
+                docRef.collection(Constants.COLLECTION_COMMENTS).get()
+                    .addOnSuccessListener { commentSnap ->
+                        commentsMap[postId] = commentSnap.size()
+                        completed++
+
+                        if (completed == total) {
+                            onComplete(likesMap, userLikedSet, commentsMap)
+                        }
+                    }
             }
-
-            // Comments
-            postRef.collection(Constants.COLLECTION_COMMENTS).get()
-                .addOnSuccessListener { commentSnapshot ->
-                    updatedCommentCounts[postId] = commentSnapshot.size()
-                    _commentLikes.value = updatedCommentCounts
-                }
         }
     }
-
-    /**
-     * Likes or unlikes a post based on current user state.
-     */
-    fun toggleLike(postId: String) {
-        val currentUserId = auth.currentUser?.uid ?: return
-        val docRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
-
-        val isLiked = _userLikes.value.contains(postId)
-        val newUserLikes = _userLikes.value.toMutableSet()
-        val newPostLikes = _postLikes.value.toMutableMap()
-
-        if (isLiked) {
-            docRef.update(Constants.FIELD_LIKES, FieldValue.arrayRemove(currentUserId))
-            newUserLikes.remove(postId)
-            newPostLikes[postId] = (newPostLikes[postId] ?: 1) - 1
-        } else {
-            docRef.update(Constants.FIELD_LIKES, FieldValue.arrayUnion(currentUserId))
-            newUserLikes.add(postId)
-            newPostLikes[postId] = (newPostLikes[postId] ?: 0) + 1
-        }
-
-        _userLikes.value = newUserLikes
-        _postLikes.value = newPostLikes
-    }
-
-    /**
-     * Applies a tag filter to the post list.
-     */
-    fun setTagFilter(tag: String) {
-        _currentTagFilter.value = tag
-        val filtered = _posts.value.filter { post ->
-            post.tags.any { it.equals(tag, ignoreCase = true) }
-        }
-        _filteredPosts.value = filtered
-    }
-
-    /**
-     * Clears the tag filter and shows all posts again.
-     */
-    fun clearTagFilter() {
-        _filteredPosts.value = _posts.value
-        _currentTagFilter.value = null
-    }
-
 }
