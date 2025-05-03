@@ -3,6 +3,7 @@ package com.example.echo.ui.post
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +34,10 @@ fun PostDetailScreen(
     val isLiked by viewModel.isLikedByUser.collectAsState()
     val likeCount by viewModel.likeCount.collectAsState()
     val commentCount by viewModel.commentCount.collectAsState()
+    val listState = rememberLazyListState()
+    var commentJustAdded by remember { mutableStateOf(false) }
+
+
 
     var newComment by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf("feed") }
@@ -46,6 +51,14 @@ fun PostDetailScreen(
 
     LaunchedEffect(postId) {
         viewModel.loadPostAndComments(postId)
+    }
+
+    //Scroll up when a new comment is added
+    LaunchedEffect(comments.size, commentJustAdded) {
+        if (commentJustAdded && comments.isNotEmpty()) {
+            listState.animateScrollToItem(comments.size)
+            commentJustAdded = false // reset
+        }
     }
 
     Scaffold(
@@ -91,6 +104,7 @@ fun PostDetailScreen(
                 }
             } else if (post != null) {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
@@ -164,7 +178,8 @@ fun PostDetailScreen(
                                 commentTimestamps.add(now)
                                 if (newComment.isNotBlank()) {
                                     viewModel.addComment(postId, newComment) {
-                                        newComment = "" // ✅ This ensures the input clears immediately
+                                        newComment = ""
+                                        commentJustAdded = true //triggers down-scroll to display the comment
                                     }
                                 }
                             }
