@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -101,24 +102,39 @@ fun MapScreen(
                             Text(
                                 text = "Filtered: #${state.currentTag}",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.onPrimary
                             )
-                            IconButton(onClick = {
-                                mapViewModel.clearTagFilter()
-                                tagInput = ""
-                            }) {
+                            IconButton(
+                                onClick = {
+                                    mapViewModel.clearTagFilter()
+                                    tagInput = ""
+                                },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    contentColor = Color.White // Set the icon color to white
+                                )
+                            ) {
                                 Icon(Icons.Default.Close, contentDescription = "Clear Filter")
                             }
                         }
                     } else {
-                        Text("Echo", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "Echo",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showFilterDialog = true }) {
+                    IconButton(
+                        onClick = { showFilterDialog = true },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = Color.White // Set the icon color to white
+                        )
+                    ) {
                         Icon(Icons.Default.FilterList, contentDescription = "Filter by Tag")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
             )
         },
         bottomBar = {

@@ -14,17 +14,22 @@ import androidx.compose.ui.graphics.Color
 
 val NavyBlue = Color(0xFF001F54)
 val lightBlue = Color(0xFF20b1e6)
+val skyBlue = Color(0xffbcf2f8)
+val blue = Color(0xFF19799c)
+
 
 private val DarkColorScheme = darkColorScheme(
     primary = NavyBlue,
-    secondary = Color(0xFF19799c),
-    tertiary = Pink80
+    secondary = lightBlue,
+    tertiary = blue,
+    onPrimary = skyBlue
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = NavyBlue,
-    secondary = Color(0xFF03DAC6),
-    tertiary = Pink40
+    primary = skyBlue,
+    secondary = lightBlue,
+    tertiary = blue,
+    onPrimary = lightBlue
 
     /* Other default colors to override
     background = Color(0xFFFFFBFE),

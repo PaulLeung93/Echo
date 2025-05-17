@@ -49,32 +49,53 @@ fun FeedScreen(
                             Text(
                                 text = "Filtered: #${state.currentTag}",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.onPrimary
                             )
-                            IconButton(onClick = {
-                                feedViewModel.clearTagFilter()
-                                tagInput = ""
-                            }) {
+                            IconButton(
+                                onClick = {
+                                    feedViewModel.clearTagFilter()
+                                    tagInput = ""
+                                },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    contentColor = Color.White // Set the icon color to white
+                                )
+                            ) {
                                 Icon(Icons.Default.Close, contentDescription = "Clear Filter")
                             }
                         }
                     } else {
-                        Text("Echo", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "Echo",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showFilterDialog = true }) {
+                    IconButton(
+                        onClick = { showFilterDialog = true },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = Color.White // Set the icon color to white
+                        )
+                    ) {
                         Icon(Icons.Default.FilterList, contentDescription = "Filter by Tag")
+
                     }
-                    IconButton(onClick = {
-                        authViewModel.signOut()
-                        navController.navigate(Destinations.SIGN_IN) {
-                            popUpTo(Destinations.FEED) { inclusive = true }
-                        }
-                    }) {
+                    IconButton(
+                        onClick = {
+                            authViewModel.signOut()
+                            navController.navigate(Destinations.SIGN_IN) {
+                                popUpTo(Destinations.FEED) { inclusive = true }
+                            }
+                        },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = Color.White // Set the icon color to white
+                        )
+                    ) {
                         Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
             )
         },
         floatingActionButton = {

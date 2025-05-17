@@ -53,7 +53,15 @@ fun ProfileScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("My Profile") })
+            TopAppBar(
+                title = {
+                    Text(
+                        "My Profile",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimary
+                        ) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
+            )
         },
         bottomBar = {
             BottomNavigationBar(selectedTab = selectedTab) { tab ->
