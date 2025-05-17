@@ -1,5 +1,6 @@
 package com.example.echo.ui.map
 
+import com.example.echo.R
 import android.Manifest
 import android.util.Log
 import androidx.compose.foundation.layout.*
@@ -29,6 +30,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -174,7 +176,10 @@ fun MapScreen(
                 GoogleMap(
                     modifier = Modifier.fillMaxSize(),
                     cameraPositionState = cameraPositionState,
-                    properties = MapProperties(isMyLocationEnabled = true),
+                    properties = MapProperties(
+                        isMyLocationEnabled = true,
+                        mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style)
+                    ),
                     uiSettings = MapUiSettings(zoomControlsEnabled = false),
                     onMapClick = { mapViewModel.clearSelectedPost() }
                 ) {
