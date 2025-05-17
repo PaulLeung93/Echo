@@ -60,6 +60,8 @@ fun MapScreen(
     val uiState by mapViewModel.uiState.collectAsState()
     val selectedPost by mapViewModel.selectedPost.collectAsState()
     val clusterGroups by mapViewModel.clusterGroups.collectAsState()
+    val poiMarkers by mapViewModel.poiMarkers.collectAsState()
+
 
     LaunchedEffect(Unit) {
         if (locationPermissionState.status.isGranted) {
@@ -207,6 +209,25 @@ fun MapScreen(
                                 }
                             )
                         }
+                    }
+
+                    // Place POI markers
+                    poiMarkers.forEach { poi ->
+                        val latLng = LatLng(poi.location.latitude, poi.location.longitude)
+
+                        Marker(
+                            state = MarkerState(position = latLng),
+                            title = poi.name,
+                            snippet = poi.description,
+                            icon = BitmapDescriptorFactory.defaultMarker(
+                                when (poi.type.lowercase()) {
+                                    "college" -> BitmapDescriptorFactory.HUE_AZURE
+                                    "landmark" -> BitmapDescriptorFactory.HUE_ORANGE
+                                    "park" -> BitmapDescriptorFactory.HUE_GREEN
+                                    else -> BitmapDescriptorFactory.HUE_RED
+                                }
+                            )
+                        )
                     }
                 }
             } else {

@@ -1,6 +1,7 @@
 package com.example.echo.ui.map
 
 import android.location.Location.distanceBetween
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.echo.models.POI
@@ -197,14 +198,30 @@ class MapViewModel : ViewModel() {
     /**
      * Loads point-of-interest (POI) markers for static locations on the map.
      */
-    fun fetchPOIMarkers() {
-        db.collection("points_of_interest")
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val pois = snapshot.documents.mapNotNull { it.toObject(POI::class.java)?.copy(id = it.id) }
-                _poiMarkers.value = pois
+    private fun fetchPOIMarkers() {
+        viewModelScope.launch {
+            try {
+                val snapshot = db.collection("pois").get().await()
+                val loaded = snapshot.documents.mapNotNull { doc ->
+                    val name = doc.getString("name")
+                    val type = doc.getString("type")
+                    val description = doc.getString("description")
+                    val geoPoint = doc.getGeoPoint("location")
+
+
+                    if (name != null && type != null && geoPoint != null) {
+                        POI(name, type, geoPoint, description ?: "")
+                    } else null
+                }
+                _poiMarkers.value = loaded
+                Log.d("MapViewModel", "Loaded POIs: ${loaded.size}")
+
+            } catch (e: Exception) {
+                Log.e("MapViewModel", "Failed to fetch POIs", e)
             }
+        }
     }
+
 
     /**
      * Toggles like on a post and updates both Firestore and local state.
