@@ -21,6 +21,7 @@ import com.example.echo.navigation.Destinations
 import com.example.echo.ui.common.BottomNavigationBar
 import com.example.echo.ui.common.TopSnackbarHost
 import com.example.echo.ui.feed.FeedUiState
+import com.example.echo.ui.maps.bitmapDescriptorFromVector
 import com.example.echo.ui.maps.createClusterIcon
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
@@ -34,6 +35,7 @@ import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -211,7 +213,8 @@ fun MapScreen(
                                 onClick = {
                                     mapViewModel.setSelectedPost(post, cameraPositionState)
                                     true
-                                }
+                                },
+                                icon = bitmapDescriptorFromVector(context, R.drawable.ic_default)
                             )
                         }
                     }
@@ -224,14 +227,12 @@ fun MapScreen(
                             state = MarkerState(position = latLng),
                             title = poi.name,
                             snippet = poi.description,
-                            icon = BitmapDescriptorFactory.defaultMarker(
-                                when (poi.type.lowercase()) {
-                                    "college" -> BitmapDescriptorFactory.HUE_AZURE
-                                    "landmark" -> BitmapDescriptorFactory.HUE_ORANGE
-                                    "park" -> BitmapDescriptorFactory.HUE_GREEN
-                                    else -> BitmapDescriptorFactory.HUE_RED
-                                }
-                            )
+                            icon = when (poi.type.lowercase()) {
+                                "college" -> bitmapDescriptorFromVector(context, R.drawable.ic_college)
+                                "park" -> bitmapDescriptorFromVector(context, R.drawable.ic_park)
+                                "landmark" -> bitmapDescriptorFromVector(context, R.drawable.ic_landmark)
+                            else -> BitmapDescriptorFactory.defaultMarker()
+                            }
                         )
                     }
                 }

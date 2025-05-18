@@ -13,16 +13,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 
 val NavyBlue = Color(0xFF001F54)
-val lightBlue = Color(0xFF20b1e6)
+val lightBlue = Color(0xFF94d4f2)
 val skyBlue = Color(0xffbcf2f8)
 val blue = Color(0xFF19799c)
 
 
 private val DarkColorScheme = darkColorScheme(
-    primary = NavyBlue,
-    secondary = lightBlue,
+    primary = lightBlue,
+    secondary = NavyBlue,
     tertiary = blue,
-    onPrimary = skyBlue
+    onPrimary = NavyBlue
 )
 
 private val LightColorScheme = lightColorScheme(
