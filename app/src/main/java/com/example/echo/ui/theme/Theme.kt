@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 
 val NavyBlue = Color(0xFF001F54)
+val Navy2 = Color(0xFF224580)
 val lightBlue = Color(0xFF94d4f2)
 val skyBlue = Color(0xffbcf2f8)
 val blue = Color(0xFF19799c)
@@ -26,10 +27,10 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = skyBlue,
+    primary = Navy2,
     secondary = lightBlue,
     tertiary = blue,
-    onPrimary = lightBlue
+    onPrimary = Color.White
 
     /* Other default colors to override
     background = Color(0xFFFFFBFE),
@@ -45,19 +46,9 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun EchoTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

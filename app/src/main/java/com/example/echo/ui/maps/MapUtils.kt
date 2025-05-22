@@ -11,8 +11,8 @@ import androidx.core.graphics.createBitmap
 fun bitmapDescriptorFromVector(context: Context, resId: Int): BitmapDescriptor {
     val drawable = ContextCompat.getDrawable(context, resId) ?: return BitmapDescriptorFactory.defaultMarker()
 
-    val width = 96  // Adjust this as needed (original Google markers are ~48-96px)
-    val height = 96
+    val width = 128  // Adjust this as needed (original Google markers are ~48-96px)
+    val height = 128
 
     val bitmap = createBitmap(width, height)
     val canvas = Canvas(bitmap)
