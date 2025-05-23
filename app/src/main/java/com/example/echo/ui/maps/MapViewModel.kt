@@ -55,7 +55,7 @@ class MapViewModel : ViewModel() {
      * Fetch all posts from Firestore that have valid lat/lng.
      * Also fetch likes/comments and initialize cluster groups.
      */
-    private fun fetchPostsWithLocation() {
+     fun fetchPostsWithLocation() {
         viewModelScope.launch {
             _uiState.value = Loading
             try {

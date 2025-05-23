@@ -86,6 +86,10 @@ fun MapScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        mapViewModel.fetchPostsWithLocation()
+    }
+
     val effectiveZoom by remember { derivedStateOf { cameraPositionState.position.zoom } }
     LaunchedEffect(uiState, effectiveZoom) {
         (uiState as? MapUiState.Success)?.let {
