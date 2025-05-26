@@ -32,6 +32,7 @@ fun FeedScreen(
     feedViewModel: FeedViewModel = viewModel()
 ) {
     val uiState by feedViewModel.uiState.collectAsState()
+    val isUserAuthenticated = authViewModel.isUserAuthenticated
 
     var showFilterDialog by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
@@ -177,15 +178,18 @@ fun FeedScreen(
         }
 
         // --- Floating Action Button ---
-        FloatingActionButton(
-            onClick = { navController.navigate(Destinations.CREATE_POST) },
-            containerColor = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Create Post", tint = Color.White)
+        if (isUserAuthenticated) {
+            FloatingActionButton(
+                onClick = { navController.navigate(Destinations.CREATE_POST) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Create Post", tint = Color.White)
+            }
         }
+
     }
 
     // --- Filter Dialog ---

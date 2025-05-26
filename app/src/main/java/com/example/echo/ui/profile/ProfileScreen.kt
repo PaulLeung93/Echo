@@ -39,15 +39,21 @@ fun ProfileScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val totalLikes by viewModel.totalLikes.collectAsState()
     val totalComments by viewModel.totalComments.collectAsState()
-    val userEmail = FirebaseAuth.getInstance().currentUser?.email ?: "Anonymous"
-    val isAnonymous = FirebaseAuth.getInstance().currentUser?.isAnonymous == true
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    val userEmail = currentUser?.email ?: "Anonymous"
+    val isAnonymous = currentUser?.isAnonymous == true
 
-    if (isAnonymous) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Please sign in to access your profile.", style = MaterialTheme.typography.titleMedium)
+    // Redirect anonymous users to sign-in screen
+    LaunchedEffect(Unit) {
+        if (currentUser == null || isAnonymous) {
+            navController.navigate(Destinations.SIGN_IN) {
+                popUpTo(Destinations.PROFILE) { inclusive = true }
+            }
         }
-        return
     }
+
+    // Early return to avoid rendering UI before redirect
+    if (currentUser == null || isAnonymous) return
 
     // --- Layout ---
     Column(modifier = Modifier.fillMaxSize()) {
@@ -89,7 +95,10 @@ fun ProfileScreen(
                 Text(text = userEmail, style = MaterialTheme.typography.titleMedium)
 
                 Spacer(modifier = Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     StatColumn(label = "Posts", value = posts.size)
                     StatColumn(label = "Likes", value = totalLikes)
                     StatColumn(label = "Comments", value = totalComments)

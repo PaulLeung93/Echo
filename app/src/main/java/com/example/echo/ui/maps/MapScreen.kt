@@ -268,7 +268,7 @@ fun MapScreen(
         // --- Snackbar overlay ---
         SnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(top = 8.dp)
         )
     }
 

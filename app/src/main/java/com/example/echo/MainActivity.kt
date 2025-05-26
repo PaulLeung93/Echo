@@ -36,6 +36,8 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
 
+                val isUserAuthenticated = authViewModel.isUserAuthenticated
+
                 Scaffold(
                     bottomBar = {
                         if (currentRoute in listOf("feed", "map", "profile")) {
@@ -51,7 +53,8 @@ class MainActivity : ComponentActivity() {
                                             restoreState = true
                                         }
                                     }
-                                }
+                                },
+                                isUserAuthenticated = isUserAuthenticated
                             )
                         }
                     }

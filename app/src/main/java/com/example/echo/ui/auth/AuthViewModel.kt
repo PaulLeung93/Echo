@@ -20,6 +20,9 @@ class AuthViewModel : ViewModel() {
     private val _isSignedIn = MutableStateFlow(auth.currentUser != null)
     val isSignedIn: StateFlow<Boolean> = _isSignedIn
 
+    val isUserAuthenticated: Boolean
+        get() = auth.currentUser?.isAnonymous == false
+
     /**
      * Sign In with Email/Password
      */
