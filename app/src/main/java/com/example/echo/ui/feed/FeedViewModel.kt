@@ -17,7 +17,7 @@ class FeedViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    //UI State
+    // UI State
     private val _uiState = MutableStateFlow<FeedUiState>(FeedUiState.Loading)
     val uiState: StateFlow<FeedUiState> = _uiState
 
@@ -43,19 +43,32 @@ class FeedViewModel : ViewModel() {
 
                 val posts = snapshot.documents.mapNotNull { it.toObject(Post::class.java) }
                 allPosts = posts
-                val postIds = posts.map { it.id }
 
-                fetchLikesAndCommentsAsync(postIds) { likes, userLiked, commentCounts ->
-                    _uiState.value = FeedUiState.Success(
-                        posts = posts,
-                        filteredPosts = posts,
-                        postLikes = likes,
-                        userLikes = userLiked,
-                        commentCount = commentCounts,
-                        currentTag = null,
-                        isRefreshing = false
-                    )
+                val currentUserId = auth.currentUser?.uid
+                val isAnonymous = auth.currentUser?.isAnonymous == true
+
+                // Use denormalized fields
+                val postLikes = posts.associate { it.id to (it.likeCount ?: 0) }
+                val commentCounts = posts.associate { it.id to (it.commentCount ?: 0) }
+
+                // Track which posts the current user liked
+                val userLiked = if (isAnonymous || currentUserId == null) {
+                    emptySet()
+                } else {
+                    posts.filter { it.likes.contains(currentUserId) }
+                        .map { it.id }
+                        .toSet()
                 }
+
+                _uiState.value = FeedUiState.Success(
+                    posts = posts,
+                    filteredPosts = posts,
+                    postLikes = postLikes,
+                    userLikes = userLiked,
+                    commentCount = commentCounts,
+                    currentTag = null,
+                    isRefreshing = false
+                )
             } catch (e: Exception) {
                 _uiState.value = FeedUiState.Error("Failed to fetch posts: ${e.message}")
             }
@@ -86,19 +99,31 @@ class FeedViewModel : ViewModel() {
                     refreshedPosts
                 }
 
-                val postIds = refreshedPosts.map { it.id }
+                val currentUserId = auth.currentUser?.uid
+                val isAnonymous = auth.currentUser?.isAnonymous == true
 
-                fetchLikesAndCommentsAsync(postIds) { likes, userLiked, commentCounts ->
-                    _uiState.value = FeedUiState.Success(
-                        posts = refreshedPosts,
-                        filteredPosts = filtered,
-                        postLikes = likes,
-                        userLikes = userLiked,
-                        commentCount = commentCounts,
-                        currentTag = currentTag,
-                        isRefreshing = false
-                    )
+                // Use denormalized fields
+                val postLikes = refreshedPosts.associate { it.id to (it.likeCount ?: 0) }
+                val commentCounts = refreshedPosts.associate { it.id to (it.commentCount ?: 0) }
+
+                // Track which posts the current user liked
+                val userLiked = if (isAnonymous || currentUserId == null) {
+                    emptySet()
+                } else {
+                    refreshedPosts.filter { it.likes.contains(currentUserId) }
+                        .map { it.id }
+                        .toSet()
                 }
+
+                _uiState.value = FeedUiState.Success(
+                    posts = refreshedPosts,
+                    filteredPosts = filtered,
+                    postLikes = postLikes,
+                    userLikes = userLiked,
+                    commentCount = commentCounts,
+                    currentTag = currentTag,
+                    isRefreshing = false
+                )
             } catch (e: Exception) {
                 _uiState.value = FeedUiState.Error("Failed to refresh posts: ${e.message}")
             }
@@ -150,8 +175,10 @@ class FeedViewModel : ViewModel() {
             try {
                 if (isLiked) {
                     docRef.update(Constants.FIELD_LIKES, FieldValue.arrayRemove(currentUserId)).await()
+                    docRef.update("likeCount", FieldValue.increment(-1)).await()
                 } else {
                     docRef.update(Constants.FIELD_LIKES, FieldValue.arrayUnion(currentUserId)).await()
+                    docRef.update("likeCount", FieldValue.increment(1)).await()
                 }
 
                 // Update UI optimistically
@@ -168,48 +195,6 @@ class FeedViewModel : ViewModel() {
                 )
             } catch (e: Exception) {
                 // Optional: handle like failure
-            }
-        }
-    }
-
-    /**
-     * Fetch like and comment counts for all post IDs.
-     * likesMap tracks how many likes each post has.
-     * userLikesSet tracks which posts the current user liked.
-     * commentMap tracks how many comments each post has.
-     */
-    private fun fetchLikesAndCommentsAsync(
-        postIds: List<String>,
-        onComplete: (likes: Map<String, Int>, userLikes: Set<String>, comments: Map<String, Int>) -> Unit
-    ) {
-        val currentUserId = auth.currentUser?.uid ?: return
-
-        val likesMap = mutableMapOf<String, Int>()
-        val userLikedSet = mutableSetOf<String>()
-        val commentsMap = mutableMapOf<String, Int>()
-
-        var completed = 0
-        val total = postIds.size
-
-        postIds.forEach { postId ->
-            val docRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
-
-            docRef.get().addOnSuccessListener { doc ->
-                val likes = doc.get(Constants.FIELD_LIKES) as? List<*> ?: emptyList<Any>()
-                likesMap[postId] = likes.size
-                if (likes.contains(currentUserId)) {
-                    userLikedSet.add(postId)
-                }
-
-                docRef.collection(Constants.COLLECTION_COMMENTS).get()
-                    .addOnSuccessListener { commentSnap ->
-                        commentsMap[postId] = commentSnap.size()
-                        completed++
-
-                        if (completed == total) {
-                            onComplete(likesMap, userLikedSet, commentsMap)
-                        }
-                    }
             }
         }
     }
