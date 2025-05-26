@@ -23,7 +23,6 @@ import com.example.echo.utils.Constants
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import com.example.echo.components.PostCard
-import com.example.echo.ui.common.BottomNavigationBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,12 +33,12 @@ fun FeedScreen(
 ) {
     val uiState by feedViewModel.uiState.collectAsState()
 
-    var selectedTab by remember { mutableStateOf("feed") }
     var showFilterDialog by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
 
-    Scaffold(
-        topBar = {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // --- Top App Bar ---
             TopAppBar(
                 title = {
                     val state = uiState
@@ -79,7 +78,6 @@ fun FeedScreen(
                         )
                     ) {
                         Icon(Icons.Default.FilterList, contentDescription = "Filter by Tag")
-
                     }
                     IconButton(
                         onClick = {
@@ -97,159 +95,130 @@ fun FeedScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate(Destinations.CREATE_POST) },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Create Post", tint = Color.White)
-            }
-        },
-        bottomBar = {
-            BottomNavigationBar(selectedTab = selectedTab) { tab ->
-                selectedTab = tab
-                when (tab) {
-                    "feed" -> {
-                        navController.navigate(Destinations.FEED) {
-                            popUpTo(Destinations.FEED) { inclusive = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                    "map" -> {
-                        navController.navigate(Destinations.MAP) {
-                            popUpTo(Destinations.FEED) { inclusive = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                    "profile" -> {
-                        navController.navigate(Destinations.PROFILE) {
-                            popUpTo(Destinations.FEED) { inclusive = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                }
-            }
 
-        }
-    ) { paddingValues ->
-        when (val state = uiState) {
-            is FeedUiState.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-
-            is FeedUiState.Error -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = state.message,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
-            }
-
-            is FeedUiState.Success -> {
-                SwipeRefresh(
-                    state = rememberSwipeRefreshState(state.isRefreshing),
-                    onRefresh = { feedViewModel.refreshPosts() }
-                ) {
-                    LazyColumn(
-                        contentPadding = paddingValues,
+            // --- Main Feed Content ---
+            when (val state = uiState) {
+                is FeedUiState.Loading -> {
+                    Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp)
+                            .fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        if (state.filteredPosts.isEmpty()) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(top = 100.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "No posts yet.\nBe the first to share something!",
-                                        textAlign = TextAlign.Center,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        CircularProgressIndicator()
+                    }
+                }
+
+                is FeedUiState.Error -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = state.message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+
+                is FeedUiState.Success -> {
+                    SwipeRefresh(
+                        state = rememberSwipeRefreshState(state.isRefreshing),
+                        onRefresh = { feedViewModel.refreshPosts() }
+                    ) {
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            if (state.filteredPosts.isEmpty()) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(top = 100.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "No posts yet.\nBe the first to share something!",
+                                            textAlign = TextAlign.Center,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                            } else {
+                                items(state.filteredPosts) { post ->
+                                    val isLiked = state.userLikes.contains(post.id)
+                                    val likeCount = state.postLikes[post.id] ?: 0
+                                    val commentCount = state.commentCount[post.id] ?: 0
+
+                                    PostCard(
+                                        post = post,
+                                        isLiked = isLiked,
+                                        likeCount = likeCount,
+                                        commentCount = commentCount,
+                                        onLikeClick = { feedViewModel.toggleLike(post.id) },
+                                        onClick = {
+                                            navController.navigate("${Constants.ROUTE_POST_DETAILS}/${post.id}")
+                                        },
+                                        onTagClick = { tag ->
+                                            tagInput = tag
+                                            feedViewModel.setTagFilter(tag)
+                                        }
                                     )
+                                    Spacer(modifier = Modifier.height(12.dp))
                                 }
                             }
-                        } else {
-                            items(state.filteredPosts) { post ->
-                                val isLiked = state.userLikes.contains(post.id)
-                                val likeCount = state.postLikes[post.id] ?: 0
-                                val commentCount = state.commentCount[post.id] ?: 0
-
-                                PostCard(
-                                    post = post,
-                                    isLiked = isLiked,
-                                    likeCount = likeCount,
-                                    commentCount = commentCount,
-                                    onLikeClick = { feedViewModel.toggleLike(post.id) },
-                                    onClick = {
-                                        navController.navigate("${Constants.ROUTE_POST_DETAILS}/${post.id}")
-                                    },
-                                    onTagClick = { tag ->
-                                        tagInput = tag
-                                        feedViewModel.setTagFilter(tag)
-                                    }
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                            }
                         }
                     }
                 }
             }
         }
 
-        // --- Filter Dialog ---
-        if (showFilterDialog) {
-            AlertDialog(
-                onDismissRequest = { showFilterDialog = false },
-                title = { Text("Filter Posts by Tag") },
-                text = {
-                    OutlinedTextField(
-                        value = tagInput,
-                        onValueChange = { tagInput = it },
-                        label = { Text("Enter tag") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        feedViewModel.setTagFilter(tagInput.trim().lowercase())
-                        showFilterDialog = false
-                    }) {
-                        Text("Apply")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        feedViewModel.clearTagFilter()
-                        tagInput = ""
-                        showFilterDialog = false
-                    }) {
-                        Text("Clear")
-                    }
-                }
-            )
+        // --- Floating Action Button ---
+        FloatingActionButton(
+            onClick = { navController.navigate(Destinations.CREATE_POST) },
+            containerColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Create Post", tint = Color.White)
         }
+    }
+
+    // --- Filter Dialog ---
+    if (showFilterDialog) {
+        AlertDialog(
+            onDismissRequest = { showFilterDialog = false },
+            title = { Text("Filter Posts by Tag") },
+            text = {
+                OutlinedTextField(
+                    value = tagInput,
+                    onValueChange = { tagInput = it },
+                    label = { Text("Enter tag") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    feedViewModel.setTagFilter(tagInput.trim().lowercase())
+                    showFilterDialog = false
+                }) {
+                    Text("Apply")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    feedViewModel.clearTagFilter()
+                    tagInput = ""
+                    showFilterDialog = false
+                }) {
+                    Text("Clear")
+                }
+            }
+        )
     }
 }

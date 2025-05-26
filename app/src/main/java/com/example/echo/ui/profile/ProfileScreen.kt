@@ -21,7 +21,6 @@ import com.example.echo.components.PostCard
 import com.example.echo.models.Post
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.auth.AuthViewModel
-import com.example.echo.ui.common.BottomNavigationBar
 import com.google.firebase.auth.FirebaseAuth
 
 /**
@@ -42,7 +41,6 @@ fun ProfileScreen(
     val totalComments by viewModel.totalComments.collectAsState()
     val userEmail = FirebaseAuth.getInstance().currentUser?.email ?: "Anonymous"
     val isAnonymous = FirebaseAuth.getInstance().currentUser?.isAnonymous == true
-    var selectedTab by remember { mutableStateOf("profile") }
 
     if (isAnonymous) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -51,51 +49,30 @@ fun ProfileScreen(
         return
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "My Profile",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onPrimary
-                        ) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
-            )
-        },
-        bottomBar = {
-            BottomNavigationBar(selectedTab = selectedTab) { tab ->
-                selectedTab = tab
-                when (tab) {
-                    "feed" -> navController.navigate(Destinations.FEED) {
-                        popUpTo(Destinations.FEED) { inclusive = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                    "map" -> navController.navigate(Destinations.MAP) {
-                        popUpTo(Destinations.FEED) { inclusive = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                    "profile" -> navController.navigate(Destinations.PROFILE) {
-                        popUpTo(Destinations.FEED) { inclusive = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
-            }
-        }
-    ) { paddingValues ->
+    // --- Layout ---
+    Column(modifier = Modifier.fillMaxSize()) {
+        // --- Top App Bar ---
+        TopAppBar(
+            title = {
+                Text(
+                    "My Profile",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(16.dp)
         ) {
             // Profile Header
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .padding(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Placeholder profile image
@@ -132,7 +109,7 @@ fun ProfileScreen(
                     Text("You haven’t posted anything yet.", style = MaterialTheme.typography.bodyMedium)
                 }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(16.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(posts) { post ->
                         PostCard(
                             post = post,

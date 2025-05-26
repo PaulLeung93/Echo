@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,7 +17,6 @@ import androidx.navigation.NavHostController
 import com.example.echo.components.PostCard
 import com.example.echo.models.Comment
 import com.example.echo.navigation.Destinations
-import com.example.echo.ui.common.BottomNavigationBar
 import com.example.echo.utils.formatTimestamp
 import kotlinx.coroutines.launch
 
@@ -37,11 +38,7 @@ fun PostDetailScreen(
     val listState = rememberLazyListState()
     var commentJustAdded by remember { mutableStateOf(false) }
 
-
-
     var newComment by remember { mutableStateOf("") }
-    var selectedTab by remember { mutableStateOf("feed") }
-
     val commentTimestamps = remember { mutableStateListOf<Long>() }
     val MAX_COMMENTS = 5
     val WINDOW_MS = 30_000L // 30 seconds
@@ -53,7 +50,7 @@ fun PostDetailScreen(
         viewModel.loadPostAndComments(postId)
     }
 
-    //Scroll up when a new comment is added
+    // Scroll up when a new comment is added
     LaunchedEffect(comments.size, commentJustAdded) {
         if (commentJustAdded && comments.isNotEmpty()) {
             listState.animateScrollToItem(comments.size)
@@ -63,32 +60,25 @@ fun PostDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Post Details") })
-        },
-        bottomBar = {
-            BottomNavigationBar(selectedTab = selectedTab) { tab ->
-                selectedTab = tab
-                when (tab) {
-                    "feed" -> navController.navigate("feed") {
-                        popUpTo("feed") { inclusive = true }
-                        launchSingleTop = true
-                        restoreState = true
+            TopAppBar(
+                title = {
+                    Text("Post Details", color = MaterialTheme.colorScheme.onPrimary)
+                },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onPrimary)
                     }
-                    "map" -> navController.navigate("map") {
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                    "profile" -> { /* No-op */ }
-                }
-            }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
+                .padding(top = paddingValues.calculateTopPadding()) // no bottom padding
         ) {
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -110,7 +100,7 @@ fun PostDetailScreen(
                         .fillMaxWidth()
                 ) {
                     item {
-                        // --- Reused PostCard composable (consistent with Feed & Map) ---
+                        // --- Reused PostCard composable ---
                         PostCard(
                             post = post!!,
                             isLiked = isLiked,
@@ -141,8 +131,7 @@ fun PostDetailScreen(
                         }
                     } else {
                         items(comments, key = { it.id ?: it.hashCode() }) { comment ->
-
-                        CommentCard(comment)
+                            CommentCard(comment)
                             Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
@@ -179,7 +168,7 @@ fun PostDetailScreen(
                                 if (newComment.isNotBlank()) {
                                     viewModel.addComment(postId, newComment) {
                                         newComment = ""
-                                        commentJustAdded = true //triggers down-scroll to display the comment
+                                        commentJustAdded = true // triggers down-scroll to display the comment
                                     }
                                 }
                             }
