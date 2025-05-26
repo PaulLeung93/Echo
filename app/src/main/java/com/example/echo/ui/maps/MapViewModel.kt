@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-// Data class to represent a group of nearby posts (i.e., a cluster)
+// Represents a group of nearby posts (clustered by location)
 data class ClusterGroup(
     val position: LatLng,
     val posts: List<Post>
@@ -30,12 +30,9 @@ class MapViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    // --- UI State ---
+    // UI state exposed to MapScreen
     private val _uiState = MutableStateFlow<MapUiState>(Loading)
     val uiState: StateFlow<MapUiState> = _uiState
-
-    // All posts from Firestore
-    private var allPosts = emptyList<Post>()
 
     private val _selectedPost = MutableStateFlow<Post?>(null)
     val selectedPost: StateFlow<Post?> = _selectedPost
@@ -46,16 +43,26 @@ class MapViewModel : ViewModel() {
     private val _clusterGroups = MutableStateFlow<List<ClusterGroup>>(emptyList())
     val clusterGroups: StateFlow<List<ClusterGroup>> = _clusterGroups
 
+    // All posts from firestore
+    private var allPosts = emptyList<Post>()
+
+    // Filter options
+    private var currentTypeFilters = setOf("user posts", "landmark", "park", "college")
+    private var currentTag: String? = null
+
+    val markerTypes: Set<String>
+        get() = currentTypeFilters
+
+
     init {
         fetchPostsWithLocation()
         fetchPOIMarkers()
     }
 
     /**
-     * Fetch all posts from Firestore that have valid lat/lng.
-     * Also fetch likes/comments and initialize cluster groups.
+     * Fetch all posts from Firestore that include location data.
      */
-     fun fetchPostsWithLocation() {
+    fun fetchPostsWithLocation() {
         viewModelScope.launch {
             _uiState.value = Loading
             try {
@@ -64,20 +71,7 @@ class MapViewModel : ViewModel() {
                     .filter { it.latitude != null && it.longitude != null }
 
                 allPosts = fetched
-                val postIds = fetched.map { it.id }
-
-                val (likes, liked, comments) = fetchLikesAndComments(postIds)
-
-                _uiState.value = Success(
-                    posts = fetched,
-                    filteredPosts = fetched,
-                    postLikes = likes,
-                    userLikes = liked,
-                    commentCount = comments
-                )
-
-                _clusterGroups.value = clusterPosts(fetched, zoom = 12f)
-
+                applyCurrentFilters()
             } catch (e: Exception) {
                 _uiState.value = Error("Failed to load posts: ${e.message}")
             }
@@ -85,7 +79,91 @@ class MapViewModel : ViewModel() {
     }
 
     /**
-     * Create clusters by grouping posts that are nearby, based on zoom level.
+     * Apply current tag and marker type filters to the post list.
+     */
+    private fun applyCurrentFilters() {
+        viewModelScope.launch {
+            val filtered = if ("user posts" in currentTypeFilters) {
+                allPosts.filter { post ->
+                    val tagMatch = currentTag?.let { tag ->
+                        post.tags.any { it.equals(tag, ignoreCase = true) }
+                    } ?: true
+                    tagMatch
+                }
+            } else {
+                emptyList()
+            }
+
+            val (likes, liked, comments) = fetchLikesAndComments(filtered.map { it.id })
+
+            _uiState.value = Success(
+                posts = allPosts,
+                filteredPosts = filtered,
+                postLikes = likes,
+                userLikes = liked,
+                commentCount = comments,
+                currentTag = currentTag
+            )
+
+            _clusterGroups.value = clusterPosts(filtered, 12f)
+        }
+    }
+
+    /**
+     * Set a tag to filter by.
+     */
+    fun setTagFilter(tag: String, userLocation: LatLng?, camera: CameraPositionState?) {
+        currentTag = tag
+        _selectedPost.value = null
+        applyCurrentFilters()
+
+        viewModelScope.launch {
+            val filtered = (_uiState.value as? Success)?.filteredPosts ?: return@launch
+            if (camera != null && filtered.isNotEmpty()) {
+                val cameraLatLng = camera.position.target
+                val nearest = filtered.minByOrNull {
+                    distanceBetween(cameraLatLng, LatLng(it.latitude!!, it.longitude!!))
+                }
+
+                nearest?.let {
+                    camera.animate(
+                        CameraUpdateFactory.newLatLngZoom(
+                            LatLng(it.latitude!!, it.longitude!!),
+                            camera.position.zoom
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+
+    /**
+     * Remove tag filter.
+     */
+    fun clearTagFilter() {
+        currentTag = null
+        _selectedPost.value = null
+        applyCurrentFilters()
+    }
+
+    /**
+     * Update which marker types (User Posts, POIs) are shown.
+     */
+    fun filterByMarkerTypes(types: Set<String>) {
+        currentTypeFilters = types
+        applyCurrentFilters()
+    }
+
+    /**
+     * Cluster posts for current zoom level.
+     */
+    fun refreshClusters(zoom: Float, posts: List<Post>) {
+        _clusterGroups.value = clusterPosts(posts, zoom)
+    }
+
+    /**
+     * Helper to cluster posts based on distance and zoom.
      */
     private fun clusterPosts(posts: List<Post>, zoom: Float): List<ClusterGroup> {
         val radius = when {
@@ -96,7 +174,9 @@ class MapViewModel : ViewModel() {
         }
 
         if (radius == 0f) {
-            return posts.map { ClusterGroup(LatLng(it.latitude!!, it.longitude!!), listOf(it)) }
+            return posts.map {
+                ClusterGroup(LatLng(it.latitude!!, it.longitude!!), listOf(it))
+            }
         }
 
         val clusters = mutableListOf<ClusterGroup>()
@@ -125,14 +205,7 @@ class MapViewModel : ViewModel() {
     }
 
     /**
-     * Refresh clusters when zoom level changes.
-     */
-    fun refreshClusters(zoom: Float, posts: List<Post>) {
-        _clusterGroups.value = clusterPosts(posts, zoom)
-    }
-
-    /**
-     * Triggered when a marker is tapped. Sets the selected post and moves the camera to it.
+     * Called when user taps on a post marker.
      */
     fun setSelectedPost(post: Post, camera: CameraPositionState) {
         _selectedPost.value = post
@@ -142,61 +215,15 @@ class MapViewModel : ViewModel() {
         }
     }
 
-    /** Clears the selected post from state. */
+    /**
+     * Clear selected post preview.
+     */
     fun clearSelectedPost() {
         _selectedPost.value = null
     }
 
     /**
-     * Filters posts by a specific tag and optionally recenters on the nearest one.
-     */
-    fun setTagFilter(tag: String, userLocation: LatLng?, camera: CameraPositionState?) {
-        _selectedPost.value = null
-        val filtered = allPosts.filter { post ->
-            post.tags.any { it.equals(tag, ignoreCase = true) }
-        }
-
-        viewModelScope.launch {
-            val (likes, liked, comments) = fetchLikesAndComments(filtered.map { it.id })
-
-            _uiState.value = Success(
-                posts = allPosts,
-                filteredPosts = filtered,
-                postLikes = likes,
-                userLikes = liked,
-                commentCount = comments,
-                currentTag = tag
-            )
-            _clusterGroups.value = clusterPosts(filtered, 12f)
-
-            if (userLocation != null && camera != null && filtered.isNotEmpty()) {
-                val nearest = filtered.minByOrNull {
-                    distanceBetween(userLocation, LatLng(it.latitude!!, it.longitude!!))
-                }
-
-                nearest?.let {
-                    camera.animate(CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude!!, it.longitude!!), 13f))
-                }
-            }
-        }
-    }
-
-    /**
-     * Clears any tag filter and resets the full map state.
-     */
-    fun clearTagFilter() {
-        _selectedPost.value = null
-        (_uiState.value as? Success)?.let { current ->
-            _uiState.value = current.copy(
-                filteredPosts = allPosts,
-                currentTag = null
-            )
-            _clusterGroups.value = clusterPosts(allPosts, 12f)
-        }
-    }
-
-    /**
-     * Loads point-of-interest (POI) markers for static locations on the map.
+     * Load predefined points of interest from Firestore.
      */
     private fun fetchPOIMarkers() {
         viewModelScope.launch {
@@ -207,7 +234,6 @@ class MapViewModel : ViewModel() {
                     val type = doc.getString("type")
                     val description = doc.getString("description")
                     val geoPoint = doc.getGeoPoint("location")
-
 
                     if (name != null && type != null && geoPoint != null) {
                         POI(name, type, geoPoint, description ?: "")
@@ -222,9 +248,8 @@ class MapViewModel : ViewModel() {
         }
     }
 
-
     /**
-     * Toggles like on a post and updates both Firestore and local state.
+     * Handle like/unlike action on post.
      */
     fun toggleLike(postId: String) {
         val userId = auth.currentUser?.uid ?: return
@@ -252,7 +277,7 @@ class MapViewModel : ViewModel() {
     }
 
     /**
-     * Utility: Calculates the distance in meters between two LatLng points.
+     * Utility: Measure distance between two LatLng points in meters.
      */
     private fun distanceBetween(a: LatLng, b: LatLng): Float {
         val results = FloatArray(1)
@@ -261,7 +286,7 @@ class MapViewModel : ViewModel() {
     }
 
     /**
-     * Utility: Fetches like counts, comment counts, and user-liked posts.
+     * Utility: Load like counts, comment counts, and whether current user liked each post.
      */
     private suspend fun fetchLikesAndComments(
         postIds: List<String>

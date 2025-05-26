@@ -1,6 +1,5 @@
 package com.example.echo.ui.map
 
-import com.example.echo.R
 import android.Manifest
 import android.util.Log
 import androidx.compose.foundation.layout.*
@@ -16,11 +15,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.example.echo.R
 import com.example.echo.components.PostCard
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.common.BottomNavigationBar
 import com.example.echo.ui.common.TopSnackbarHost
-import com.example.echo.ui.feed.FeedUiState
+import com.example.echo.ui.maps.MarkerTypeFilterDialog
 import com.example.echo.ui.maps.bitmapDescriptorFromVector
 import com.example.echo.ui.maps.createClusterIcon
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -28,14 +28,10 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
+import com.google.android.gms.maps.model.*
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -49,9 +45,16 @@ fun MapScreen(
 
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
     var selectedTab by remember { mutableStateOf("map") }
-    var showFilterDialog by remember { mutableStateOf(false) }
+    var showTagDialog by remember { mutableStateOf(false) }
+    var showTypeDialog by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
     var filterAttempted by remember { mutableStateOf(false) }
+
+    // Marker type filter options - simplified for exact Firestore match
+    var selectedMarkerTypes by remember {
+        mutableStateOf(setOf("user posts", "landmark", "park", "college"))
+    }
 
     val defaultLocation = LatLng(40.7128, -74.0060)
     val cameraPositionState = rememberCameraPositionState {
@@ -66,7 +69,7 @@ fun MapScreen(
     val clusterGroups by mapViewModel.clusterGroups.collectAsState()
     val poiMarkers by mapViewModel.poiMarkers.collectAsState()
 
-
+    // Get last known location on launch
     LaunchedEffect(Unit) {
         if (locationPermissionState.status.isGranted) {
             try {
@@ -80,16 +83,19 @@ fun MapScreen(
         }
     }
 
+    // Center camera on user location when acquired
     LaunchedEffect(userLocation) {
         userLocation?.let {
             cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(it, 14f))
         }
     }
 
+    // Initial post fetch
     LaunchedEffect(Unit) {
         mapViewModel.fetchPostsWithLocation()
     }
 
+    // Watch for cluster updates and notify user if no results
     val effectiveZoom by remember { derivedStateOf { cameraPositionState.position.zoom } }
     LaunchedEffect(uiState, effectiveZoom) {
         (uiState as? MapUiState.Success)?.let {
@@ -119,29 +125,38 @@ fun MapScreen(
                                     mapViewModel.clearTagFilter()
                                     tagInput = ""
                                 },
-                                colors = IconButtonDefaults.iconButtonColors(
-                                    contentColor = Color.White // Set the icon color to white
-                                )
+                                colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)
                             ) {
                                 Icon(Icons.Default.Close, contentDescription = "Clear Filter")
                             }
                         }
                     } else {
-                        Text(
-                            "Echo",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
+                        Text("Echo", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimary)
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = { showFilterDialog = true },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = Color.White // Set the icon color to white
-                        )
+                    // Dropdown menu for filter options
+                    IconButton(onClick = { menuExpanded = true }, colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)) {
+                        Icon(Icons.Default.FilterList, contentDescription = "Filter Options")
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
                     ) {
-                        Icon(Icons.Default.FilterList, contentDescription = "Filter by Tag")
+                        DropdownMenuItem(
+                            text = { Text("Filter by Tags") },
+                            onClick = {
+                                menuExpanded = false
+                                showTagDialog = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Filter by Marker Type") },
+                            onClick = {
+                                menuExpanded = false
+                                showTypeDialog = true
+                            }
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -151,33 +166,28 @@ fun MapScreen(
             BottomNavigationBar(selectedTab = selectedTab) { tab ->
                 selectedTab = tab
                 when (tab) {
-                    "feed" -> {
-                        navController.navigate(Destinations.FEED) {
-                            popUpTo(Destinations.FEED) { inclusive = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                    "feed" -> navController.navigate(Destinations.FEED) {
+                        popUpTo(Destinations.FEED) { inclusive = true }
+                        launchSingleTop = true
+                        restoreState = true
                     }
-                    "map" -> {
-                        navController.navigate(Destinations.MAP) {
-                            popUpTo(Destinations.FEED) { inclusive = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                    "map" -> navController.navigate(Destinations.MAP) {
+                        popUpTo(Destinations.FEED) { inclusive = true }
+                        launchSingleTop = true
+                        restoreState = true
                     }
-                    "profile" -> {
-                        navController.navigate(Destinations.PROFILE) {
-                            popUpTo(Destinations.FEED) { inclusive = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                    "profile" -> navController.navigate(Destinations.PROFILE) {
+                        popUpTo(Destinations.FEED) { inclusive = true }
+                        launchSingleTop = true
+                        restoreState = true
                     }
                 }
             }
-
         }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+
+            // Google Map layer
             if (locationPermissionState.status.isGranted) {
                 GoogleMap(
                     modifier = Modifier.fillMaxSize(),
@@ -189,6 +199,7 @@ fun MapScreen(
                     uiSettings = MapUiSettings(zoomControlsEnabled = false),
                     onMapClick = { mapViewModel.clearSelectedPost() }
                 ) {
+                    // Cluster markers for user posts
                     clusterGroups.forEach { cluster ->
                         val count = cluster.posts.size
                         if (count > 1) {
@@ -223,24 +234,26 @@ fun MapScreen(
                         }
                     }
 
-                    // Place POI markers
+                    // POI markers (filtered by type)
                     poiMarkers.forEach { poi ->
                         val latLng = LatLng(poi.location.latitude, poi.location.longitude)
-
-                        Marker(
-                            state = MarkerState(position = latLng),
-                            title = poi.name,
-                            snippet = poi.description,
-                            icon = when (poi.type.lowercase()) {
-                                "college" -> bitmapDescriptorFromVector(context, R.drawable.ic_college)
-                                "park" -> bitmapDescriptorFromVector(context, R.drawable.ic_park)
-                                "landmark" -> bitmapDescriptorFromVector(context, R.drawable.ic_landmark)
-                            else -> BitmapDescriptorFactory.defaultMarker()
-                            }
-                        )
+                        if (selectedMarkerTypes.contains(poi.type.lowercase())) {
+                            Marker(
+                                state = MarkerState(position = latLng),
+                                title = poi.name,
+                                snippet = poi.description,
+                                icon = when (poi.type.lowercase()) {
+                                    "college" -> bitmapDescriptorFromVector(context, R.drawable.ic_college)
+                                    "park" -> bitmapDescriptorFromVector(context, R.drawable.ic_park)
+                                    "landmark" -> bitmapDescriptorFromVector(context, R.drawable.ic_landmark)
+                                    else -> BitmapDescriptorFactory.defaultMarker()
+                                }
+                            )
+                        }
                     }
                 }
             } else {
+                // Fallback UI if permission not granted
                 Column(
                     modifier = Modifier.fillMaxSize().padding(32.dp),
                     verticalArrangement = Arrangement.Center,
@@ -254,7 +267,7 @@ fun MapScreen(
                 }
             }
 
-            // Show selected post as a preview card at bottom
+            // Post preview card (if marker tapped)
             (uiState as? MapUiState.Success)?.let { state ->
                 selectedPost?.let { post ->
                     PostCard(
@@ -270,18 +283,17 @@ fun MapScreen(
                             tagInput = tag
                             mapViewModel.setTagFilter(tag, userLocation, cameraPositionState)
                         },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(16.dp)
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
                     )
                 }
             }
         }
     }
 
-    if (showFilterDialog) {
+    // Tag filter prompt dialog
+    if (showTagDialog) {
         AlertDialog(
-            onDismissRequest = { showFilterDialog = false },
+            onDismissRequest = { showTagDialog = false },
             title = { Text("Filter Posts by Tag") },
             text = {
                 OutlinedTextField(
@@ -296,7 +308,7 @@ fun MapScreen(
                 TextButton(onClick = {
                     filterAttempted = true
                     mapViewModel.setTagFilter(tagInput.trim().lowercase(), userLocation, cameraPositionState)
-                    showFilterDialog = false
+                    showTagDialog = false
                 }) {
                     Text("Apply")
                 }
@@ -305,10 +317,22 @@ fun MapScreen(
                 TextButton(onClick = {
                     mapViewModel.clearTagFilter()
                     tagInput = ""
-                    showFilterDialog = false
+                    showTagDialog = false
                 }) {
                     Text("Clear")
                 }
+            }
+        )
+    }
+
+    // Marker type filter dialog
+    if (showTypeDialog) {
+        MarkerTypeFilterDialog(
+            selectedTypes = selectedMarkerTypes,
+            onDismiss = { showTypeDialog = false },
+            onApply = { selectedTypes ->
+                selectedMarkerTypes = selectedTypes
+                mapViewModel.filterByMarkerTypes(selectedTypes)
             }
         )
     }
