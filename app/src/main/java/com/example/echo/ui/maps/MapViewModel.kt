@@ -53,7 +53,6 @@ class MapViewModel : ViewModel() {
     val markerTypes: Set<String>
         get() = currentTypeFilters
 
-
     init {
         fetchPostsWithLocation()
         fetchPOIMarkers()
@@ -80,6 +79,7 @@ class MapViewModel : ViewModel() {
 
     /**
      * Apply current tag and marker type filters to the post list.
+     * Uses denormalized likeCount and commentCount fields to reduce Firestore reads.
      */
     private fun applyCurrentFilters() {
         viewModelScope.launch {
@@ -94,14 +94,27 @@ class MapViewModel : ViewModel() {
                 emptyList()
             }
 
-            val (likes, liked, comments) = fetchLikesAndComments(filtered.map { it.id })
+            // Use denormalized fields instead of fetching each document
+            val currentUserId = auth.currentUser?.uid
+            val isAnonymous = auth.currentUser?.isAnonymous == true
+
+            val postLikes = filtered.associate { it.id to (it.likeCount ?: 0) }
+            val commentCounts = filtered.associate { it.id to (it.commentCount ?: 0) }
+
+            val userLiked = if (isAnonymous || currentUserId == null) {
+                emptySet()
+            } else {
+                filtered.filter { it.likes.contains(currentUserId) }
+                    .map { it.id }
+                    .toSet()
+            }
 
             _uiState.value = Success(
                 posts = allPosts,
                 filteredPosts = filtered,
-                postLikes = likes,
-                userLikes = liked,
-                commentCount = comments,
+                postLikes = postLikes,
+                userLikes = userLiked,
+                commentCount = commentCounts,
                 currentTag = currentTag
             )
 
@@ -136,7 +149,6 @@ class MapViewModel : ViewModel() {
             }
         }
     }
-
 
     /**
      * Remove tag filter.
@@ -283,33 +295,5 @@ class MapViewModel : ViewModel() {
         val results = FloatArray(1)
         distanceBetween(a.latitude, a.longitude, b.latitude, b.longitude, results)
         return results[0]
-    }
-
-    /**
-     * Utility: Load like counts, comment counts, and whether current user liked each post.
-     */
-    private suspend fun fetchLikesAndComments(
-        postIds: List<String>
-    ): Triple<Map<String, Int>, Set<String>, Map<String, Int>> {
-        val likesMap = mutableMapOf<String, Int>()
-        val commentMap = mutableMapOf<String, Int>()
-        val userLiked = mutableSetOf<String>()
-        val userId = auth.currentUser?.uid
-
-        postIds.forEach { postId ->
-            val postRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
-            val snapshot = postRef.get().await()
-
-            val likes = snapshot.get(Constants.FIELD_LIKES) as? List<*> ?: emptyList<Any>()
-            likesMap[postId] = likes.size
-            if (userId != null && likes.contains(userId)) {
-                userLiked.add(postId)
-            }
-
-            val commentSnap = postRef.collection(Constants.COLLECTION_COMMENTS).get().await()
-            commentMap[postId] = commentSnap.size()
-        }
-
-        return Triple(likesMap, userLiked, commentMap)
     }
 }

@@ -42,7 +42,7 @@ class PostDetailViewModel : ViewModel() {
 
     /**
      * Loads a post and its comments given a post ID.
-     * Also fetches like and comment counts and whether the current user liked the post.
+     * Uses denormalized likeCount and commentCount stored in the post document.
      */
     fun loadPostAndComments(postId: String) {
         viewModelScope.launch {
@@ -59,11 +59,9 @@ class PostDetailViewModel : ViewModel() {
                     val post = postDoc.toObject(Post::class.java)?.copy(id = postDoc.id)
                     _post.value = post
 
-                    val likes = postDoc.get(Constants.FIELD_LIKES) as? List<*> ?: emptyList<Any>()
-                    _likeCount.value = likes.size
-
                     val currentUserId = auth.currentUser?.uid
-                    _isLikedByUser.value = currentUserId != null && likes.contains(currentUserId)
+                    _likeCount.value = post?.likeCount ?: 0
+                    _isLikedByUser.value = currentUserId != null && post?.likes?.contains(currentUserId) == true
                 } else {
                     _errorMessage.value = "Post not found."
                     return@launch
@@ -82,6 +80,7 @@ class PostDetailViewModel : ViewModel() {
 
                 _comments.value = fetchedComments
                 _commentCount.value = fetchedComments.size
+
             } catch (e: Exception) {
                 _errorMessage.value = "Failed to load post or comments: ${e.message}"
             } finally {
@@ -89,7 +88,6 @@ class PostDetailViewModel : ViewModel() {
             }
         }
     }
-
 
     /**
      * Toggles like for the current user on this post.
@@ -116,7 +114,6 @@ class PostDetailViewModel : ViewModel() {
             }
         }
     }
-
 
     /**
      * Adds a comment to the post and updates the comment list.
@@ -159,5 +156,4 @@ class PostDetailViewModel : ViewModel() {
                 _errorMessage.value = "Failed to add comment: ${it.message}"
             }
     }
-
 }

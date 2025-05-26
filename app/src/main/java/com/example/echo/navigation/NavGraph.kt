@@ -90,8 +90,15 @@ fun AppNavGraph(
 
         // Profile Screen
         composable(Destinations.PROFILE) {
-            ProfileScreen(navController = navController, authViewModel = authViewModel)
+            ProfileScreen(
+                navController = navController,
+                authViewModel = authViewModel,
+                onPostClick = { post ->
+                    navController.navigate("${Destinations.POST_DETAILS}/${post.id}")
+                }
+            )
         }
+
 
     }
 }

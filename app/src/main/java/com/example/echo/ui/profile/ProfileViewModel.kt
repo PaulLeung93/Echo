@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.echo.models.Post
 import com.example.echo.utils.Constants
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,7 +51,7 @@ class ProfileViewModel : ViewModel() {
 
     /**
      * Retrieves posts made by the signed-in user, ordered from newest to oldest.
-     * Also computes total likes and comments.
+     * Uses denormalized likeCount and commentCount fields.
      */
     private fun fetchUserPosts() {
         val email = auth.currentUser?.email ?: return
@@ -60,7 +61,6 @@ class ProfileViewModel : ViewModel() {
             try {
                 val snapshot = db.collection(Constants.COLLECTION_POSTS)
                     .whereEqualTo("username", email)
-                    //.orderBy(Constants.FIELD_TIMESTAMP, com.google.firebase.firestore.Query.Direction.DESCENDING)
                     .get()
                     .await()
 
@@ -69,33 +69,14 @@ class ProfileViewModel : ViewModel() {
                 }
                 _userPosts.value = posts
 
-                val likesMap = mutableMapOf<String, Int>()
-                val commentsMap = mutableMapOf<String, Int>()
-                var likeSum = 0
-                var commentSum = 0
-
-                for (doc in snapshot.documents) {
-                    val postId = doc.id
-                    val likes = (doc.get(Constants.FIELD_LIKES) as? List<*>)?.size ?: 0
-                    likesMap[postId] = likes
-                    likeSum += likes
-
-                    // Fetch number of comments from subcollection
-                    val commentSnapshot = db.collection(Constants.COLLECTION_POSTS)
-                        .document(postId)
-                        .collection(Constants.COLLECTION_COMMENTS)
-                        .get()
-                        .await()
-
-                    val commentCount = commentSnapshot.size()
-                    commentsMap[postId] = commentCount
-                    commentSum += commentCount
-                }
+                // Extract denormalized like and comment counts directly from post objects
+                val likesMap = posts.associate { it.id to (it.likeCount ?: 0) }
+                val commentsMap = posts.associate { it.id to (it.commentCount ?: 0) }
 
                 _postLikes.value = likesMap
                 _postCommentCounts.value = commentsMap
-                _totalLikes.value = likeSum
-                _totalComments.value = commentSum
+                _totalLikes.value = likesMap.values.sum()
+                _totalComments.value = commentsMap.values.sum()
 
             } catch (e: Exception) {
                 _userPosts.value = emptyList() // Fallback on failure
@@ -165,4 +146,45 @@ class ProfileViewModel : ViewModel() {
      * Returns the number of comments for a specific post ID.
      */
     fun getCommentCountForPost(postId: String?): Int = postCommentCounts.value[postId] ?: 0
+
+    /**
+     * Toggles the like status for a specific post ID.
+     * Updates Firestore and local UI state accordingly.
+     */
+    fun toggleLike(postId: String) {
+        val userId = auth.currentUser?.uid ?: return
+        val docRef = db.collection(Constants.COLLECTION_POSTS).document(postId)
+
+        viewModelScope.launch {
+            try {
+                val isLiked = _postLikes.value[postId]?.let { it > 0 &&
+                        _userPosts.value.firstOrNull { it.id == postId }?.likes?.contains(userId) == true
+                } ?: false
+
+                if (isLiked) {
+                    docRef.update(Constants.FIELD_LIKES, FieldValue.arrayRemove(userId)).await()
+                } else {
+                    docRef.update(Constants.FIELD_LIKES, FieldValue.arrayUnion(userId)).await()
+                }
+
+                // Re-fetch the updated post to ensure we have fresh counts
+                val snapshot = docRef.get().await()
+                val updatedPost = snapshot.toObject(Post::class.java)?.copy(id = postId) ?: return@launch
+
+                // Update local list of posts
+                val updatedPosts = _userPosts.value.map {
+                    if (it.id == postId) updatedPost else it
+                }
+                _userPosts.value = updatedPosts
+
+                // Update count maps and totals
+                _postLikes.value = updatedPosts.associate { it.id to (it.likeCount ?: 0) }
+                _totalLikes.value = _postLikes.value.values.sum()
+
+            } catch (e: Exception) {
+                // Optional: emit error to UI
+            }
+        }
+    }
+
 }
