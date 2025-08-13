@@ -1,21 +1,29 @@
 # 📍 Echo
 
 **Echo** is a location-based social networking app built with **Kotlin** and **Jetpack Compose**.  
-It fosters real-world connections by letting people share posts, discover local events, and interact with others nearby — creating a true sense of community.
+It blends a modern social feed with an interactive map, empowering people to share posts, discover events, and connect with others in their area.  
+By focusing on **proximity and community**, Echo transforms local conversations into meaningful real-world interactions.
 
 ---
 
 ## 🎯 Overview
 
-Echo connects people through **proximity and shared interests**.  
-Posts are visible to users within a defined local radius, making conversations relevant and community-driven.  
-The app delivers real-time updates, location-based filtering, and globally seeded Points of Interest (POIs) that act as community hubs.  
-It’s built with **clean architecture** principles, prioritizing performance, scalability, and a seamless user experience.
+Echo is designed to make your neighborhood feel closer.  
+Posts are tailored to your location, ensuring discussions are relevant to where you are and what’s happening around you.  
+Whether you’re sharing an event, reporting an alert, or highlighting a hidden gem, Echo brings together people who are geographically close — encouraging engagement that matters.  
+
+The app features real-time updates, tag-based filtering, and interactive Points of Interest (POIs) such as colleges, landmarks, and parks that serve as gathering points for discussion.  
+Built using **clean architecture** and **Firebase-powered infrastructure**, Echo prioritizes speed, scalability, and a frictionless user experience.
 
 ---
 
 ## 🌟 Key Features
 
+- **Login Screen**
+  - Secure sign-in with **Firebase Authentication**.
+  - Support for both email/password and Google sign-in.
+  - Smooth transition into the app’s main feed.
+    
 - **Feed Screen**
   - Browse posts from users in your local area, sorted by recency or popularity.
   - Filter content by tags (e.g., `events`, `alerts`, `offers`).
@@ -60,6 +68,9 @@ It’s built with **clean architecture** principles, prioritizing performance, s
 ---
 
 ## 📸 Screenshots & GIFs
+
+### Login Screen
+![Login Screen](docs/gifs/login-screen.gif)
 
 ### Feed Screen
 ![Feed Screenshot](docs/gifs/feed-screen.gif)
