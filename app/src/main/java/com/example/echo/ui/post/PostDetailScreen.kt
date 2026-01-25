@@ -15,26 +15,21 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.echo.components.PostCard
-import com.example.echo.models.Comment
 import com.example.echo.navigation.Destinations
+import com.example.echo.domain.model.Comment
+import com.example.echo.domain.model.Post
 import com.example.echo.utils.formatTimestamp
 import kotlinx.coroutines.launch
+
+import androidx.hilt.navigation.compose.hiltViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostDetailScreen(
-    postId: String,
     navController: NavHostController,
-    viewModel: PostDetailViewModel = viewModel()
+    viewModel: PostDetailViewModel = hiltViewModel()
 ) {
-    // --- UI State ---
-    val post by viewModel.post.collectAsState()
-    val comments by viewModel.comments.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val errorMessage by viewModel.errorMessage.collectAsState()
-    val isLiked by viewModel.isLikedByUser.collectAsState()
-    val likeCount by viewModel.likeCount.collectAsState()
-    val commentCount by viewModel.commentCount.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     var commentJustAdded by remember { mutableStateOf(false) }
 
@@ -46,14 +41,10 @@ fun PostDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(postId) {
-        viewModel.loadPostAndComments(postId)
-    }
-
     // Scroll up when a new comment is added
-    LaunchedEffect(comments.size, commentJustAdded) {
-        if (commentJustAdded && comments.isNotEmpty()) {
-            listState.animateScrollToItem(comments.size)
+    LaunchedEffect(uiState.comments.size, commentJustAdded) {
+        if (commentJustAdded && uiState.comments.isNotEmpty()) {
+            listState.animateScrollToItem(uiState.comments.size)
             commentJustAdded = false // reset
         }
     }
@@ -78,21 +69,22 @@ fun PostDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
-                .padding(top = paddingValues.calculateTopPadding()) // no bottom padding
+                .padding(top = paddingValues.calculateTopPadding())
         ) {
-            if (isLoading) {
+            if (uiState.isLoading && uiState.post == null) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-            } else if (errorMessage != null) {
+            } else if (uiState.error != null) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = errorMessage ?: "Unknown error",
+                        text = uiState.error ?: "Unknown error",
                         color = MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center
                     )
                 }
-            } else if (post != null) {
+            } else if (uiState.post != null) {
+                val post = uiState.post!!
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -100,15 +92,14 @@ fun PostDetailScreen(
                         .fillMaxWidth()
                 ) {
                     item {
-                        // --- Reused PostCard composable ---
                         PostCard(
-                            post = post!!,
-                            isLiked = isLiked,
-                            likeCount = likeCount,
-                            commentCount = commentCount,
-                            onLikeClick = { viewModel.toggleLike(postId) },
+                            post = post,
+                            isLiked = post.likedByCurrentUser,
+                            likeCount = post.likeCount,
+                            commentCount = post.commentCount,
+                            onLikeClick = { viewModel.toggleLike() },
                             onClick = {},
-                            onTagClick = {}, // Tag filtering not needed here
+                            onTagClick = {},
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
@@ -119,7 +110,7 @@ fun PostDetailScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    if (comments.isEmpty()) {
+                    if (uiState.comments.isEmpty()) {
                         item {
                             Text(
                                 text = "No comments yet.",
@@ -130,7 +121,7 @@ fun PostDetailScreen(
                             )
                         }
                     } else {
-                        items(comments, key = { it.id ?: it.hashCode() }) { comment ->
+                        items(uiState.comments, key = { it.id ?: it.hashCode() }) { comment ->
                             CommentCard(comment)
                             Spacer(modifier = Modifier.height(8.dp))
                         }
@@ -144,7 +135,7 @@ fun PostDetailScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp)
+                        .padding(bottom = 16.dp, top = 8.dp)
                 ) {
                     OutlinedTextField(
                         value = newComment,
@@ -166,9 +157,9 @@ fun PostDetailScreen(
                             } else {
                                 commentTimestamps.add(now)
                                 if (newComment.isNotBlank()) {
-                                    viewModel.addComment(postId, newComment) {
+                                    viewModel.addComment(newComment) {
                                         newComment = ""
-                                        commentJustAdded = true // triggers down-scroll to display the comment
+                                        commentJustAdded = true
                                     }
                                 }
                             }

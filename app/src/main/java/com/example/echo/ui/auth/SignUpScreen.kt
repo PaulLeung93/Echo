@@ -28,11 +28,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+import androidx.hilt.navigation.compose.hiltViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignUpScreen(
     navController: NavHostController,
-    authViewModel: AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val coroutineScope = rememberCoroutineScope()
 
@@ -46,8 +48,26 @@ fun SignUpScreen(
     var confirmPasswordVisible by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
-    var isLoading by remember { mutableStateOf(false) }
     var emailCheckJob by remember { mutableStateOf<Job?>(null) }
+
+    val uiState by authViewModel.uiState.collectAsState()
+
+    // Handle one-shot UI events
+    LaunchedEffect(Unit) {
+        authViewModel.uiEvent.collect { event ->
+            when (event) {
+                is AuthUiEvent.NavigateToHome -> {
+                    navController.navigate(Destinations.FEED) {
+                        popUpTo(Destinations.SIGN_UP) { inclusive = true }
+                    }
+                }
+                is AuthUiEvent.ShowError -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+                else -> {}
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -81,7 +101,7 @@ fun SignUpScreen(
                         val trimmedEmail = email.trim()
                         if (isValidEmail(trimmedEmail)) {
                             val methods = authViewModel.fetchSignInMethods(trimmedEmail)
-                            if (!methods.isNullOrEmpty()) {
+                            if (methods.isNotEmpty()) {
                                 emailError = "An account with this email already exists."
                             }
                         }
@@ -164,57 +184,41 @@ fun SignUpScreen(
             // Sign Up Button
             Button(
                 onClick = {
-                    coroutineScope.launch {
-                        val trimmedEmail = email.trim()
-                        val trimmedPassword = password.trim()
-                        val trimmedConfirmPassword = confirmPassword.trim()
+                    val trimmedEmail = email.trim()
+                    val trimmedPassword = password.trim()
+                    val trimmedConfirmPassword = confirmPassword.trim()
 
-                        if (!isValidEmail(trimmedEmail)) {
-                            snackbarHostState.showSnackbar("Please enter a valid email address.")
-                            return@launch
-                        }
-                        if (emailError != null) {
-                            snackbarHostState.showSnackbar(emailError!!)
-                            return@launch
-                        }
-                        if (trimmedPassword.isBlank() || trimmedConfirmPassword.isBlank()) {
-                            snackbarHostState.showSnackbar("Password fields cannot be empty.")
-                            return@launch
-                        }
-                        if (trimmedPassword.length < 6) {
-                            snackbarHostState.showSnackbar("Password must be at least 6 characters long.")
-                            return@launch
-                        }
-                        if (!isStrongPassword(trimmedPassword)) {
-                            snackbarHostState.showSnackbar("Password must contain uppercase, lowercase, number, and special character.")
-                            return@launch
-                        }
-                        if (trimmedPassword != trimmedConfirmPassword) {
-                            snackbarHostState.showSnackbar("Passwords do not match.")
-                            return@launch
-                        }
-
-                        isLoading = true
-
-                        when (val result = authViewModel.signUpWithEmail(trimmedEmail, trimmedPassword)) {
-                            is SignInResult.Success -> {
-                                snackbarHostState.showSnackbar("Account created successfully!")
-                                navController.navigate(Destinations.FEED) {
-                                    popUpTo(Destinations.SIGN_UP) { inclusive = true }
-                                }
-                            }
-                            is SignInResult.Error -> {
-                                snackbarHostState.showSnackbar(result.message)
-                            }
-                        }
-
-                        isLoading = false
+                    if (!isValidEmail(trimmedEmail)) {
+                        coroutineScope.launch { snackbarHostState.showSnackbar("Please enter a valid email address.") }
+                        return@Button
                     }
+                    if (emailError != null) {
+                        coroutineScope.launch { snackbarHostState.showSnackbar(emailError!!) }
+                        return@Button
+                    }
+                    if (trimmedPassword.isBlank() || trimmedConfirmPassword.isBlank()) {
+                        coroutineScope.launch { snackbarHostState.showSnackbar("Password fields cannot be empty.") }
+                        return@Button
+                    }
+                    if (trimmedPassword.length < 6) {
+                        coroutineScope.launch { snackbarHostState.showSnackbar("Password must be at least 6 characters long.") }
+                        return@Button
+                    }
+                    if (!isStrongPassword(trimmedPassword)) {
+                        coroutineScope.launch { snackbarHostState.showSnackbar("Password must contain uppercase, lowercase, number, and special character.") }
+                        return@Button
+                    }
+                    if (trimmedPassword != trimmedConfirmPassword) {
+                        coroutineScope.launch { snackbarHostState.showSnackbar("Passwords do not match.") }
+                        return@Button
+                    }
+
+                    authViewModel.signUpWithEmail(trimmedEmail, trimmedPassword)
                 },
-                enabled = !isLoading,
+                enabled = !uiState.isLoading,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                if (isLoading) {
+                if (uiState.isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         color = MaterialTheme.colorScheme.onPrimary

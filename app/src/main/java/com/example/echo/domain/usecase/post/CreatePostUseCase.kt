@@ -17,7 +17,7 @@ class CreatePostUseCase @Inject constructor(
      * @param latitude Optional latitude coordinate.
      * @param longitude Optional longitude coordinate.
      * @param tags List of tags for the post.
-     * @return Result with post ID on success, or exception on failure.
+     * @return Result with success or exception on failure.
      */
     suspend operator fun invoke(
         message: String,
@@ -25,7 +25,7 @@ class CreatePostUseCase @Inject constructor(
         latitude: Double?,
         longitude: Double?,
         tags: List<String>
-    ): Result<String> {
+    ): Result<Unit> {
         // Validate message
         val trimmedMessage = message.trim()
         if (trimmedMessage.isBlank()) {
@@ -49,17 +49,12 @@ class CreatePostUseCase @Inject constructor(
         val finalLatitude = if (includeLocation) latitude else null
         val finalLongitude = if (includeLocation) longitude else null
         
-        return try {
-            val postId = postRepository.createPost(
-                message = trimmedMessage,
-                latitude = finalLatitude,
-                longitude = finalLongitude,
-                tags = tags.map { it.trim().lowercase() }
-            )
-            Result.success(postId)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return postRepository.createPost(
+            message = trimmedMessage,
+            latitude = finalLatitude,
+            longitude = finalLongitude,
+            tags = tags.map { it.trim().lowercase() }
+        )
     }
     
     companion object {

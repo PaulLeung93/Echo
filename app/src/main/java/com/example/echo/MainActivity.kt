@@ -11,24 +11,23 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.echo.navigation.RootNavHost
 import com.example.echo.ui.auth.AuthViewModel
 import com.example.echo.ui.common.BottomNavigationBar
 import com.example.echo.ui.theme.EchoTheme
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-
-    private val authViewModel: AuthViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val viewModel = ViewModelProvider(this)[AuthViewModel::class.java]
-        viewModel.checkUserSession()
 
         setContent {
             EchoTheme {
@@ -36,7 +35,9 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
 
-                val isUserAuthenticated = authViewModel.isUserAuthenticated
+                val authViewModel: AuthViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                val authUiState by authViewModel.uiState.collectAsState()
+                val isUserAuthenticated = authUiState.currentUser != null
 
                 Scaffold(
                     bottomBar = {
@@ -68,7 +69,7 @@ class MainActivity : ComponentActivity() {
                         RootNavHost(
                             navController = navController,
                             authViewModel = authViewModel,
-                            webClientId = "YOUR_WEB_CLIENT_ID"
+                            webClientId = "YOUR_WEB_CLIENT_ID" // Should be in strings/BuildConfig
                         )
                     }
                 }

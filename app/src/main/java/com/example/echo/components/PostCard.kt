@@ -27,7 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.echo.models.Post
+import com.example.echo.domain.model.Post
 import com.example.echo.utils.formatTimestamp
 
 @Composable
@@ -124,10 +124,16 @@ fun PostCard(
 fun PreviewPostCard() {
     PostCard(
         post = Post(
+            id = "1",
             username = "preview_user",
             message = "This is a preview of a post in Echo.",
             timestamp = System.currentTimeMillis(),
-            tags = listOf("cs101", "finals")
+            latitude = null,
+            longitude = null,
+            tags = listOf("cs101", "finals"),
+            likeCount = 5,
+            commentCount = 2,
+            likedByCurrentUser = true
         ),
         isLiked = true,
         likeCount = 5,

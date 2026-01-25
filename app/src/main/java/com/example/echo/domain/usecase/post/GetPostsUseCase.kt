@@ -36,5 +36,5 @@ class GetPostsUseCase @Inject constructor(
      * @param userEmail The user's email.
      * @return Flow of user's posts.
      */
-    fun byUser(userEmail: String): Flow<List<Post>> = postRepository.getPostsByUser(userEmail)
+    fun byUser(userEmail: String): Flow<List<Post>> = postRepository.getPostsByUsername(userEmail)
 }

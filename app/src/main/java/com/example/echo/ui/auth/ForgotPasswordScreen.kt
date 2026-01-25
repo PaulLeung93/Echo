@@ -27,14 +27,26 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-@Composable
-fun ForgotPasswordScreen(navController: NavHostController) {
-    val auth = remember { FirebaseAuth.getInstance() }
+import androidx.hilt.navigation.compose.hiltViewModel
 
+@Composable
+fun ForgotPasswordScreen(
+    navController: NavHostController,
+    authViewModel: AuthViewModel = hiltViewModel()
+) {
     var email by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
+    val uiState by authViewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+
+    // Handle events
+    LaunchedEffect(Unit) {
+        authViewModel.uiEvent.collect { event ->
+            if (event is AuthUiEvent.ShowError) {
+                snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
 
     Box(
         modifier = Modifier.fillMaxSize()
@@ -84,30 +96,24 @@ fun ForgotPasswordScreen(navController: NavHostController) {
 
             Button(
                 onClick = {
-                    coroutineScope.launch {
-                        if (!isValidEmail(email)) {
-                            snackbarHostState.showSnackbar("Please enter a valid email address.")
-                            return@launch
-                        }
+                    if (!isValidEmail(email)) {
+                        coroutineScope.launch { snackbarHostState.showSnackbar("Please enter a valid email address.") }
+                        return@Button
+                    }
 
-                        isLoading = true
-                        try {
-                            auth.sendPasswordResetEmail(email.trim()).await()
+                    authViewModel.sendPasswordResetEmail(email.trim()) {
+                        coroutineScope.launch {
                             snackbarHostState.showSnackbar("Password reset email sent! Check your inbox.")
                             navController.popBackStack()
-                        } catch (e: Exception) {
-                            snackbarHostState.showSnackbar("Failed to send reset email. Please try again.")
-                        } finally {
-                            isLoading = false
                         }
                     }
                 },
-                enabled = !isLoading,
+                enabled = !uiState.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
             ) {
-                if (isLoading) {
+                if (uiState.isLoading) {
                     CircularProgressIndicator(
                         color = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(24.dp)

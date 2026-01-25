@@ -15,24 +15,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.auth.AuthViewModel
 import com.example.echo.utils.Constants
+import com.example.echo.components.PostCard
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
-import com.example.echo.components.PostCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeedScreen(
     navController: NavHostController,
     authViewModel: AuthViewModel,
-    feedViewModel: FeedViewModel = viewModel()
+    feedViewModel: FeedViewModel = hiltViewModel()
 ) {
     val uiState by feedViewModel.uiState.collectAsState()
-    val isUserAuthenticated = authViewModel.isUserAuthenticated
+    val isRefreshing by feedViewModel.isRefreshing.collectAsState()
+    
+    val authState by authViewModel.uiState.collectAsState()
+    val isUserAuthenticated = authState.currentUser != null
 
     var showFilterDialog by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
@@ -42,12 +45,11 @@ fun FeedScreen(
             // --- Top App Bar ---
             TopAppBar(
                 title = {
-                    val state = uiState
-                    if (state is FeedUiState.Success && state.currentTag != null) {
+                    if (uiState.currentTag != null) {
                         // Show filtered tag in top bar with option to clear
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "Filtered: #${state.currentTag}",
+                                text = "Filtered: #${uiState.currentTag}",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onPrimary
                             )
@@ -57,7 +59,7 @@ fun FeedScreen(
                                     tagInput = ""
                                 },
                                 colors = IconButtonDefaults.iconButtonColors(
-                                    contentColor = Color.White // Set the icon color to white
+                                    contentColor = Color.White
                                 )
                             ) {
                                 Icon(Icons.Default.Close, contentDescription = "Clear Filter")
@@ -75,7 +77,7 @@ fun FeedScreen(
                     IconButton(
                         onClick = { showFilterDialog = true },
                         colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = Color.White // Set the icon color to white
+                            contentColor = Color.White
                         )
                     ) {
                         Icon(Icons.Default.FilterList, contentDescription = "Filter by Tag")
@@ -83,12 +85,9 @@ fun FeedScreen(
                     IconButton(
                         onClick = {
                             authViewModel.signOut()
-                            navController.navigate(Destinations.SIGN_IN) {
-                                popUpTo(Destinations.FEED) { inclusive = true }
-                            }
                         },
                         colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = Color.White // Set the icon color to white
+                            contentColor = Color.White
                         )
                     ) {
                         Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
@@ -98,41 +97,35 @@ fun FeedScreen(
             )
 
             // --- Main Feed Content ---
-            when (val state = uiState) {
-                is FeedUiState.Loading -> {
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (uiState.isLoading && uiState.posts.isEmpty()) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize(),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator()
                     }
-                }
-
-                is FeedUiState.Error -> {
+                } else if (uiState.error != null) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize(),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = state.message,
+                            text = uiState.error ?: "Unknown error",
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
-                }
-
-                is FeedUiState.Success -> {
+                } else {
                     SwipeRefresh(
-                        state = rememberSwipeRefreshState(state.isRefreshing),
+                        state = rememberSwipeRefreshState(isRefreshing),
                         onRefresh = { feedViewModel.refreshPosts() }
                     ) {
                         LazyColumn(
                             contentPadding = PaddingValues(16.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            if (state.filteredPosts.isEmpty()) {
+                            if (uiState.posts.isEmpty()) {
                                 item {
                                     Box(
                                         modifier = Modifier
@@ -149,16 +142,12 @@ fun FeedScreen(
                                     }
                                 }
                             } else {
-                                items(state.filteredPosts) { post ->
-                                    val isLiked = state.userLikes.contains(post.id)
-                                    val likeCount = state.postLikes[post.id] ?: 0
-                                    val commentCount = state.commentCount[post.id] ?: 0
-
+                                items(uiState.posts) { post ->
                                     PostCard(
                                         post = post,
-                                        isLiked = isLiked,
-                                        likeCount = likeCount,
-                                        commentCount = commentCount,
+                                        isLiked = post.likedByCurrentUser,
+                                        likeCount = post.likeCount,
+                                        commentCount = post.commentCount,
                                         onLikeClick = { feedViewModel.toggleLike(post.id) },
                                         onClick = {
                                             navController.navigate("${Constants.ROUTE_POST_DETAILS}/${post.id}")
@@ -189,7 +178,6 @@ fun FeedScreen(
                 Icon(Icons.Default.Add, contentDescription = "Create Post", tint = Color.White)
             }
         }
-
     }
 
     // --- Filter Dialog ---

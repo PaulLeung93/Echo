@@ -32,11 +32,13 @@ import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+import androidx.hilt.navigation.compose.hiltViewModel
+
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     navController: NavHostController,
-    mapViewModel: MapViewModel = viewModel()
+    mapViewModel: MapViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -49,11 +51,6 @@ fun MapScreen(
     var tagInput by remember { mutableStateOf("") }
     var filterAttempted by remember { mutableStateOf(false) }
 
-    // Marker type filter options - simplified for exact Firestore match
-    var selectedMarkerTypes by remember {
-        mutableStateOf(setOf("user posts", "landmark", "park", "college"))
-    }
-
     val defaultLocation = LatLng(40.7128, -74.0060)
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(defaultLocation, 12f)
@@ -63,18 +60,15 @@ fun MapScreen(
     val coroutineScope = rememberCoroutineScope()
 
     val uiState by mapViewModel.uiState.collectAsState()
-    val selectedPost by mapViewModel.selectedPost.collectAsState()
-    val clusterGroups by mapViewModel.clusterGroups.collectAsState()
-    val poiMarkers by mapViewModel.poiMarkers.collectAsState()
 
     // Get last known location on launch
     LaunchedEffect(Unit) {
         if (locationPermissionState.status.isGranted) {
             try {
                 val location = fusedLocationClient.lastLocation.await()
-                userLocation = LatLng(location.latitude, location.longitude)
-            } catch (e: SecurityException) {
-                Log.e("MapScreen", "Missing location permission", e)
+                if (location != null) {
+                    userLocation = LatLng(location.latitude, location.longitude)
+                }
             } catch (e: Exception) {
                 Log.e("MapScreen", "Failed to get location", e)
             }
@@ -88,19 +82,16 @@ fun MapScreen(
         }
     }
 
-    // Initial post fetch
-    LaunchedEffect(Unit) {
-        mapViewModel.fetchPostsWithLocation()
+    // Update zoom in ViewModel for clustering
+    LaunchedEffect(cameraPositionState.position.zoom) {
+        mapViewModel.updateZoom(cameraPositionState.position.zoom)
     }
 
-    // Watch for cluster updates and notify user if no results
-    val effectiveZoom by remember { derivedStateOf { cameraPositionState.position.zoom } }
-    LaunchedEffect(uiState, effectiveZoom) {
-        (uiState as? MapUiState.Success)?.let {
-            if (filterAttempted && it.filteredPosts.isEmpty()) {
-                snackbarHostState.showSnackbar("No posts found for \"$tagInput\"")
-            }
-            mapViewModel.refreshClusters(effectiveZoom, it.filteredPosts)
+    // Notify user if no search results found
+    LaunchedEffect(uiState.posts, filterAttempted) {
+        if (filterAttempted && uiState.posts.isEmpty()) {
+            snackbarHostState.showSnackbar("No posts found for \"$tagInput\"")
+            filterAttempted = false
         }
     }
 
@@ -110,12 +101,10 @@ fun MapScreen(
             // --- Top App Bar ---
             TopAppBar(
                 title = {
-                    val state = uiState
-                    if (state is MapUiState.Success && state.currentTag != null) {
-                        // Show filtered tag in top bar with option to clear
+                    if (uiState.currentTag != null) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "Filtered: #${state.currentTag}",
+                                text = "Filtered: #${uiState.currentTag}",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onPrimary
                             )
@@ -134,7 +123,6 @@ fun MapScreen(
                     }
                 },
                 actions = {
-                    // Dropdown menu for filter options
                     IconButton(onClick = { menuExpanded = true }, colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)) {
                         Icon(Icons.Default.FilterList, contentDescription = "Filter Options")
                     }
@@ -175,7 +163,7 @@ fun MapScreen(
                         onMapClick = { mapViewModel.clearSelectedPost() }
                     ) {
                         // Cluster markers for user posts
-                        clusterGroups.forEach { cluster ->
+                        uiState.clusters.forEach { cluster ->
                             val count = cluster.posts.size
                             if (count > 1) {
                                 Marker(
@@ -209,26 +197,23 @@ fun MapScreen(
                             }
                         }
 
-                        // POI markers (filtered by type)
-                        poiMarkers.forEach { poi ->
-                            val latLng = LatLng(poi.location.latitude, poi.location.longitude)
-                            if (selectedMarkerTypes.contains(poi.type.lowercase())) {
-                                Marker(
-                                    state = MarkerState(position = latLng),
-                                    title = poi.name,
-                                    snippet = poi.description,
-                                    icon = when (poi.type.lowercase()) {
-                                        "college" -> bitmapDescriptorFromVector(context, R.drawable.ic_college)
-                                        "park" -> bitmapDescriptorFromVector(context, R.drawable.ic_park)
-                                        "landmark" -> bitmapDescriptorFromVector(context, R.drawable.ic_landmark)
-                                        else -> BitmapDescriptorFactory.defaultMarker()
-                                    }
-                                )
-                            }
+                        // POI markers
+                        uiState.pois.forEach { poi ->
+                            val latLng = LatLng(poi.latitude, poi.longitude)
+                            Marker(
+                                state = MarkerState(position = latLng),
+                                title = poi.name,
+                                snippet = poi.description,
+                                icon = when (poi.type.lowercase()) {
+                                    "college" -> bitmapDescriptorFromVector(context, R.drawable.ic_college)
+                                    "park" -> bitmapDescriptorFromVector(context, R.drawable.ic_park)
+                                    "landmark" -> bitmapDescriptorFromVector(context, R.drawable.ic_landmark)
+                                    else -> BitmapDescriptorFactory.defaultMarker()
+                                }
+                            )
                         }
                     }
                 } else {
-                    // Fallback UI if permission not granted
                     Column(
                         modifier = Modifier.fillMaxSize().padding(32.dp),
                         verticalArrangement = Arrangement.Center,
@@ -242,34 +227,28 @@ fun MapScreen(
                     }
                 }
 
-                // Post preview card (if marker tapped)
-                (uiState as? MapUiState.Success)?.let { state ->
-                    selectedPost?.let { post ->
-                        PostCard(
-                            post = post,
-                            isLiked = state.userLikes.contains(post.id),
-                            likeCount = state.postLikes[post.id] ?: 0,
-                            commentCount = state.commentCount[post.id] ?: 0,
-                            onLikeClick = { mapViewModel.toggleLike(post.id) },
-                            onClick = {
-                                navController.navigate("${Destinations.POST_DETAILS}/${post.id}")
-                            },
-                            onTagClick = { tag ->
-                                tagInput = tag
-                                mapViewModel.setTagFilter(tag, userLocation, cameraPositionState)
-                            },
-                            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
-                        )
-                    }
+                // Post preview card
+                uiState.selectedPost?.let { post ->
+                    PostCard(
+                        post = post,
+                        isLiked = post.likedByCurrentUser,
+                        likeCount = post.likeCount,
+                        commentCount = post.commentCount,
+                        onLikeClick = { mapViewModel.toggleLike(post.id) },
+                        onClick = {
+                            navController.navigate("${com.example.echo.utils.Constants.ROUTE_POST_DETAILS}/${post.id}")
+                        },
+                        onTagClick = { tag ->
+                            tagInput = tag
+                            mapViewModel.setTagFilter(tag, cameraPositionState)
+                        },
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+                    )
                 }
             }
         }
 
-        // --- Snackbar overlay ---
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(top = 8.dp)
-        )
+        TopSnackbarHost(snackbarHostState = snackbarHostState)
     }
 
     // --- Tag filter prompt dialog ---
@@ -289,7 +268,7 @@ fun MapScreen(
             confirmButton = {
                 TextButton(onClick = {
                     filterAttempted = true
-                    mapViewModel.setTagFilter(tagInput.trim().lowercase(), userLocation, cameraPositionState)
+                    mapViewModel.setTagFilter(tagInput.trim().lowercase(), cameraPositionState)
                     showTagDialog = false
                 }) {
                     Text("Apply")
@@ -310,10 +289,9 @@ fun MapScreen(
     // --- Marker type filter dialog ---
     if (showTypeDialog) {
         MarkerTypeFilterDialog(
-            selectedTypes = selectedMarkerTypes,
+            selectedTypes = uiState.activeFilters,
             onDismiss = { showTypeDialog = false },
             onApply = { selectedTypes ->
-                selectedMarkerTypes = selectedTypes
                 mapViewModel.filterByMarkerTypes(selectedTypes)
             }
         )

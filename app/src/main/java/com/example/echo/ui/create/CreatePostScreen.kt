@@ -21,16 +21,17 @@ import com.example.echo.navigation.Destinations
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.launch
 
+import androidx.hilt.navigation.compose.hiltViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
-@SuppressLint("MissingPermission") // We'll manually check permission
+@SuppressLint("MissingPermission")
 @Composable
 fun CreatePostScreen(
     navController: NavHostController,
-    viewModel: CreatePostViewModel = viewModel()
+    viewModel: CreatePostViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val isLoading by viewModel.isLoading.collectAsState()
-    val errorMessage by viewModel.errorMessage.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -42,6 +43,23 @@ fun CreatePostScreen(
     var newTag by remember { mutableStateOf("") }
     val tags = remember { mutableStateListOf<String>() }
     val maxTags = 3
+
+    // Handle success
+    LaunchedEffect(uiState.isSuccess) {
+        if (uiState.isSuccess) {
+            navController.navigate(Destinations.FEED) {
+                popUpTo(Destinations.FEED) { inclusive = true }
+            }
+        }
+    }
+
+    // Handle error
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -62,12 +80,6 @@ fun CreatePostScreen(
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                errorMessage?.let { error ->
-                    LaunchedEffect(error) {
-                        snackbarHostState.showSnackbar(error)
-                        viewModel.clearError()
-                    }
-                }
 
                 OutlinedTextField(
                     value = message,
@@ -138,9 +150,7 @@ fun CreatePostScreen(
                         onCheckedChange = { checked ->
                             includeLocation = checked
                             if (checked) {
-                                // Check location permission
                                 val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-                                includeLocation = true
                                 if (ActivityCompat.checkSelfPermission(
                                         context,
                                         Manifest.permission.ACCESS_FINE_LOCATION
@@ -157,7 +167,6 @@ fun CreatePostScreen(
                                         }
                                     }
                                 }
-                                // If no permission, do nothing
                             } else {
                                 latitude = null
                                 longitude = null
@@ -174,21 +183,17 @@ fun CreatePostScreen(
                 Button(
                     onClick = {
                         viewModel.submitPost(
-                            message,
-                            includeLocation,
-                            userLatitude = if (includeLocation) latitude else null,
-                            userLongitude = if (includeLocation) longitude else null,
+                            message = message,
+                            includeLocation = includeLocation,
+                            userLatitude = latitude,
+                            userLongitude = longitude,
                             tags = tags.toList()
-                        ) {
-                            navController.navigate(Destinations.FEED) {
-                                popUpTo(Destinations.FEED) { inclusive = true }
-                            }
-                        }
+                        )
                     },
-                    enabled = !isLoading,
+                    enabled = !uiState.isLoading,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    if (isLoading) {
+                    if (uiState.isLoading) {
                         CircularProgressIndicator(
                             color = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(24.dp)

@@ -97,9 +97,10 @@ class PostRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }.flowOn(ioDispatcher)
     
-    override fun getPostsByUser(userEmail: String): Flow<List<Post>> = callbackFlow {
+    
+    override fun getPostsByUsername(username: String): Flow<List<Post>> = callbackFlow {
         val listener = postsCollection
-            .whereEqualTo("username", userEmail)
+            .whereEqualTo("username", username)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     close(error)
@@ -124,32 +125,52 @@ class PostRepositoryImpl @Inject constructor(
         val currentUserId = auth.currentUser?.uid
         postMapper.toDomain(entity, currentUserId)
     }
+
+    override fun getPostByIdFlow(postId: String): Flow<Post?> = callbackFlow {
+        val listener = postsCollection.document(postId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                
+                val entity = snapshot?.toObject(PostEntity::class.java)
+                val currentUserId = auth.currentUser?.uid
+                trySend(entity?.let { postMapper.toDomain(it, currentUserId) })
+            }
+        
+        awaitClose { listener.remove() }
+    }.flowOn(ioDispatcher)
     
     override suspend fun createPost(
         message: String,
         latitude: Double?,
         longitude: Double?,
         tags: List<String>
-    ): String = withContext(ioDispatcher) {
-        val currentUser = auth.currentUser 
-            ?: throw IllegalStateException("User must be signed in to create a post")
-        
-        if (currentUser.isAnonymous) {
-            throw IllegalStateException("Anonymous users cannot create posts")
+    ): Result<Unit> = withContext(ioDispatcher) {
+        try {
+            val currentUser = auth.currentUser 
+                ?: return@withContext Result.failure(IllegalStateException("User must be signed in to create a post"))
+            
+            if (currentUser.isAnonymous) {
+                return@withContext Result.failure(IllegalStateException("Anonymous users cannot create posts"))
+            }
+            
+            val newDocRef = postsCollection.document()
+            val postMap = postMapper.toFirestoreMap(
+                username = currentUser.email ?: "anonymous",
+                message = message,
+                latitude = latitude,
+                longitude = longitude,
+                tags = tags,
+                postId = newDocRef.id
+            )
+            
+            newDocRef.set(postMap).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
-        
-        val newDocRef = postsCollection.document()
-        val postMap = postMapper.toFirestoreMap(
-            username = currentUser.email ?: "anonymous",
-            message = message,
-            latitude = latitude,
-            longitude = longitude,
-            tags = tags,
-            postId = newDocRef.id
-        )
-        
-        newDocRef.set(postMap).await()
-        newDocRef.id
     }
     
     override suspend fun updatePost(postId: String, newMessage: String): Unit = withContext(ioDispatcher) {
@@ -188,8 +209,7 @@ class PostRepositoryImpl @Inject constructor(
         !isCurrentlyLiked
     }
     
-    override suspend fun refreshPosts() {
-        // With Firestore snapshots, data is automatically refreshed
-        // This method is kept for interface compliance and potential future use
+    override suspend fun refreshPosts(): Result<Unit> {
+        return Result.success(Unit)
     }
 }

@@ -27,9 +27,9 @@ interface PostRepository {
     
     /**
      * Get posts by a specific user.
-     * @param userEmail The user's email address.
+     * @param username The user's username (email).
      */
-    fun getPostsByUser(userEmail: String): Flow<List<Post>>
+    fun getPostsByUsername(username: String): Flow<List<Post>>
     
     /**
      * Get a single post by ID.
@@ -38,19 +38,24 @@ interface PostRepository {
     suspend fun getPostById(postId: String): Post?
     
     /**
+     * Get a post by its ID as a Flow for real-time updates.
+     */
+    fun getPostByIdFlow(postId: String): Flow<Post?>
+    
+    /**
      * Create a new post.
      * @param message The post message content.
      * @param latitude Optional latitude for location.
      * @param longitude Optional longitude for location.
      * @param tags List of tags for the post.
-     * @return The ID of the created post.
+     * @return Result containing Success or Failure
      */
     suspend fun createPost(
         message: String,
         latitude: Double?,
         longitude: Double?,
         tags: List<String>
-    ): String
+    ): Result<Unit>
     
     /**
      * Update an existing post's message.
@@ -75,5 +80,5 @@ interface PostRepository {
     /**
      * Refresh posts from the remote data source.
      */
-    suspend fun refreshPosts()
+    suspend fun refreshPosts(): Result<Unit>
 }

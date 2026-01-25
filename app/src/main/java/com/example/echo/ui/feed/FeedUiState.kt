@@ -1,19 +1,14 @@
 package com.example.echo.ui.feed
 
-import com.example.echo.models.Post
+import com.example.echo.domain.model.Post
 
-sealed class FeedUiState {
-    object Loading : FeedUiState()
-
-    data class Success(
-        val posts: List<Post>,
-        val filteredPosts: List<Post>,
-        val postLikes: Map<String, Int>,
-        val userLikes: Set<String>,
-        val commentCount: Map<String, Int>,
-        val currentTag: String?,
-        val isRefreshing: Boolean = false
-    ) : FeedUiState()
-
-    data class Error(val message: String) : FeedUiState()
-}
+/**
+ * UI State for the Feed screen.
+ */
+data class FeedUiState(
+    val posts: List<Post> = emptyList(),
+    val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val error: String? = null,
+    val currentTag: String? = null
+)

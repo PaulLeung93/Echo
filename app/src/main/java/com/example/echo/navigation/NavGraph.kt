@@ -78,12 +78,11 @@ fun AppNavGraph(
             arguments = listOf(
                 navArgument("postId") { defaultValue = "" }
             )
-        ) { backStackEntry ->
-            val postId = backStackEntry.arguments?.getString("postId") ?: ""
-            PostDetailScreen(postId = postId, navController = navController)
+        ) { _ ->
+            PostDetailScreen(navController = navController)
         }
 
-        //Msp Screen
+        // Map Screen
         composable(Destinations.MAP) {
             MapScreen(navController = navController)
         }
@@ -92,10 +91,7 @@ fun AppNavGraph(
         composable(Destinations.PROFILE) {
             ProfileScreen(
                 navController = navController,
-                authViewModel = authViewModel,
-                onPostClick = { post ->
-                    navController.navigate("${Destinations.POST_DETAILS}/${post.id}")
-                }
+                authViewModel = authViewModel
             )
         }
 

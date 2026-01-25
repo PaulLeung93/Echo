@@ -18,33 +18,32 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.echo.R
 import com.example.echo.components.PostCard
-import com.example.echo.models.Post
+import com.example.echo.domain.model.Post
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.auth.AuthViewModel
-import com.google.firebase.auth.FirebaseAuth
 
 /**
  * ProfileScreen displays the current user's info, total stats, and their posts.
  * Anonymous users are blocked from accessing this screen.
  */
+import androidx.hilt.navigation.compose.hiltViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     navController: NavHostController,
     authViewModel: AuthViewModel,
-    viewModel: ProfileViewModel = viewModel(),
-    onPostClick: (Post) -> Unit = {}
+    viewModel: ProfileViewModel = hiltViewModel()
 ) {
-    val posts by viewModel.userPosts.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val totalLikes by viewModel.totalLikes.collectAsState()
-    val totalComments by viewModel.totalComments.collectAsState()
-    val currentUser = FirebaseAuth.getInstance().currentUser
+    val uiState by viewModel.uiState.collectAsState()
+    val authState by authViewModel.uiState.collectAsState()
+    
+    val currentUser = authState.currentUser
     val userEmail = currentUser?.email ?: "Anonymous"
     val isAnonymous = currentUser?.isAnonymous == true
 
     // Redirect anonymous users to sign-in screen
-    LaunchedEffect(Unit) {
+    LaunchedEffect(currentUser) {
         if (currentUser == null || isAnonymous) {
             navController.navigate(Destinations.SIGN_IN) {
                 popUpTo(Destinations.PROFILE) { inclusive = true }
@@ -52,12 +51,9 @@ fun ProfileScreen(
         }
     }
 
-    // Early return to avoid rendering UI before redirect
     if (currentUser == null || isAnonymous) return
 
-    // --- Layout ---
     Column(modifier = Modifier.fillMaxSize()) {
-        // --- Top App Bar ---
         TopAppBar(
             title = {
                 Text(
@@ -81,7 +77,6 @@ fun ProfileScreen(
                     .padding(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Placeholder profile image
                 Image(
                     painter = painterResource(id = R.drawable.ic_profile_placeholder),
                     contentDescription = "Profile Picture",
@@ -99,34 +94,39 @@ fun ProfileScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    StatColumn(label = "Posts", value = posts.size)
-                    StatColumn(label = "Likes", value = totalLikes)
-                    StatColumn(label = "Comments", value = totalComments)
+                    StatColumn(label = "Posts", value = uiState.userPosts.size)
+                    StatColumn(label = "Likes", value = uiState.totalLikes)
+                    StatColumn(label = "Comments", value = uiState.totalComments)
                 }
             }
 
-            Divider()
-
+            HorizontalDivider()
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (isLoading) {
+            if (uiState.isLoading && uiState.userPosts.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-            } else if (posts.isEmpty()) {
+            } else if (uiState.error != null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(uiState.error ?: "Error loading posts", color = MaterialTheme.colorScheme.error)
+                }
+            } else if (uiState.userPosts.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("You haven’t posted anything yet.", style = MaterialTheme.typography.bodyMedium)
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(posts) { post ->
+                    items(uiState.userPosts) { post ->
                         PostCard(
                             post = post,
-                            isLiked = false,
-                            likeCount = viewModel.getLikeCountForPost(post.id),
-                            commentCount = viewModel.getCommentCountForPost(post.id),
-                            onLikeClick = {},
-                            onClick = { onPostClick(post) },
+                            isLiked = post.likedByCurrentUser,
+                            likeCount = post.likeCount,
+                            commentCount = post.commentCount,
+                            onLikeClick = { viewModel.toggleLike(post.id) },
+                            onClick = {
+                                navController.navigate("${com.example.echo.utils.Constants.ROUTE_POST_DETAILS}/${post.id}")
+                            },
                             onTagClick = {},
                         )
                     }

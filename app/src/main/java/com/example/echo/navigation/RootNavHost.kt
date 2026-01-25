@@ -13,22 +13,20 @@ fun RootNavHost(
     authViewModel: AuthViewModel,
     webClientId: String
 ) {
-    val isSignedIn by authViewModel.isSignedIn.collectAsState()
+    val uiState by authViewModel.uiState.collectAsState()
 
-    val startDestination = when (isSignedIn) {
-        true -> Destinations.FEED
-        false -> Destinations.SIGN_IN
-        null -> null // while loading
-    }
-
-    if (startDestination == null) {
-        SplashScreen()
+    // We can assume user is signed in if currentUser is not null
+    // You might want to add an isInitialSessionCheckComplete flag to AuthUiState for better splash handling
+    val startDestination = if (uiState.currentUser != null) {
+        Destinations.FEED
     } else {
-        AppNavGraph(
-            navController = navController,
-            authViewModel = authViewModel,
-            webClientId = webClientId,
-            startDestination = startDestination
-        )
+        Destinations.SIGN_IN
     }
+
+    AppNavGraph(
+        navController = navController,
+        authViewModel = authViewModel,
+        webClientId = webClientId,
+        startDestination = startDestination
+    )
 }

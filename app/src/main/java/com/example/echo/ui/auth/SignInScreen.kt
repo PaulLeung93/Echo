@@ -35,31 +35,49 @@ import com.example.echo.utils.isValidEmail
 import com.example.echo.utils.mapFirebaseErrorMessage
 import kotlinx.coroutines.launch
 
+import androidx.hilt.navigation.compose.hiltViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignInScreen(
-    authViewModel: AuthViewModel,
+    authViewModel: AuthViewModel = hiltViewModel(),
     webClientId: String,
     navController: NavHostController,
     successMessage: String = ""
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
 
-    val isSignedIn by authViewModel.isSignedIn.collectAsState()
+    val uiState by authViewModel.uiState.collectAsState()
 
-    //If user is already signed in, navigate to Feed Screen
-    LaunchedEffect(isSignedIn) {
-        if (isSignedIn) {
-            navController.navigate(Destinations.FEED) {
-                popUpTo(Destinations.SIGN_IN) { inclusive = true }
+    // Handle one-shot UI events
+    LaunchedEffect(Unit) {
+        authViewModel.uiEvent.collect { event ->
+            when (event) {
+                is AuthUiEvent.NavigateToHome -> {
+                    navController.navigate(Destinations.FEED) {
+                        popUpTo(Destinations.SIGN_IN) { inclusive = true }
+                    }
+                }
+                is AuthUiEvent.ShowError -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+                is AuthUiEvent.SignInSuccess -> {
+                    snackbarHostState.showSnackbar("Welcome back!")
+                }
+                else -> {}
             }
+        }
+    }
+
+    // Display success message if passed from another screen
+    LaunchedEffect(successMessage) {
+        if (successMessage.isNotBlank()) {
+            snackbarHostState.showSnackbar(successMessage)
         }
     }
 
@@ -77,20 +95,7 @@ fun SignInScreen(
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        coroutineScope.launch {
-            isLoading = true
-            try {
-                authViewModel.handleGoogleSignInResult(result)
-                snackbarHostState.showSnackbar("Signed in with Google!")
-                navController.navigate(Destinations.FEED) {
-                    popUpTo(Destinations.SIGN_IN) { inclusive = true }
-                }
-            } catch (e: Exception) {
-                snackbarHostState.showSnackbar("Google Sign-In failed. Please try again.")
-            } finally {
-                isLoading = false
-            }
-        }
+        authViewModel.handleGoogleSignInResult(result)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -168,32 +173,16 @@ fun SignInScreen(
                     // Login Button
                     Button(
                         onClick = {
-                            coroutineScope.launch {
-                                isLoading = true
-                                try {
-                                    if (isValidEmail(email) && password.isNotBlank()) {
-                                        when (val result = authViewModel.signInWithEmail(email, password)) {
-                                            is SignInResult.Success -> {
-                                                snackbarHostState.showSnackbar("Welcome back!")
-                                                navController.navigate(Destinations.FEED) {
-                                                    popUpTo(Destinations.SIGN_IN) { inclusive = true }
-                                                }
-                                            }
-                                            is SignInResult.Error -> snackbarHostState.showSnackbar(
-                                                mapFirebaseErrorMessage(result.message)
-                                            )
-                                        }
-                                    } else {
-                                        snackbarHostState.showSnackbar("Please enter valid credentials.")
-                                    }
-                                } finally {
-                                    isLoading = false
-                                }
+                            if (isValidEmail(email) && password.isNotBlank()) {
+                                authViewModel.signInWithEmail(email, password)
+                            } else {
+                                authViewModel.checkUserSession() // Just a placeholder for error or check
                             }
                         },
+                        enabled = !uiState.isLoading,
                         modifier = Modifier.fillMaxWidth(0.75f)
                     ) {
-                        if (isLoading) CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        if (uiState.isLoading) CircularProgressIndicator(modifier = Modifier.size(24.dp))
                         else Text("Login")
                     }
 
@@ -219,23 +208,24 @@ fun SignInScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth(0.85f)
                     ) {
-                        Divider(Modifier.weight(1f), color = Color.White)
+                        HorizontalDivider(Modifier.weight(1f), color = Color.White)
                         Text("  OR  ", color = Color.White)
-                        Divider(Modifier.weight(1f), color = Color.White)
+                        HorizontalDivider(Modifier.weight(1f), color = Color.White)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Google Sign-In Button
-                    GoogleSignInButton { googleSignInLauncher.launch(googleSignInClient.signInIntent) }
+                    if (uiState.isGoogleLoading) {
+                        CircularProgressIndicator()
+                    } else {
+                        GoogleSignInButton { googleSignInLauncher.launch(googleSignInClient.signInIntent) }
+                    }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     TextButton(onClick = {
                         authViewModel.signInAsGuest()
-                        navController.navigate(Destinations.FEED) {
-                            popUpTo(Destinations.SIGN_IN) { inclusive = true }
-                        }
                     }) {
                         Text("Continue as Guest", color = Color.White)
                     }

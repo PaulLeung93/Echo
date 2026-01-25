@@ -1,123 +1,150 @@
 package com.example.echo.ui.auth
 
 import androidx.lifecycle.ViewModel
-import com.example.echo.utils.mapFirebaseErrorMessage
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.GoogleAuthProvider
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.tasks.await
+import androidx.lifecycle.viewModelScope
+import com.example.echo.domain.usecase.auth.*
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-sealed class SignInResult {
-    object Success : SignInResult()
-    class Error(val message: String) : SignInResult()
-}
+@HiltViewModel
+class AuthViewModel @Inject constructor(
+    private val signInWithEmailUseCase: SignInWithEmailUseCase,
+    private val signUpWithEmailUseCase: SignUpWithEmailUseCase,
+    private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
+    private val signInAsGuestUseCase: SignInAsGuestUseCase,
+    private val fetchSignInMethodsUseCase: FetchSignInMethodsUseCase,
+    private val signOutUseCase: SignOutUseCase,
+    private val sendPasswordResetEmailUseCase: SendPasswordResetEmailUseCase,
+    private val getCurrentUserUseCase: GetCurrentUserUseCase
+) : ViewModel() {
 
-class AuthViewModel : ViewModel() {
+    private val _uiState = MutableStateFlow(AuthUiState())
+    val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val _uiEvent = Channel<AuthUiEvent>()
+    val uiEvent = _uiEvent.receiveAsFlow()
 
-    private val _isSignedIn = MutableStateFlow(auth.currentUser != null)
-    val isSignedIn: StateFlow<Boolean> = _isSignedIn
+    init {
+        checkUserSession()
+    }
 
-    val isUserAuthenticated: Boolean
-        get() = auth.currentUser?.isAnonymous == false
+    fun checkUserSession() {
+        val user = getCurrentUserUseCase()
+        _uiState.update { it.copy(currentUser = user) }
+    }
 
-    /**
-     * Sign In with Email/Password
-     */
-    suspend fun signInWithEmail(email: String, password: String): SignInResult {
-        return try {
-            val result = auth.signInWithEmailAndPassword(email.trim(), password.trim()).await()
-            if (result.user != null) {
-                _isSignedIn.value = true
-                SignInResult.Success
-            } else {
-                SignInResult.Error("Authentication failed.")
-            }
-        } catch (e: Exception) {
-            SignInResult.Error(e.message ?: "Authentication failed.")
+    fun signInWithEmail(email: String, password: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            signInWithEmailUseCase(email, password)
+                .onSuccess { user ->
+                    _uiState.update { it.copy(isLoading = false, currentUser = user) }
+                    _uiEvent.send(AuthUiEvent.SignInSuccess)
+                    _uiEvent.send(AuthUiEvent.NavigateToHome)
+                }
+                .onFailure { error ->
+                    _uiState.update { it.copy(isLoading = false, error = error.message) }
+                    _uiEvent.send(AuthUiEvent.ShowError(error.message ?: "Sign in failed"))
+                }
         }
     }
 
-    /**
-     * Sign Up with Email/Password
-     */
-    suspend fun signUpWithEmail(email: String, password: String): SignInResult {
-        return try {
-            auth.createUserWithEmailAndPassword(email.trim(), password.trim()).await()
-            SignInResult.Success
-        } catch (e: Exception) {
-            SignInResult.Error(mapFirebaseErrorMessage(e.localizedMessage))
-        }
-    }
-
-
-    /**
-     * Sign in as Guest (Anonymous)
-     */
     fun signInAsGuest() {
-        auth.signInAnonymously().addOnCompleteListener { task ->
-            _isSignedIn.value = task.isSuccessful
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            signInAsGuestUseCase()
+                .onSuccess { user ->
+                    _uiState.update { it.copy(isLoading = false, currentUser = user) }
+                    _uiEvent.send(AuthUiEvent.NavigateToHome)
+                }
+                .onFailure { error ->
+                    _uiState.update { it.copy(isLoading = false, error = error.message) }
+                    _uiEvent.send(AuthUiEvent.ShowError(error.message ?: "Guest sign in failed"))
+                }
+        }
+    }
+
+    fun signUpWithEmail(email: String, password: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            signUpWithEmailUseCase(email, password)
+                .onSuccess { user ->
+                    _uiState.update { it.copy(isLoading = false, currentUser = user) }
+                    _uiEvent.send(AuthUiEvent.NavigateToHome)
+                }
+                .onFailure { error ->
+                    _uiState.update { it.copy(isLoading = false, error = error.message) }
+                    _uiEvent.send(AuthUiEvent.ShowError(error.message ?: "Sign up failed"))
+                }
+        }
+    }
+
+    fun signInWithGoogle(idToken: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isGoogleLoading = true, error = null) }
+            signInWithGoogleUseCase(idToken)
+                .onSuccess { user ->
+                    _uiState.update { it.copy(isGoogleLoading = false, currentUser = user) }
+                    _uiEvent.send(AuthUiEvent.NavigateToHome)
+                }
+                .onFailure { error ->
+                    _uiState.update { it.copy(isGoogleLoading = false, error = error.message) }
+                    _uiEvent.send(AuthUiEvent.ShowError(error.message ?: "Google sign in failed"))
+                }
+        }
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            signOutUseCase()
+            _uiState.update { it.copy(currentUser = null) }
+            _uiEvent.send(AuthUiEvent.NavigateToSignIn)
+        }
+    }
+
+    suspend fun fetchSignInMethods(email: String): List<String> {
+        return fetchSignInMethodsUseCase(email)
+    }
+
+    fun sendPasswordResetEmail(email: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            sendPasswordResetEmailUseCase(email)
+                .onSuccess {
+                    _uiState.update { it.copy(isLoading = false) }
+                    onSuccess()
+                }
+                .onFailure { error ->
+                    _uiState.update { it.copy(isLoading = false, error = error.message) }
+                    _uiEvent.send(AuthUiEvent.ShowError(error.message ?: "Failed to send reset email"))
+                }
         }
     }
 
     /**
-     * Handle Google Sign-In Result
+     * Legacy support for Google Sign-In helper that doesn't use ID token directly.
+     * Note: In a full refactor, the Google Sign-In logic should be moved to the Repository.
      */
     fun handleGoogleSignInResult(result: androidx.activity.result.ActivityResult) {
         val data = result.data ?: return
         val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(data)
-        val account = task.result ?: return
-
-        val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-        auth.signInWithCredential(credential).addOnCompleteListener { taskResult ->
-            _isSignedIn.value = taskResult.isSuccessful
-        }
-    }
-
-    /**
-     * Reset Password
-     */
-    fun resetPassword(email: String, onComplete: (Boolean, String?) -> Unit) {
-        auth.sendPasswordResetEmail(email)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    onComplete(true, null)
-                } else {
-                    onComplete(false, task.exception?.localizedMessage)
+        try {
+            val account = task.result
+            val idToken = account?.idToken
+            if (idToken != null) {
+                signInWithGoogle(idToken)
+            } else {
+                viewModelScope.launch {
+                    _uiEvent.send(AuthUiEvent.ShowError("Google ID Token not found"))
                 }
             }
-    }
-
-    /**
-     * Sign Out
-     */
-    fun signOut() {
-        auth.signOut()
-        _isSignedIn.value = false
-    }
-
-    suspend fun fetchSignInMethods(email: String): List<String>? {
-        return try {
-            val result = auth.fetchSignInMethodsForEmail(email.trim()).await()
-            result.signInMethods
         } catch (e: Exception) {
-            null
+            viewModelScope.launch {
+                _uiEvent.send(AuthUiEvent.ShowError(e.message ?: "Google sign in failed"))
+            }
         }
     }
-
-    fun checkUserSession() {
-        val user = auth.currentUser
-        if (user != null) {
-            user.reload()
-                .addOnCompleteListener {
-                    _isSignedIn.value = it.isSuccessful && !user.isAnonymous
-                }
-        } else {
-            _isSignedIn.value = false
-        }
-    }
-
-
 }

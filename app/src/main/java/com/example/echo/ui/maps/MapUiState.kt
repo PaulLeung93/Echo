@@ -1,19 +1,27 @@
 package com.example.echo.ui.map
 
-import com.example.echo.models.Post
+import com.example.echo.domain.model.Poi
+import com.example.echo.domain.model.Post
+import com.google.android.gms.maps.model.LatLng
 
-sealed class MapUiState {
-    object Loading : MapUiState()
+/**
+ * Represents a group of nearby posts (clustered by location).
+ */
+data class ClusterGroup(
+    val position: LatLng,
+    val posts: List<Post>
+)
 
-    data class Success(
-        val posts: List<Post>,
-        val filteredPosts: List<Post>,
-        val postLikes: Map<String, Int>,
-        val userLikes: Set<String>,
-        val commentCount: Map<String, Int>,
-        val currentTag: String? = null,
-        val isRefreshing: Boolean = false
-    ) : MapUiState()
-
-    data class Error(val message: String) : MapUiState()
-}
+/**
+ * UI State for the Map screen.
+ */
+data class MapUiState(
+    val posts: List<Post> = emptyList(),
+    val pois: List<Poi> = emptyList(),
+    val clusters: List<ClusterGroup> = emptyList(),
+    val selectedPost: Post? = null,
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val currentTag: String? = null,
+    val activeFilters: Set<String> = setOf("user posts", "landmark", "park", "college")
+)
