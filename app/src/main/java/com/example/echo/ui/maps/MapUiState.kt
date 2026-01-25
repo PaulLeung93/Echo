@@ -21,6 +21,7 @@ data class MapUiState(
     val clusters: List<ClusterGroup> = emptyList(),
     val selectedPost: Post? = null,
     val selectedCluster: ClusterGroup? = null,
+    val selectedPoi: Poi? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
     val currentTag: String? = null,

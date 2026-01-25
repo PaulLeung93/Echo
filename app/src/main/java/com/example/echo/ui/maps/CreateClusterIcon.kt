@@ -8,8 +8,9 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.core.content.ContextCompat
 
-fun createClusterIcon(context: android.content.Context, count: Int): Bitmap {
-    val radius = 40f
+fun createClusterIcon(context: Context, count: Int, scale: Float = 1f): Bitmap {
+    val baseRadius = 40f
+    val radius = baseRadius * scale
     val bitmap = Bitmap.createBitmap((radius * 2).toInt(), (radius * 2).toInt(), Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -19,7 +20,7 @@ fun createClusterIcon(context: android.content.Context, count: Int): Bitmap {
 
     paint.apply {
         color = Color.WHITE
-        textSize = 36f
+        textSize = 36f * scale
         typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.CENTER
     }

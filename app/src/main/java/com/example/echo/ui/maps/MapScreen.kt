@@ -168,10 +168,17 @@ fun MapScreen(
                         uiState.clusters.forEach { cluster ->
                             val count = cluster.posts.size
                             if (count > 1) {
+                                val isSelected = uiState.selectedCluster?.position == cluster.position
                                 Marker(
                                     state = MarkerState(cluster.position),
                                     title = "$count posts",
-                                    icon = BitmapDescriptorFactory.fromBitmap(createClusterIcon(context, count)),
+                                    icon = BitmapDescriptorFactory.fromBitmap(
+                                        createClusterIcon(
+                                            context, 
+                                            count, 
+                                            scale = if (isSelected) 1.5f else 1.0f
+                                        )
+                                    ),
                                     onClick = {
                                         mapViewModel.onClusterClick(cluster, cameraPositionState)
                                         true
@@ -179,6 +186,7 @@ fun MapScreen(
                                 )
                             } else {
                                 val post = cluster.posts.first()
+                                val isSelected = uiState.selectedPost?.id == post.id
                                 Marker(
                                     state = MarkerState(cluster.position),
                                     title = post.username,
@@ -187,7 +195,11 @@ fun MapScreen(
                                         mapViewModel.setSelectedPost(post, cameraPositionState)
                                         true
                                     },
-                                    icon = bitmapDescriptorFromVector(context, R.drawable.ic_default)
+                                    icon = bitmapDescriptorFromVector(
+                                        context, 
+                                        R.drawable.ic_default,
+                                        scale = if (isSelected) 1.5f else 1.0f
+                                    )
                                 )
                             }
                         }
@@ -195,14 +207,19 @@ fun MapScreen(
                         // POI markers
                         uiState.pois.forEach { poi ->
                             val latLng = LatLng(poi.latitude, poi.longitude)
+                            val isSelected = uiState.selectedPoi?.id == poi.id
                             Marker(
                                 state = MarkerState(position = latLng),
                                 title = poi.name,
                                 snippet = poi.description,
+                                onClick = {
+                                    mapViewModel.setSelectedPoi(poi, cameraPositionState)
+                                    true
+                                },
                                 icon = when (poi.type.lowercase()) {
-                                    "college" -> bitmapDescriptorFromVector(context, R.drawable.ic_college)
-                                    "park" -> bitmapDescriptorFromVector(context, R.drawable.ic_park)
-                                    "landmark" -> bitmapDescriptorFromVector(context, R.drawable.ic_landmark)
+                                    "college" -> bitmapDescriptorFromVector(context, R.drawable.ic_college, scale = if (isSelected) 1.5f else 1.0f)
+                                    "park" -> bitmapDescriptorFromVector(context, R.drawable.ic_park, scale = if (isSelected) 1.5f else 1.0f)
+                                    "landmark" -> bitmapDescriptorFromVector(context, R.drawable.ic_landmark, scale = if (isSelected) 1.5f else 1.0f)
                                     else -> BitmapDescriptorFactory.defaultMarker()
                                 }
                             )
@@ -271,6 +288,36 @@ fun MapScreen(
                         },
                         modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
                     )
+                } ?: uiState.selectedPoi?.let { poi ->
+                    Card(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(16.dp)
+                            .fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = poi.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = poi.description,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Category: ${poi.type.replaceFirstChar { it.uppercase() }}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                 }
             }
         }
