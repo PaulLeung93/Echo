@@ -2,7 +2,10 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.google.secrets)
+    alias(libs.plugins.hilt.android)
+    alias(libs.plugins.ksp)
     id("com.google.gms.google-services")
 }
 
@@ -11,11 +14,9 @@ android {
     compileSdk = 35
 
     secrets {
-
         propertiesFileName = "secrets.properties"
         defaultPropertiesFileName = "local.defaults.properties"
     }
-
 
     defaultConfig {
         applicationId = "com.example.echo"
@@ -42,6 +43,11 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
+    }
+    configurations.all {
+        resolutionStrategy {
+            force("com.squareup:javapoet:1.13.0")
+        }
     }
     buildFeatures {
         compose = true
@@ -72,21 +78,33 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation(libs.accompanist.permissions)
 
-    //Firebase
+    // Firebase
     implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth.ktx)
-    implementation(libs.firebase.firestore.ktx)
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
     implementation(libs.google.auth)
-    implementation (libs.androidx.material.icons.extended)
+    implementation(libs.androidx.material.icons.extended)
     implementation(libs.accompanist.swiperefresh)
 
-    //Google Maps
+    // Google Maps
     implementation(libs.play.services.maps)
     implementation(libs.maps.compose)
     implementation(libs.play.services.location)
 
+    // Hilt DI
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.android.compiler)
+    implementation(libs.hilt.navigation.compose)
 
+    // Coroutines
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
 
+    // Serialization (for type-safe navigation)
+    implementation(libs.kotlinx.serialization.json)
 
-
+    // Testing
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
+    testImplementation(libs.turbine)
 }

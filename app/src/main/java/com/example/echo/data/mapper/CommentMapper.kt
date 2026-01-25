@@ -1,0 +1,48 @@
+package com.example.echo.data.mapper
+
+import com.example.echo.data.entity.CommentEntity
+import com.example.echo.domain.model.Comment
+import javax.inject.Inject
+
+/**
+ * Mapper for converting between CommentEntity (data layer) and Comment (domain layer).
+ */
+class CommentMapper @Inject constructor() {
+    
+    /**
+     * Convert CommentEntity to domain Comment.
+     * @param entity The Firestore entity to convert.
+     * @return The domain Comment model.
+     */
+    fun toDomain(entity: CommentEntity): Comment {
+        return Comment(
+            id = entity.id ?: "",
+            username = entity.username,
+            message = entity.message,
+            timestamp = entity.timestamp
+        )
+    }
+    
+    /**
+     * Convert a list of CommentEntities to domain Comments.
+     * @param entities The list of Firestore entities.
+     * @return List of domain Comment models.
+     */
+    fun toDomainList(entities: List<CommentEntity>): List<Comment> {
+        return entities.map { toDomain(it) }
+    }
+    
+    /**
+     * Create a map representation for Firestore from comment parameters.
+     * @param username The username of the commenter.
+     * @param message The comment message.
+     * @return Map representation for Firestore document.
+     */
+    fun toFirestoreMap(username: String, message: String): Map<String, Any> {
+        return mapOf(
+            "username" to username,
+            "message" to message,
+            "timestamp" to System.currentTimeMillis()
+        )
+    }
+}
