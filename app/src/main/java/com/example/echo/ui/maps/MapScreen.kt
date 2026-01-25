@@ -3,6 +3,8 @@ package com.example.echo.ui.map
 import android.Manifest
 import android.util.Log
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
@@ -171,14 +173,7 @@ fun MapScreen(
                                     title = "$count posts",
                                     icon = BitmapDescriptorFactory.fromBitmap(createClusterIcon(context, count)),
                                     onClick = {
-                                        coroutineScope.launch {
-                                            cameraPositionState.animate(
-                                                CameraUpdateFactory.newLatLngZoom(
-                                                    cluster.position,
-                                                    cameraPositionState.position.zoom + 2
-                                                )
-                                            )
-                                        }
+                                        mapViewModel.onClusterClick(cluster, cameraPositionState)
                                         true
                                     }
                                 )
@@ -227,8 +222,40 @@ fun MapScreen(
                     }
                 }
 
-                // Post preview card
-                uiState.selectedPost?.let { post ->
+                // Post preview card / Carousel
+                uiState.selectedCluster?.let { cluster ->
+                    val pagerState = rememberPagerState(pageCount = { cluster.posts.size })
+                    
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 16.dp),
+                        contentPadding = PaddingValues(horizontal = 32.dp),
+                        pageSpacing = 16.dp
+                    ) { page ->
+                        val post = cluster.posts[page]
+                        PostCard(
+                            post = post,
+                            isLiked = post.likedByCurrentUser,
+                            likeCount = post.likeCount,
+                            commentCount = post.commentCount,
+                            onLikeClick = { mapViewModel.toggleLike(post.id) },
+                            onClick = {
+                                navController.navigate("${com.example.echo.utils.Constants.ROUTE_POST_DETAILS}/${post.id}")
+                            },
+                            onTagClick = { tag ->
+                                tagInput = tag
+                                mapViewModel.setTagFilter(tag, cameraPositionState)
+                            }
+                        )
+                    }
+
+                    // Update selected post when page changes
+                    LaunchedEffect(pagerState.currentPage) {
+                        mapViewModel.onSelectedPostChanged(cluster.posts[pagerState.currentPage])
+                    }
+                } ?: uiState.selectedPost?.let { post ->
                     PostCard(
                         post = post,
                         isLiked = post.likedByCurrentUser,
