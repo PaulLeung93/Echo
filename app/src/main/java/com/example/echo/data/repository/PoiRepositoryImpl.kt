@@ -17,32 +17,37 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Implementation of PoiRepository using Firebase Firestore.
- */
 @Singleton
 class PoiRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val poiMapper: PoiMapper,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : PoiRepository {
-    
+
     private val poisCollection = firestore.collection("pois")
-    
+
     override fun getPois(): Flow<List<Poi>> = callbackFlow {
         val listener = poisCollection.addSnapshotListener { snapshot, error ->
             if (error != null) {
+                android.util.Log.e("PoiRepository", "Firestore Listener FAILED", error)
                 close(error)
                 return@addSnapshotListener
             }
-            
+// In PoiRepositoryImpl.kt inside the listener
+
+            val source = if (snapshot != null && snapshot.metadata.isFromCache) "LOCAL CACHE" else "SERVER"
+            android.util.Log.d("PoiRepository", "Data fetched from: $source")
+
+            val docCount = snapshot?.documents?.size ?: 0
+            android.util.Log.d("PoiRepository", "Fetched $docCount documents from Firestore")
+
             val entities = snapshot?.documents?.mapNotNull { doc ->
                 try {
                     val name = doc.getString("name")
                     val type = doc.getString("type")
                     val geoPoint = doc.getGeoPoint("location")
                     val description = doc.getString("description") ?: ""
-                    
+
                     if (name != null && type != null && geoPoint != null) {
                         PoiEntity(
                             id = doc.id,
@@ -51,24 +56,36 @@ class PoiRepositoryImpl @Inject constructor(
                             location = geoPoint,
                             description = description
                         )
-                    } else null
+                    } else {
+                        android.util.Log.w("PoiRepository", "Missing fields for POI: ${doc.id}")
+                        null
+                    }
                 } catch (e: Exception) {
+                    android.util.Log.e("PoiRepository", "Error parsing POI: ${doc.id}", e)
                     null
                 }
             } ?: emptyList()
-            
+
+            // --- NEW LOGGING BLOCK ---
+            android.util.Log.d("PoiRepository", "--- START POI LIST ---")
+            entities.forEach { poi ->
+                android.util.Log.d("PoiRepository", "POI: ${poi.name} | Type: ${poi.type} | Loc: ${poi.location.latitude},${poi.location.longitude}")
+            }
+            android.util.Log.d("PoiRepository", "--- END POI LIST ---")
+            // -------------------------
+
             val pois = poiMapper.toDomainList(entities)
             trySend(pois)
         }
-        
+
         awaitClose { listener.remove() }
     }.flowOn(ioDispatcher)
-    
-    override fun getPoisByTypes(types: Set<String>): Flow<List<Poi>> = 
+
+    override fun getPoisByTypes(types: Set<String>): Flow<List<Poi>> =
         getPois().map { pois ->
             pois.filter { poi -> poi.type in types }
         }
-    
+
     override suspend fun getPoiById(poiId: String): Poi? = withContext(ioDispatcher) {
         try {
             val doc = poisCollection.document(poiId).get().await()
@@ -76,7 +93,7 @@ class PoiRepositoryImpl @Inject constructor(
             val type = doc.getString("type")
             val geoPoint = doc.getGeoPoint("location")
             val description = doc.getString("description") ?: ""
-            
+
             if (name != null && type != null && geoPoint != null) {
                 val entity = PoiEntity(
                     id = doc.id,
