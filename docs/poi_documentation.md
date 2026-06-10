@@ -42,4 +42,43 @@ To add or modify POIs:
 4. The changes will propagate to all active app instances via Firestore's real-time sync.
 
 ---
-*Last Updated: 2026-01-25*
+
+## 4. POI Comments (in-flight feature)
+
+POIs support their own comment thread, separate from post comments, mirroring the
+proximity-based commenting model used for posts.
+
+### Data Structure (Firestore Schema)
+- **Subcollection**: `pois/{poiId}/comments/{commentId}`, same shape as post comments
+  (`username`, `message`, `timestamp`).
+- **`commentCount` (Number)**: Stored on the parent `pois/{poiId}` document. Kept in sync
+  via `FieldValue.increment(1)` / `increment(-1)` whenever a comment is added or deleted.
+  Surfaced through `PoiEntity.commentCount` → `Poi.commentCount`.
+
+### Technical Implementation
+- **`CommentRepositoryImpl.kt`**: Extends the existing post-comment repository with
+  `getCommentsForPoi`, `addCommentToPoi`, and `deleteCommentFromPoi`, using the
+  `pois/{poiId}/comments` subcollection and incrementing/decrementing `commentCount` on
+  the POI document.
+- **Use Cases** (`domain/usecase/comment/`):
+  - `GetPoiCommentsUseCase` — streams comments for a POI.
+  - `AddPoiCommentUseCase` — validates the user is signed in (non-anonymous) and the
+    message is non-blank before delegating to the repository.
+  - `DeletePoiCommentUseCase` — deletes a comment by id.
+- **Presentation**: `PoiDetailViewModel` + `PoiDetailScreen`
+  (`feature/map/presentation/`) load the POI (via `getPoiByIdFlow`) and its comments,
+  and expose add/delete actions. Wired into `NavGraph` at
+  `${Destinations.POI_DETAILS}/{poiId}`, navigated to from map markers.
+
+### Status / Known Gaps
+Per `ROADMAP.md` Phase 1, this feature is functional but unfinished:
+- The 5km proximity rule (enforced for post comments) is **not yet enforced** for POI
+  comments.
+- Comment-ownership check for delete compares `comment.username` to the current user's
+  **email**, which needs correcting to a stable user id.
+- `feature/map/presentation/` and `feature/map/domain/` currently duplicate some files
+  under `domain/usecase/comment/` and `ui/map/` — the roadmap calls for collapsing this
+  into the documented `ui/` tree.
+
+---
+*Last Updated: 2026-06-10*

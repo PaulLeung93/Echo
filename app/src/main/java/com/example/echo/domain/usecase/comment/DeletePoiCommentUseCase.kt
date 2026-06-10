@@ -1,0 +1,15 @@
+package com.example.echo.domain.usecase.comment
+
+import com.example.echo.domain.repository.CommentRepository
+import javax.inject.Inject
+
+/**
+ * Use case for deleting a comment from a POI.
+ */
+class DeletePoiCommentUseCase @Inject constructor(
+    private val commentRepository: CommentRepository
+) {
+    suspend operator fun invoke(poiId: String, commentId: String) {
+        commentRepository.deleteCommentFromPoi(poiId, commentId)
+    }
+}

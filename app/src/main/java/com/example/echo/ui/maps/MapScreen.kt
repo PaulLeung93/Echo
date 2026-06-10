@@ -8,6 +8,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Message
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -211,7 +212,7 @@ fun MapScreen(
                             Marker(
                                 state = MarkerState(position = latLng),
                                 title = poi.name,
-                                snippet = poi.description,
+                                snippet = "${poi.description} • ${poi.commentCount} comments",
                                 onClick = {
                                     mapViewModel.setSelectedPoi(poi, cameraPositionState)
                                     true
@@ -290,6 +291,9 @@ fun MapScreen(
                     )
                 } ?: uiState.selectedPoi?.let { poi ->
                     Card(
+                        onClick = {
+                            navController.navigate("${Destinations.POI_DETAILS}/${poi.id}")
+                        },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(16.dp)
@@ -316,6 +320,20 @@ fun MapScreen(
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Message,
+                                    contentDescription = "Comments",
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "${poi.commentCount} ${if (poi.commentCount == 1) "comment" else "comments"}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
                         }
                     }
                 }

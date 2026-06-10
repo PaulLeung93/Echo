@@ -27,7 +27,7 @@ class MapViewModel @Inject constructor(
     private val _activeFilters = MutableStateFlow(setOf("user posts", "landmark", "park", "college"))
     private val _selectedPost = MutableStateFlow<Post?>(null)
     private val _selectedCluster = MutableStateFlow<ClusterGroup?>(null)
-    private val _selectedPoi = MutableStateFlow<Poi?>(null)
+    private val _selectedPoiId = MutableStateFlow<String?>(null)
     private val _currentZoom = MutableStateFlow(12f)
 
     @Suppress("UNCHECKED_CAST")
@@ -38,7 +38,7 @@ class MapViewModel @Inject constructor(
         _activeFilters,
         _selectedPost,
         _selectedCluster,
-        _selectedPoi,
+        _selectedPoiId,
         _currentZoom
     ) { args: Array<Any?> ->
         val posts = args[0] as List<Post>
@@ -47,7 +47,7 @@ class MapViewModel @Inject constructor(
         val filters = args[3] as Set<String>
         val selected = args[4] as Post?
         val selectedCluster = args[5] as ClusterGroup?
-        val selectedPoi = args[6] as Poi?
+        val selectedPoiId = args[6] as String?
         val zoom = args[7] as Float
 
         val filteredPosts = if ("user posts" in filters) {
@@ -60,6 +60,7 @@ class MapViewModel @Inject constructor(
         }
 
         val filteredPois = pois.filter { it.type.lowercase() in filters }
+        val selectedPoi = filteredPois.find { it.id == selectedPoiId }
         
         MapUiState(
             posts = filteredPosts,
@@ -81,7 +82,7 @@ class MapViewModel @Inject constructor(
     fun setTagFilter(tag: String, camera: CameraPositionState?) {
         _currentTag.value = tag
         _selectedPost.value = null
-        _selectedPoi.value = null
+        _selectedPoiId.value = null
         
         viewModelScope.launch {
             val state = uiState.value
@@ -106,7 +107,7 @@ class MapViewModel @Inject constructor(
     fun clearTagFilter() {
         _currentTag.value = null
         _selectedPost.value = null
-        _selectedPoi.value = null
+        _selectedPoiId.value = null
     }
 
     fun filterByMarkerTypes(types: Set<String>) {
@@ -120,7 +121,7 @@ class MapViewModel @Inject constructor(
     fun setSelectedPost(post: Post, camera: CameraPositionState) {
         _selectedPost.value = post
         _selectedCluster.value = null
-        _selectedPoi.value = null
+        _selectedPoiId.value = null
         val latLng = LatLng(post.latitude ?: return, post.longitude ?: return)
         viewModelScope.launch {
             camera.animate(CameraUpdateFactory.newLatLng(latLng))
@@ -128,7 +129,7 @@ class MapViewModel @Inject constructor(
     }
 
     fun setSelectedPoi(poi: Poi, camera: CameraPositionState) {
-        _selectedPoi.value = poi
+        _selectedPoiId.value = poi.id
         _selectedPost.value = null
         _selectedCluster.value = null
         val latLng = LatLng(poi.latitude, poi.longitude)
@@ -140,13 +141,13 @@ class MapViewModel @Inject constructor(
     fun clearSelectedPost() {
         _selectedPost.value = null
         _selectedCluster.value = null
-        _selectedPoi.value = null
+        _selectedPoiId.value = null
     }
 
     fun onClusterClick(cluster: ClusterGroup, camera: CameraPositionState) {
         _selectedCluster.value = cluster
         _selectedPost.value = cluster.posts.firstOrNull()
-        _selectedPoi.value = null
+        _selectedPoiId.value = null
         viewModelScope.launch {
             camera.animate(CameraUpdateFactory.newLatLng(cluster.position))
         }

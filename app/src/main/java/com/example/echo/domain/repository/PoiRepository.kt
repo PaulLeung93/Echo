@@ -23,9 +23,9 @@ interface PoiRepository {
     fun getPoisByTypes(types: Set<String>): Flow<List<Poi>>
     
     /**
-     * Get a single POI by ID.
+     * Get a single POI by ID with real-time updates.
      * @param poiId The ID of the POI.
-     * @return The POI, or null if not found.
+     * @return Flow of the POI, or null if not found.
      */
-    suspend fun getPoiById(poiId: String): Poi?
+    fun getPoiByIdFlow(poiId: String): Flow<Poi?>
 }

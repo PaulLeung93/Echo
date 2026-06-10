@@ -96,4 +96,71 @@ class CommentRepositoryImpl @Inject constructor(
                 .await()
             Unit
         }
+
+    private fun getPoiCommentsCollection(poiId: String) = 
+        firestore.collection(Constants.COLLECTION_POIS)
+            .document(poiId)
+            .collection(Constants.COLLECTION_COMMENTS)
+
+    override fun getCommentsForPoi(poiId: String): Flow<List<Comment>> = callbackFlow {
+        val listener = getPoiCommentsCollection(poiId)
+            .orderBy(Constants.FIELD_TIMESTAMP, Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                
+                val entities = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(CommentEntity::class.java)?.copy(id = doc.id)
+                } ?: emptyList()
+                
+                val comments = commentMapper.toDomainList(entities)
+                trySend(comments)
+            }
+        
+        awaitClose { listener.remove() }
+    }.flowOn(ioDispatcher)
+
+    override suspend fun addCommentToPoi(poiId: String, message: String): Comment = 
+        withContext(ioDispatcher) {
+            val currentUser = auth.currentUser 
+                ?: throw IllegalStateException("User must be signed in to comment")
+            
+            if (currentUser.isAnonymous) {
+                throw IllegalStateException("Anonymous users cannot comment")
+            }
+            
+            val commentMap = commentMapper.toFirestoreMap(
+                username = currentUser.email ?: "anonymous",
+                message = message
+            )
+            
+            val docRef = getPoiCommentsCollection(poiId).add(commentMap).await()
+            
+            // Update comment count on POI
+            firestore.collection(Constants.COLLECTION_POIS)
+                .document(poiId)
+                .update("commentCount", com.google.firebase.firestore.FieldValue.increment(1))
+                .await()
+            
+            Comment(
+                id = docRef.id,
+                username = currentUser.email ?: "anonymous",
+                message = message,
+                timestamp = System.currentTimeMillis()
+            )
+        }
+
+    override suspend fun deleteCommentFromPoi(poiId: String, commentId: String): Unit = 
+        withContext(ioDispatcher) {
+            getPoiCommentsCollection(poiId).document(commentId).delete().await()
+            
+            // Update comment count on POI
+            firestore.collection(Constants.COLLECTION_POIS)
+                .document(poiId)
+                .update("commentCount", com.google.firebase.firestore.FieldValue.increment(-1))
+                .await()
+            Unit
+        }
 }

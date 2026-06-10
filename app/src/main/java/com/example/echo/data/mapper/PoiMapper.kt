@@ -23,7 +23,8 @@ class PoiMapper @Inject constructor() {
             type = entity.type,
             latitude = entity.location.latitude,
             longitude = entity.location.longitude,
-            description = entity.description
+            description = entity.description,
+            commentCount = entity.commentCount
         )
     }
     
@@ -47,7 +48,8 @@ class PoiMapper @Inject constructor() {
             name = poi.name,
             type = poi.type,
             location = GeoPoint(poi.latitude, poi.longitude),
-            description = poi.description
+            description = poi.description,
+            commentCount = poi.commentCount
         )
     }
 }

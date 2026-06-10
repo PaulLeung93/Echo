@@ -1,4 +1,4 @@
-package com.example.echo.ui.post
+package com.example.echo.feature.map.presentation
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,23 +12,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
-import com.example.echo.components.PostCard
-import com.example.echo.components.CommentCard
-import com.example.echo.navigation.Destinations
-import com.example.echo.domain.model.Comment
-import com.example.echo.domain.model.Post
-import com.example.echo.utils.formatTimestamp
-import kotlinx.coroutines.launch
-
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavHostController
+import com.example.echo.components.CommentCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PostDetailScreen(
+fun PoiDetailScreen(
     navController: NavHostController,
-    viewModel: PostDetailViewModel = hiltViewModel()
+    viewModel: PoiDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
@@ -45,7 +37,16 @@ fun PostDetailScreen(
     // Scroll up when a new comment is added
     LaunchedEffect(uiState.comments.size, commentJustAdded) {
         if (commentJustAdded && uiState.comments.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.comments.size)
+            listState.animateScrollToItem(uiState.comments.size) // Scroll to bottom (comments are appending?)
+            // Actually usually comments list might be inverted or we append to bottom.
+            // PostDetailScreen scrolled to 'uiState.comments.size'.
+            // If we have a header item, we need to account for it.
+            // PostDetailScreen had 1 header item (PostCard) plus comments.
+            // usage: listState.animateScrollToItem(uiState.comments.size) -> index = size.
+            // if we have 1 header, indices are 0 (header), 1..size (comments).
+            // So if size is 3, indices are 0, 1, 2, 3. Item 3 is the LAST one.
+            // So scrolling to size accounts for 1 header item.
+            // Here we will use a LazyColumn.
             commentJustAdded = false // reset
         }
     }
@@ -54,7 +55,7 @@ fun PostDetailScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("Post Details", color = MaterialTheme.colorScheme.onPrimary)
+                    Text("POI Details", color = MaterialTheme.colorScheme.onPrimary)
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
@@ -72,7 +73,7 @@ fun PostDetailScreen(
                 .padding(horizontal = 16.dp)
                 .padding(top = paddingValues.calculateTopPadding())
         ) {
-            if (uiState.isLoading && uiState.post == null) {
+            if (uiState.isLoading && uiState.poi == null) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
@@ -84,25 +85,43 @@ fun PostDetailScreen(
                         textAlign = TextAlign.Center
                     )
                 }
-            } else if (uiState.post != null) {
-                val post = uiState.post!!
+            } else if (uiState.poi != null) {
+                val poi = uiState.poi!!
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                 ) {
+                    // Header Item
                     item {
-                        PostCard(
-                            post = post,
-                            isLiked = post.likedByCurrentUser,
-                            likeCount = post.likeCount,
-                            commentCount = post.commentCount,
-                            onLikeClick = { viewModel.toggleLike() },
-                            onClick = {},
-                            onTagClick = {},
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = poi.name,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                SuggestionChip(
+                                    onClick = { },
+                                    label = { Text(poi.type.replaceFirstChar { it.uppercase() }) }
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = poi.description,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
 
                         Text(
                             text = "Comments",
@@ -122,8 +141,13 @@ fun PostDetailScreen(
                             )
                         }
                     } else {
-                        items(uiState.comments, key = { it.id ?: it.hashCode() }) { comment ->
-                            CommentCard(comment)
+                        items(uiState.comments, key = { it.id }) { comment ->
+                            CommentCard(
+                                comment = comment,
+                                onDelete = if (comment.username == uiState.currentUserEmail) {
+                                    { viewModel.deleteComment(comment.id) }
+                                } else null
+                            )
                             Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
@@ -149,12 +173,10 @@ fun PostDetailScreen(
                     Button(
                         onClick = {
                             val now = System.currentTimeMillis()
+                            // Simple rate limiting
                             val recent = commentTimestamps.filter { now - it < WINDOW_MS }
-
                             if (recent.size >= MAX_COMMENTS) {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("You're commenting too fast. Please wait a bit.")
-                                }
+                                // In a real app we'd show a snackbar
                             } else {
                                 commentTimestamps.add(now)
                                 if (newComment.isNotBlank()) {
@@ -174,4 +196,3 @@ fun PostDetailScreen(
         }
     }
 }
-

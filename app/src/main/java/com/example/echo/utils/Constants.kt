@@ -3,6 +3,7 @@ package com.example.echo.utils
 object Constants {
     // Firestore Collections
     const val COLLECTION_POSTS = "posts"
+    const val COLLECTION_POIS = "pois"
     const val COLLECTION_COMMENTS = "comments"
 
 
@@ -22,4 +23,5 @@ object Constants {
     const val ROUTE_POST_DETAILS = "post_details"
     const val ROUTE_MAP = "map"
     const val ROUTE_PROFILE = "profile"
+    const val ROUTE_POI_DETAILS = "poi_details"
 }

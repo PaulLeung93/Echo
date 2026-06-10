@@ -22,7 +22,7 @@ object Destinations {
     const val POST_DETAILS = Constants.ROUTE_POST_DETAILS
     const val MAP = Constants.ROUTE_MAP
     const val PROFILE = Constants.ROUTE_PROFILE
-
+    const val POI_DETAILS = Constants.ROUTE_POI_DETAILS
 }
 
 @Composable
@@ -36,6 +36,8 @@ fun AppNavGraph(
         navController = navController,
         startDestination = startDestination
     ) {
+        // ... (existing routes)
+
         // Sign In Screen
         composable(
             route = "${Destinations.SIGN_IN}?successMessage={successMessage}",
@@ -81,6 +83,16 @@ fun AppNavGraph(
         ) { _ ->
             PostDetailScreen(navController = navController)
         }
+        
+        // POI Detail Screen
+        composable(
+            route = "${Destinations.POI_DETAILS}/{poiId}",
+            arguments = listOf(
+                navArgument("poiId") { defaultValue = "" }
+            )
+        ) { _ ->
+            com.example.echo.feature.map.presentation.PoiDetailScreen(navController = navController)
+        }
 
         // Map Screen
         composable(Destinations.MAP) {
@@ -94,7 +106,5 @@ fun AppNavGraph(
                 authViewModel = authViewModel
             )
         }
-
-
     }
 }

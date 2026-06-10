@@ -47,6 +47,7 @@ class PoiRepositoryImpl @Inject constructor(
                     val type = doc.getString("type")
                     val geoPoint = doc.getGeoPoint("location")
                     val description = doc.getString("description") ?: ""
+                    val commentCount = doc.getLong("commentCount")?.toInt() ?: 0
 
                     if (name != null && type != null && geoPoint != null) {
                         PoiEntity(
@@ -54,7 +55,8 @@ class PoiRepositoryImpl @Inject constructor(
                             name = name,
                             type = type,
                             location = geoPoint,
-                            description = description
+                            description = description,
+                            commentCount = commentCount
                         )
                     } else {
                         android.util.Log.w("PoiRepository", "Missing fields for POI: ${doc.id}")
@@ -86,26 +88,37 @@ class PoiRepositoryImpl @Inject constructor(
             pois.filter { poi -> poi.type in types }
         }
 
-    override suspend fun getPoiById(poiId: String): Poi? = withContext(ioDispatcher) {
-        try {
-            val doc = poisCollection.document(poiId).get().await()
-            val name = doc.getString("name")
-            val type = doc.getString("type")
-            val geoPoint = doc.getGeoPoint("location")
-            val description = doc.getString("description") ?: ""
+    override fun getPoiByIdFlow(poiId: String): Flow<Poi?> = callbackFlow {
+        val listener = poisCollection.document(poiId).addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
 
-            if (name != null && type != null && geoPoint != null) {
-                val entity = PoiEntity(
-                    id = doc.id,
-                    name = name,
-                    type = type,
-                    location = geoPoint,
-                    description = description
-                )
-                poiMapper.toDomain(entity)
-            } else null
-        } catch (e: Exception) {
-            null
+            if (snapshot != null && snapshot.exists()) {
+                val name = snapshot.getString("name")
+                val type = snapshot.getString("type")
+                val geoPoint = snapshot.getGeoPoint("location")
+                val description = snapshot.getString("description") ?: ""
+                val commentCount = snapshot.getLong("commentCount")?.toInt() ?: 0
+
+                if (name != null && type != null && geoPoint != null) {
+                    val entity = PoiEntity(
+                        id = snapshot.id,
+                        name = name,
+                        type = type,
+                        location = geoPoint,
+                        description = description,
+                        commentCount = commentCount
+                    )
+                    trySend(poiMapper.toDomain(entity))
+                } else {
+                    trySend(null)
+                }
+            } else {
+                trySend(null)
+            }
         }
-    }
+        awaitClose { listener.remove() }
+    }.flowOn(ioDispatcher)
 }

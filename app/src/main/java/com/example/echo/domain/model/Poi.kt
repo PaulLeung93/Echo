@@ -10,5 +10,6 @@ data class Poi(
     val type: String,
     val latitude: Double,
     val longitude: Double,
-    val description: String
+    val description: String,
+    val commentCount: Int = 0
 )
