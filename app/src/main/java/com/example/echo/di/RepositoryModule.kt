@@ -1,11 +1,13 @@
 package com.example.echo.di
 
+import com.example.echo.data.location.LocationProviderImpl
 import com.example.echo.data.repository.AuthRepositoryImpl
 import com.example.echo.data.repository.CommentRepositoryImpl
 import com.example.echo.data.repository.PoiRepositoryImpl
 import com.example.echo.data.repository.PostRepositoryImpl
 import com.example.echo.domain.repository.AuthRepository
 import com.example.echo.domain.repository.CommentRepository
+import com.example.echo.domain.repository.LocationProvider
 import com.example.echo.domain.repository.PoiRepository
 import com.example.echo.domain.repository.PostRepository
 import dagger.Binds
@@ -36,4 +38,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindPoiRepository(impl: PoiRepositoryImpl): PoiRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindLocationProvider(impl: LocationProviderImpl): LocationProvider
 }

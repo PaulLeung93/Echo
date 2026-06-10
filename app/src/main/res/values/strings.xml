@@ -1,3 +1,19 @@
 <resources>
     <string name="app_name">Echo</string>
+
+    <!-- POI detail screen -->
+    <string name="poi_details_title">POI Details</string>
+    <string name="back">Back</string>
+    <string name="comments_header">Comments</string>
+    <string name="no_comments_yet">No comments yet.</string>
+    <string name="write_comment_hint">Write a comment…</string>
+    <string name="send">Send</string>
+    <string name="delete_comment">Delete comment</string>
+    <string name="unknown_error">Something went wrong.</string>
+
+    <!-- Commenting eligibility -->
+    <string name="comment_rate_limited">You\'re commenting too fast. Please wait a bit.</string>
+    <string name="comment_guest_prompt">Sign in to join the conversation.</string>
+    <string name="comment_location_unknown">Enable location to comment here.</string>
+    <string name="comment_out_of_range">You must be within %1$d km of this place to comment.</string>
 </resources>

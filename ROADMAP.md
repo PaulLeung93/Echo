@@ -32,28 +32,40 @@ via a full `assembleDebug`, then smoke-tested on a Pixel_9_Pro emulator.
 
 ---
 
-## 🧩 Phase 1 — Finish the in-flight feature: POI Comments
+## 🧩 Phase 1 — Finish the in-flight feature: POI Comments — ✅ COMPLETE (2026-06-10)
 
-You were mid-build on **proximity-based commenting on POIs**, mirroring the
-post-comment feature. The screen + ViewModel exist and are wired into
-`NavGraph` (`POI_DETAILS/{poiId}`), but the feature is unfinished.
+Proximity-gated POI commenting is now implemented and verified via a green
+`assembleDebug` + 8 passing unit tests. (Live UI tap-through on the emulator was
+blocked by a map-tile rendering quirk — see note below — so visual confirmation
+of the screen is pending a real-device run.)
 
-- [ ] **Verify the end-to-end flow**: tap a POI marker → `PoiDetailScreen` →
-      load comments → add comment → delete own comment.
-- [ ] **Enforce the 5km proximity rule** for POI comments (the README promises
-      it for posts; POIs should match). Currently the gate isn't applied here.
-- [ ] **Fix comment-ownership check.** `PoiDetailScreen` decides delete-ability
-      with `comment.username == uiState.currentUserEmail` — comparing a
-      username to an email. Confirm and correct (compare on stable user id).
-- [ ] **Fix the rate-limiter.** When the limit is exceeded the button silently
-      does nothing (`// In a real app we'd show a snackbar`). Either surface a
-      snackbar or remove the client-side limiter in favor of a real one
-      (see Phase 3 — server-side rules).
-- [ ] **Clean up `PoiDetailScreen`.** It contains a large block of rambling
-      "thinking out loud" comments in the `LaunchedEffect`. Remove them.
-- [ ] **Extract hardcoded strings** ("POI Details", "Comments", "Send", "Write a
-      comment.", "Back", "Delete Comment") into `strings.xml` — required by
-      architecture constraint #3 and for localization.
+- [x] **End-to-end flow** wired and unit-tested (load comments / add / delete +
+      gating logic). Live device tap-through deferred (emulator map issue).
+- [x] **5km proximity rule** implemented client-side: new `LocationProvider`
+      (FusedLocation) + pure `distanceMeters` (Haversine) +
+      `Constants.PROXIMITY_RADIUS_METERS`; VM computes distance and gates the
+      composer. *Server-side enforcement remains Phase 3.*
+- [x] **Comment-ownership check** — verified *already correct*: `Comment.username`
+      stores the user's email, so `username == currentUserEmail` is email-to-email.
+      Left as-is; the proper stable-`userId` refactor is folded into Phase 3
+      (security rules need a uid anyway).
+- [x] **Rate-limiter fixed** — now shows a snackbar when exceeded (was a silent
+      no-op).
+- [x] **PoiDetailScreen cleaned up** — removed the rambling `LaunchedEffect`
+      comments; extracted a `CommentComposer`; split terminal load-error from
+      transient action errors (failed add/delete now snackbar via a `uiEvent`
+      channel instead of wiping the whole screen).
+- [x] **Strings extracted** to `strings.xml` for the POI feature surface
+      (detail screen + `CommentCard`). App-wide i18n remains a broader effort.
+
+> **Bonus done:** guests are now correctly gated out of commenting with a
+> "Sign in to join the conversation" prompt (the repo already rejected anonymous
+> comments; the UI now reflects it instead of failing on send).
+>
+> **Finding (not Phase 1):** the Map screen renders blank tiles on the
+> Pixel_9_Pro emulator despite a valid API key (no auth-failure in logs, Firestore
+> works) — most likely an emulator rendering quirk; verify on a real device. This
+> is the only entry point to POI detail, so it also blocked live UI verification.
 
 ---
 
@@ -139,12 +151,39 @@ These are the items that separate a demo from a publishable app.
 
 Deferred until shipped; captured so they aren't lost.
 
+### Social & Engagement
 - [ ] Push notifications (replies, nearby activity) via FCM.
 - [ ] Post editing/deletion polish + report/block (moderation — may become
       required depending on Play policy for UGC apps).
+- [ ] Direct messaging or threaded replies to comments.
+- [ ] Follow/friend nearby users.
+- [ ] Bookmarks/saved posts.
+
+### Map & Location
 - [ ] Richer map: clustering tuning, search, "recenter on me".
-- [ ] Profile enhancements (avatar upload, bio, post history).
+- [ ] GeoFire interaction radius limit — restrict which posts/POIs a user can
+      see or interact with based on a configurable distance from their current
+      location (extend the existing 5km comment-proximity rule to broader
+      feed/map visibility).
+- [ ] Geofenced alerts ("something new posted near you").
+- [ ] User-submitted POIs (vs. only the seeded list).
+- [ ] Location link on each post — tapping a post opens the map centered on
+      that post's location (deep link from PostDetail → MapScreen).
+
+### Content
+- [ ] Multi-photo posts / image carousel.
+- [ ] Event-type posts with RSVP/date-time.
+- [ ] Post expiration after 24 hours — auto-hide or delete posts older than
+      24h, possibly via a scheduled Cloud Function.
+
+### Profile & Account
+- [ ] Avatar upload, bio/display name.
+- [ ] Post history with stats (total likes/comments).
+- [ ] Settings screen (notification prefs, dark mode toggle, account deletion).
+
+### Technical
 - [ ] Offline cache / Room layer for feed resilience.
+- [ ] Search/filter persistence across sessions.
 
 ---
 

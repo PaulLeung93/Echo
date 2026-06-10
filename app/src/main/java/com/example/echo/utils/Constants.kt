@@ -1,6 +1,10 @@
 package com.example.echo.utils
 
 object Constants {
+    // Proximity
+    /** Max distance (meters) a user may be from a POI/post to comment on it. */
+    const val PROXIMITY_RADIUS_METERS = 5_000.0
+
     // Firestore Collections
     const val COLLECTION_POSTS = "posts"
     const val COLLECTION_POIS = "pois"

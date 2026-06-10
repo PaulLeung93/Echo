@@ -17,7 +17,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.echo.R
 import com.example.echo.domain.model.Comment
 import com.example.echo.utils.formatTimestamp
 
@@ -56,7 +58,7 @@ fun CommentCard(
                 IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete Comment",
+                        contentDescription = stringResource(R.string.delete_comment),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
