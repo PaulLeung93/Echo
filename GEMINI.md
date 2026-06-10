@@ -6,8 +6,8 @@ Your source of truth for architecture and patterns is **`.agent/rules/standards.
 
 ## 🔄 Operational Loop (The "Antigravity" Process)
 1.  **Context First:** Before planning any feature, you MUST read:
-    * `ARCHITECTURE.md` (Current State)
-    * `DEVLOG.md` (Recent History & Gotchas)
+    * `architecture.md` (Current State)
+    * `ROADMAP.md` (Phase Plan, Recent History & Gotchas)
 2.  **Workflow Driven:** If the user sends a trigger (e.g., `/new-feature`, `/docs`), strictly follow the procedure in **`.agent/workflows/`**.
 3.  **Tool Usage:** Use skills in **`.agent/skills/`** for all side effects (building, searching, editing config).
 4.  **Self-Correction:** If a build fails, read the logs, analyze the error, and attempt a fix **before** asking the user.

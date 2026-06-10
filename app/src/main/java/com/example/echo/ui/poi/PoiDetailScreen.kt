@@ -1,4 +1,4 @@
-package com.example.echo.feature.map.presentation
+package com.example.echo.ui.poi
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn

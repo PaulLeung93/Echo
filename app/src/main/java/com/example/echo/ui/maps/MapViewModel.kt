@@ -1,4 +1,4 @@
-package com.example.echo.ui.map
+package com.example.echo.ui.maps
 
 import android.location.Location.distanceBetween
 import androidx.lifecycle.ViewModel

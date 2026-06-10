@@ -1,4 +1,4 @@
-package com.example.echo.ui.map
+package com.example.echo.ui.maps
 
 import com.example.echo.domain.model.Poi
 import com.example.echo.domain.model.Post

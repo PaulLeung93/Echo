@@ -1,4 +1,4 @@
-package com.example.echo.feature.map.presentation
+package com.example.echo.ui.poi
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel

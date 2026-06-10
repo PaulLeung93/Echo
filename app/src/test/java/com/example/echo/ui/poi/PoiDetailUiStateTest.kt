@@ -1,4 +1,4 @@
-package com.example.echo.feature.map.presentation
+package com.example.echo.ui.poi
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

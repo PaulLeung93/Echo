@@ -8,7 +8,8 @@ import androidx.navigation.navArgument
 import com.example.echo.ui.auth.*
 import com.example.echo.ui.create.CreatePostScreen
 import com.example.echo.ui.feed.FeedScreen
-import com.example.echo.ui.map.MapScreen
+import com.example.echo.ui.maps.MapScreen
+import com.example.echo.ui.poi.PoiDetailScreen
 import com.example.echo.ui.post.PostDetailScreen
 import com.example.echo.ui.profile.ProfileScreen
 import com.example.echo.utils.Constants
@@ -91,7 +92,7 @@ fun AppNavGraph(
                 navArgument("poiId") { defaultValue = "" }
             )
         ) { _ ->
-            com.example.echo.feature.map.presentation.PoiDetailScreen(navController = navController)
+            PoiDetailScreen(navController = navController)
         }
 
         // Map Screen

@@ -69,31 +69,36 @@ of the screen is pending a real-device run.)
 
 ---
 
-## 🧹 Phase 2 — Structural cleanup (dead code & drift)
+## 🧹 Phase 2 — Structural cleanup (dead code & drift) — ✅ COMPLETE (2026-06-10)
 
 Decision: **keep the documented `ui/` + `domain/usecase/` layout** (architecture.md
 is the source of truth). Remove the competing half-migration and dead code.
 *(Agent scaffolding — `GEMINI.md`, `.agent/` — is intentionally kept.)*
 
-- [ ] **Collapse the `feature/` experiment.** Move
+- [x] **Collapse the `feature/` experiment.** Moved
       `feature/map/presentation/{PoiDetailScreen,PoiDetailViewModel,PoiDetailUiState}.kt`
-      into the documented tree (e.g. `ui/maps/` or a new `ui/poi/`), update
-      package + imports + the `NavGraph` reference, then delete `feature/`.
-- [ ] **Delete orphaned duplicate use cases:**
-      `feature/map/domain/AddPoiCommentUseCase.kt` and
-      `feature/map/domain/GetPoiCommentsUseCase.kt` (the live VM uses the
-      `domain/usecase/comment/...` versions). Keep the `domain/usecase/comment/`
-      copies.
-- [ ] **Delete orphaned `ui/map/PoiDetailUiState.kt`** (singular `map`, nothing
-      references it; superseded by the `feature/map/presentation` copy you'll
-      relocate).
-- [ ] **Delete the legacy `models/` package** (`Comment.kt`,
-      `PointsOfInterest.kt`, `Post.kt`) — pre-Clean-Architecture leftovers,
-      only referenced by themselves; superseded by `domain/model/`.
-- [ ] **Reconcile the agent docs.** `GEMINI.md` references `ARCHITECTURE.md`
-      (uppercase) and `DEVLOG.md` that don't exist. Either create a `DEVLOG.md`
-      or update `GEMINI.md` to point at the real `architecture.md`.
-- [ ] **Re-verify build is green** after the moves.
+      (+ `PoiDetailUiStateTest`) into a new `ui/poi/` package (matches the
+      per-screen `ui/post/`, `ui/feed/` convention); updated package, the
+      `NavGraph` reference, and architecture.md's file tree + nav diagram;
+      deleted `feature/`.
+- [x] **Delete orphaned duplicate use cases:**
+      `feature/map/domain/{AddPoiCommentUseCase,GetPoiCommentsUseCase}.kt`
+      removed; the live `domain/usecase/comment/` copies kept.
+- [x] **Delete orphaned `ui/map/PoiDetailUiState.kt`** — removed (file was
+      effectively empty).
+- [x] **Delete the legacy `models/` package** (`Comment.kt`,
+      `PointsOfInterest.kt`, `Post.kt`) — removed; nothing outside the package
+      referenced them.
+- [x] **Reconcile the agent docs.** Updated `GEMINI.md` to point at the real
+      `architecture.md` and at `ROADMAP.md` (in place of the nonexistent
+      `DEVLOG.md`) rather than creating a new doc to maintain.
+- [x] **Re-verify build is green** — `assembleDebug` + `testDebugUnitTest`
+      both pass (20/20 tests, incl. the relocated `PoiDetailUiStateTest`).
+
+> **Leftover drift (resolved):** `MapScreen`, `MapViewModel`, and `MapUiState`
+> declared the singular package `com.example.echo.ui.map` despite living in the
+> `ui/maps/` directory. Aligned all three to `ui.maps` (plus the `NavGraph`
+> import); the whole `ui/` tree now has matching package/directory names.
 
 ---
 

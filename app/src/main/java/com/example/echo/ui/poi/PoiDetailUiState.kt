@@ -1,4 +1,4 @@
-package com.example.echo.feature.map.presentation
+package com.example.echo.ui.poi
 
 import com.example.echo.domain.model.Comment
 import com.example.echo.domain.model.Poi

@@ -68,6 +68,7 @@ graph LR
     Feed --> PostDetails[Post Details Screen]
     
     Map --> PostDetails
+    Map --> PoiDetails[POI Details Screen]
     Profile -- Logout --> SignIn
 ```
 
@@ -93,6 +94,7 @@ app/src/main/java/com/example/echo/
 │   ├── create/          # Post creation flow
 │   ├── feed/            # Main social feed
 │   ├── maps/            # Interactive map view
+│   ├── poi/             # POI detail view and proximity-gated comments
 │   ├── post/            # Detailed post view and interactions
 │   ├── profile/         # User profile and settings
 │   ├── splash/          # App entry and session check

@@ -1,4 +1,4 @@
-package com.example.echo.ui.map
+package com.example.echo.ui.maps
 
 import android.Manifest
 import android.util.Log
@@ -22,9 +22,6 @@ import com.example.echo.R
 import com.example.echo.components.PostCard
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.common.TopSnackbarHost
-import com.example.echo.ui.maps.MarkerTypeFilterDialog
-import com.example.echo.ui.maps.bitmapDescriptorFromVector
-import com.example.echo.ui.maps.createClusterIcon
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
