@@ -16,9 +16,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.example.echo.domain.model.Coordinates
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.auth.AuthViewModel
 import com.example.echo.utils.Constants
+import com.example.echo.utils.distanceMeters
+import com.example.echo.utils.formatDistance
 import com.example.echo.components.PostCard
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.accompanist.swiperefresh.SwipeRefresh
@@ -34,6 +37,7 @@ fun FeedScreen(
 ) {
     val uiState by feedViewModel.uiState.collectAsState()
     val isRefreshing by feedViewModel.isRefreshing.collectAsState()
+    val userCoords by feedViewModel.userCoordinates.collectAsState()
     
     val authState by authViewModel.uiState.collectAsState()
     val isUserAuthenticated = authState.currentUser != null
@@ -148,11 +152,20 @@ fun FeedScreen(
                                 }
                             } else {
                                 items(uiState.posts) { post ->
+                                    val distanceLabel = remember(post.id, userCoords) {
+                                        val u = userCoords
+                                        val lat = post.latitude
+                                        val lng = post.longitude
+                                        if (u != null && lat != null && lng != null) {
+                                            formatDistance(distanceMeters(u, Coordinates(lat, lng)))
+                                        } else null
+                                    }
                                     PostCard(
                                         post = post,
                                         isLiked = post.likedByCurrentUser,
                                         likeCount = post.likeCount,
                                         commentCount = post.commentCount,
+                                        distanceLabel = distanceLabel,
                                         onLikeClick = {
                                             if (isGuest) {
                                                 scope.launch {

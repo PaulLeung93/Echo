@@ -2,6 +2,8 @@ package com.example.echo.ui.feed
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.echo.domain.model.Coordinates
+import com.example.echo.domain.repository.LocationProvider
 import com.example.echo.domain.usecase.post.GetPostsUseCase
 import com.example.echo.domain.usecase.post.GetPostsByTagUseCase
 import com.example.echo.domain.usecase.post.ToggleLikeUseCase
@@ -16,10 +18,21 @@ class FeedViewModel @Inject constructor(
     private val getPostsUseCase: GetPostsUseCase,
     private val getPostsByTagUseCase: GetPostsByTagUseCase,
     private val toggleLikeUseCase: ToggleLikeUseCase,
-    private val refreshPostsUseCase: RefreshPostsUseCase
+    private val refreshPostsUseCase: RefreshPostsUseCase,
+    private val locationProvider: LocationProvider
 ) : ViewModel() {
 
     private val _currentTag = MutableStateFlow<String?>(null)
+
+    /** The user's current location, for showing how far away each post is. Null if unavailable. */
+    private val _userCoordinates = MutableStateFlow<Coordinates?>(null)
+    val userCoordinates: StateFlow<Coordinates?> = _userCoordinates.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            _userCoordinates.value = runCatching { locationProvider.getCurrentCoordinates() }.getOrNull()
+        }
+    }
     
     val uiState: StateFlow<FeedUiState> = combine(
         _currentTag.flatMapLatest { tag ->

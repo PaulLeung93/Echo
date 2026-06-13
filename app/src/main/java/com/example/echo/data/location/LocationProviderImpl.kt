@@ -35,7 +35,7 @@ class LocationProviderImpl @Inject constructor(
 
         try {
             val location = fusedLocationClient.getCurrentLocation(
-                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                Priority.PRIORITY_HIGH_ACCURACY,
                 CancellationTokenSource().token
             ).await() ?: fusedLocationClient.lastLocation.await()
 

@@ -3,6 +3,7 @@ package com.example.echo.utils
 import com.example.echo.domain.model.Coordinates
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -21,4 +22,10 @@ fun distanceMeters(a: Coordinates, b: Coordinates): Double {
     val h = sin(dLat / 2) * sin(dLat / 2) +
         cos(lat1) * cos(lat2) * sin(dLng / 2) * sin(dLng / 2)
     return 2 * EARTH_RADIUS_METERS * atan2(sqrt(h), sqrt(1 - h))
+}
+
+/** Human-friendly distance label, e.g. "250 m away" or "1.2 km away". */
+fun formatDistance(meters: Double): String = when {
+    meters < 1000 -> "${meters.roundToInt()} m away"
+    else -> "%.1f km away".format(meters / 1000)
 }
