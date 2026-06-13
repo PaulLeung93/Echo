@@ -24,8 +24,9 @@ fun distanceMeters(a: Coordinates, b: Coordinates): Double {
     return 2 * EARTH_RADIUS_METERS * atan2(sqrt(h), sqrt(1 - h))
 }
 
-/** Human-friendly distance label, e.g. "250 m away" or "1.2 km away". */
+/** Human-friendly distance label, e.g. "Here", "250 m away", or "1.2 km away". */
 fun formatDistance(meters: Double): String = when {
+    meters < 15 -> "Here" // within GPS jitter — reads better than "0 m away"
     meters < 1000 -> "${meters.roundToInt()} m away"
     else -> "%.1f km away".format(meters / 1000)
 }

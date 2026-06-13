@@ -1,5 +1,9 @@
 package com.example.echo.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,10 +36,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import com.example.echo.domain.model.Post
 import com.example.echo.ui.theme.EchoTheme
 import com.example.echo.utils.formatTimestamp
@@ -60,6 +67,10 @@ fun PostCard(
     distanceLabel: String? = null,
     modifier: Modifier = Modifier
 ) {
+    // Drives the heart "pop" on tap.
+    val likeScale = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -78,7 +89,7 @@ fun PostCard(
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = post.username,
+                        text = post.username.substringBefore("@"),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -136,7 +147,19 @@ fun PostCard(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .clickable { onLikeClick() }
+                        .clickable {
+                            onLikeClick()
+                            scope.launch {
+                                likeScale.animateTo(1.3f, animationSpec = tween(120))
+                                likeScale.animateTo(
+                                    1f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessLow
+                                    )
+                                )
+                            }
+                        }
                         .padding(vertical = 4.dp, horizontal = 2.dp)
                 ) {
                     Icon(
@@ -144,7 +167,9 @@ fun PostCard(
                         contentDescription = if (isLiked) "Unlike" else "Like",
                         tint = if (isLiked) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier
+                            .size(20.dp)
+                            .scale(likeScale.value)
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
