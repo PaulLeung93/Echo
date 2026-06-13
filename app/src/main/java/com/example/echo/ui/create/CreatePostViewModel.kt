@@ -2,6 +2,7 @@ package com.example.echo.ui.create
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.echo.domain.repository.LocationProvider
 import com.example.echo.domain.usecase.post.CreatePostUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,19 +14,46 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CreatePostViewModel @Inject constructor(
-    private val createPostUseCase: CreatePostUseCase
+    private val createPostUseCase: CreatePostUseCase,
+    private val locationProvider: LocationProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CreatePostUiState())
     val uiState: StateFlow<CreatePostUiState> = _uiState.asStateFlow()
 
-    fun submitPost(
-        message: String,
-        includeLocation: Boolean,
-        userLatitude: Double? = null,
-        userLongitude: Double? = null,
-        tags: List<String> = emptyList()
-    ) {
+    /**
+     * Toggle attaching the user's location. When turned on, resolves a fix via
+     * [LocationProvider] (high-accuracy, permission-checked); flags it
+     * unavailable if no fix can be obtained.
+     */
+    fun setIncludeLocation(include: Boolean) {
+        if (!include) {
+            _uiState.update {
+                it.copy(
+                    includeLocation = false,
+                    isLocationLoading = false,
+                    locationUnavailable = false,
+                    latitude = null,
+                    longitude = null
+                )
+            }
+            return
+        }
+        _uiState.update { it.copy(includeLocation = true, isLocationLoading = true, locationUnavailable = false) }
+        viewModelScope.launch {
+            val coords = runCatching { locationProvider.getCurrentCoordinates() }.getOrNull()
+            _uiState.update {
+                it.copy(
+                    isLocationLoading = false,
+                    latitude = coords?.latitude,
+                    longitude = coords?.longitude,
+                    locationUnavailable = coords == null
+                )
+            }
+        }
+    }
+
+    fun submitPost(message: String, tags: List<String> = emptyList()) {
         val trimmedMessage = message.trim()
 
         if (trimmedMessage.isBlank()) {
@@ -45,15 +73,17 @@ class CreatePostViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            
-            val lat = if (includeLocation) userLatitude else null
-            val lng = if (includeLocation) userLongitude else null
-            
+
+            val state = _uiState.value
+            val includeLocation = state.includeLocation
+            val lat = if (includeLocation) state.latitude else null
+            val lng = if (includeLocation) state.longitude else null
+
             createPostUseCase(
                 message = trimmedMessage,
                 includeLocation = includeLocation,
-                latitude = userLatitude,
-                longitude = userLongitude,
+                latitude = lat,
+                longitude = lng,
                 tags = tags
             )
                 .onSuccess {

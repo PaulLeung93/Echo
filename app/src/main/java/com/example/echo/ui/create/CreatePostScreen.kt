@@ -1,8 +1,5 @@
 package com.example.echo.ui.create
 
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -12,34 +9,26 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.echo.navigation.Destinations
-import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.launch
 
 import androidx.hilt.navigation.compose.hiltViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
-@SuppressLint("MissingPermission")
 @Composable
 fun CreatePostScreen(
     navController: NavHostController,
     viewModel: CreatePostViewModel = hiltViewModel()
 ) {
-    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
     var message by remember { mutableStateOf("") }
-    var includeLocation by remember { mutableStateOf(false) }
-    var latitude by remember { mutableStateOf<Double?>(null) }
-    var longitude by remember { mutableStateOf<Double?>(null) }
 
     var newTag by remember { mutableStateOf("") }
     val tags = remember { mutableStateListOf<String>() }
@@ -143,40 +132,33 @@ fun CreatePostScreen(
                     Text("Add Tag")
                 }
 
-                // Include Location Checkbox
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                // Include Location
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
-                        checked = includeLocation,
-                        onCheckedChange = { checked ->
-                            includeLocation = checked
-                            if (checked) {
-                                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-                                if (ActivityCompat.checkSelfPermission(
-                                        context,
-                                        Manifest.permission.ACCESS_FINE_LOCATION
-                                    ) == PackageManager.PERMISSION_GRANTED ||
-                                    ActivityCompat.checkSelfPermission(
-                                        context,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    ) == PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                                        if (location != null) {
-                                            latitude = location.latitude
-                                            longitude = location.longitude
-                                        }
-                                    }
-                                }
-                            } else {
-                                latitude = null
-                                longitude = null
-                            }
-                        }
+                        checked = uiState.includeLocation,
+                        onCheckedChange = { viewModel.setIncludeLocation(it) }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Include Location")
+                    Column {
+                        Text(text = "Include location")
+                        when {
+                            uiState.isLocationLoading -> Text(
+                                text = "Getting your location…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            uiState.locationUnavailable -> Text(
+                                text = "Location unavailable",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            uiState.includeLocation && uiState.latitude != null -> Text(
+                                text = "Location attached",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -184,15 +166,9 @@ fun CreatePostScreen(
                 // Post Button
                 Button(
                     onClick = {
-                        viewModel.submitPost(
-                            message = message,
-                            includeLocation = includeLocation,
-                            userLatitude = latitude,
-                            userLongitude = longitude,
-                            tags = tags.toList()
-                        )
+                        viewModel.submitPost(message = message, tags = tags.toList())
                     },
-                    enabled = !uiState.isLoading,
+                    enabled = !uiState.isLoading && !uiState.isLocationLoading,
                     shape = RoundedCornerShape(percent = 50),
                     modifier = Modifier
                         .fillMaxWidth()
