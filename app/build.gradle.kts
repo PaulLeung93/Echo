@@ -82,6 +82,10 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    // App Check — attests requests come from the genuine, unmodified app.
+    // Play Integrity in release; a debug provider locally (token registered in console).
+    implementation(libs.firebase.appcheck.playintegrity)
+    debugImplementation(libs.firebase.appcheck.debug)
     implementation(libs.google.auth)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.accompanist.swiperefresh)

@@ -134,13 +134,35 @@ These are the items that separate a demo from a publishable app.
       nothing to deploy to and nothing using it. When image upload lands:
       provision Storage, swap in auth-scoped owner-path + size/type rules, then
       `firebase deploy --only storage`.
-- [ ] **Server-side proximity & rate limiting** *(deferred to a Cloud Function —
-      cannot be done in rules).* Firestore rules have **no trusted source** for
-      the caller's physical location, and per-user time-window rate limits need
-      server state, so neither the 5km rule nor abuse limits can be enforced in
-      `firestore.rules`. Both remain **client-side-gated only** until a Cloud
-      Function (or App Check + callable that derives/validates location
-      server-side) is added. This is the one genuinely unfinished security item.
+- **Server-side proximity & rate limiting** — *cannot be done in `firestore.rules`*:
+  rules have **no trusted source** for the caller's physical location, and per-user
+  time-window rate limits need server state. Both protections (the 5km comment rule
+  and the spam limiter) are **client-side-gated only** today, so anyone hitting the
+  database directly — bypassing the app — skips them. Like Tinder et al., this can
+  never be made *perfect* (any client-reported location can be spoofed); the goal is
+  to make bypass expensive and detectable. Address it as a staircase, cheapest win
+  first:
+
+  - [x] **Step 1 — App Check / Play Integrity.** Biggest bang-for-buck. The OS
+        cryptographically attests each request came from the genuine, unmodified app
+        on a real device, which blocks the common attack (curl/bots/modified APK
+        hitting the API directly). *Implemented in `EchoApplication`* (Play Integrity
+        for release, debug provider locally). **Remaining (console-side):** register
+        the app under App Check, add the debug token from logcat, then flip
+        enforcement ON for Firestore (and Functions, once Step 2 lands).
+  - [ ] **Step 2 — Server-side distance check in a callable Cloud Function.** Move
+        the 5km rule off the phone: the client calls a function that fetches the
+        POI's coordinates from Firestore (the *trusted* source), validates distance,
+        enforces a per-user rate limit via a Firestore counter, and only then writes
+        the comment via the Admin SDK. Rules then forbid direct client comment
+        creates. A spoofer can no longer bypass the check by editing the APK.
+        **Prerequisite: the Blaze (pay-as-you-go) plan** — Cloud Functions don't run
+        on the free Spark plan (generous free tier; effectively free at this volume).
+  - [ ] **Step 3 — Cross-check location signals** *(later, once there are real users
+        worth abusing).* Corroborate the reported GPS against IP geolocation, the
+        Android mock-location flag (`isFromMockProvider`), and "can't teleport"
+        velocity checks. Defeats a spoofer feeding fake GPS to the genuine app —
+        the one gap Steps 1–2 leave open. Luxury tier; not needed for launch.
 
 ### Robustness
 - [x] **Guest write-gating fixed** *(2026-06-12).* Guests could like posts (and
@@ -334,6 +356,7 @@ are ✅ done.** Remaining path to launch:
 3. **Phase 4 store prep** — privacy policy, Data Safety form, app content rating,
    and fresh screenshots (which can now show off the new UI).
 
-**Still open from earlier phases:** server-side proximity & rate limiting (needs a
-Cloud Function), post-comment delete UI, and the test harness. **Phase 5** is
-post-launch.
+**Still open from earlier phases:** server-side proximity & rate limiting — **Step 1
+(App Check) done**; Step 2 (server-side distance check via callable Cloud Function)
+needs the Blaze plan; Step 3 (cross-check signals) is post-launch luxury. Also
+post-comment delete UI and the test harness. **Phase 5** is post-launch.
