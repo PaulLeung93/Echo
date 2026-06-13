@@ -2,39 +2,35 @@ package com.example.echo.ui.auth
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavHostController
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import com.example.echo.R
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.common.TopSnackbarHost
 import com.example.echo.utils.isValidEmail
-import com.example.echo.utils.mapFirebaseErrorMessage
-import kotlinx.coroutines.launch
 
 import androidx.hilt.navigation.compose.hiltViewModel
 
@@ -66,22 +62,15 @@ fun SignInScreen(
                         popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                     }
                 }
-                is AuthUiEvent.ShowError -> {
-                    snackbarHostState.showSnackbar(event.message)
-                }
-                is AuthUiEvent.SignInSuccess -> {
-                    snackbarHostState.showSnackbar("Welcome back!")
-                }
+                is AuthUiEvent.ShowError -> snackbarHostState.showSnackbar(event.message)
+                is AuthUiEvent.SignInSuccess -> snackbarHostState.showSnackbar("Welcome back!")
                 else -> {}
             }
         }
     }
 
-    // Display success message if passed from another screen
     LaunchedEffect(successMessage) {
-        if (successMessage.isNotBlank()) {
-            snackbarHostState.showSnackbar(successMessage)
-        }
+        if (successMessage.isNotBlank()) snackbarHostState.showSnackbar(successMessage)
     }
 
     val googleSignInClient = remember {
@@ -97,63 +86,66 @@ fun SignInScreen(
 
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        authViewModel.handleGoogleSignInResult(result)
-    }
+    ) { result -> authViewModel.handleGoogleSignInResult(result) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            snackbarHost = {}
-        ) { padding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Brand mark
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(72.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(38.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("Echo", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Your neighborhood, in real time.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(28.dp))
+
+            // Form card
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.login_background),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Echo", fontSize = 48.sp, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Stay Connected, Locally.", color = Color.White)
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Email
+                Column(modifier = Modifier.padding(20.dp)) {
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
-                        label = { Text("Email") },
+                        label = { Text("Email address") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(0.85f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White
-                        ),
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Next
-                        )
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Password
+                    Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
                         label = { Text("Password") },
                         singleLine = true,
+                        shape = MaterialTheme.shapes.medium,
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
                             val icon = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility
@@ -161,106 +153,76 @@ fun SignInScreen(
                                 Icon(imageVector = icon, contentDescription = null)
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(0.85f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White
-                        ),
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
-                        )
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done)
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(Modifier.height(20.dp))
 
-                    // Login Button
                     Button(
                         onClick = {
                             if (isValidEmail(email) && password.isNotBlank()) {
                                 authViewModel.signInWithEmail(email, password)
                             } else {
-                                authViewModel.checkUserSession() // Just a placeholder for error or check
+                                authViewModel.checkUserSession()
                             }
                         },
                         enabled = !uiState.isLoading,
-                        modifier = Modifier.fillMaxWidth(0.75f)
+                        shape = RoundedCornerShape(percent = 50),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
                     ) {
-                        if (uiState.isLoading) CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        else Text("Login")
+                        if (uiState.isLoading) CircularProgressIndicator(modifier = Modifier.size(22.dp), color = MaterialTheme.colorScheme.onPrimary)
+                        else Text("Log in", style = MaterialTheme.typography.titleMedium)
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Forgot Password / Sign Up
                     Row(
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth(0.85f)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         TextButton(onClick = { navController.navigate(Destinations.FORGOT_PASSWORD) }) {
-                            Text("Forgot Password?", textDecoration = TextDecoration.Underline, color = Color.White)
+                            Text("Forgot password?", color = MaterialTheme.colorScheme.secondary)
                         }
                         TextButton(onClick = { navController.navigate(Destinations.SIGN_UP) }) {
-                            Text("Sign Up", textDecoration = TextDecoration.Underline, color = Color.White)
+                            Text("Sign up", color = MaterialTheme.colorScheme.secondary)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+                        Text("  or  ", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+                    }
 
-                    // Divider with OR
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth(0.85f)
+                    Spacer(Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) },
+                        enabled = !uiState.isGoogleLoading,
+                        shape = RoundedCornerShape(percent = 50),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
                     ) {
-                        HorizontalDivider(Modifier.weight(1f), color = Color.White)
-                        Text("  OR  ", color = Color.White)
-                        HorizontalDivider(Modifier.weight(1f), color = Color.White)
+                        if (uiState.isGoogleLoading) CircularProgressIndicator(modifier = Modifier.size(22.dp))
+                        else Text("Continue with Google", color = MaterialTheme.colorScheme.onSurface)
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Google Sign-In Button
-                    if (uiState.isGoogleLoading) {
-                        CircularProgressIndicator()
-                    } else {
-                        GoogleSignInButton { googleSignInLauncher.launch(googleSignInClient.signInIntent) }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    TextButton(onClick = {
-                        authViewModel.signInAsGuest()
-                    }) {
-                        Text("Continue as Guest", color = Color.White)
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "By continuing, you agree to Echo's Terms of Service and Privacy Policy.",
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
                 }
             }
+
+            Spacer(Modifier.height(16.dp))
+            TextButton(onClick = { authViewModel.signInAsGuest() }) {
+                Text("Continue as guest", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "By continuing, you agree to Echo's Terms of Service and Privacy Policy.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
         }
         TopSnackbarHost(snackbarHostState = snackbarHostState)
     }
-}
-
-@Composable
-fun GoogleSignInButton(onClick: () -> Unit) {
-    AndroidView(
-        factory = { context ->
-            com.google.android.gms.common.SignInButton(context).apply {
-                setSize(com.google.android.gms.common.SignInButton.SIZE_WIDE)
-                setColorScheme(com.google.android.gms.common.SignInButton.COLOR_LIGHT)
-                setOnClickListener { onClick() }
-            }
-        },
-        modifier = Modifier
-            .fillMaxWidth(0.85f)
-            .height(50.dp)
-    )
 }

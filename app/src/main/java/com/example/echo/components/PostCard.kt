@@ -9,27 +9,32 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Comment
-import androidx.compose.material.icons.filled.Message
-import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.automirrored.outlined.Comment
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.echo.domain.model.Post
+import com.example.echo.ui.theme.EchoTheme
 import com.example.echo.utils.formatTimestamp
+import androidx.compose.ui.tooling.preview.Preview
 
+/**
+ * A single post (an "echo") in the Neighborhood style: warm-white rounded card,
+ * an initials avatar with author + time, the message, soft tag chips, and a
+ * heart-style like + comment footer.
+ */
 @Composable
 fun PostCard(
     post: Post,
@@ -39,108 +44,123 @@ fun PostCard(
     onLikeClick: () -> Unit,
     onClick: () -> Unit,
     onTagClick: ((String) -> Unit)? = null,
-    modifier: Modifier = Modifier) {
-
+    modifier: Modifier = Modifier
+) {
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        elevation = CardDefaults.cardElevation(6.dp)
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Author header
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AuthorAvatar(name = post.username, size = 40.dp)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = post.username,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = formatTimestamp(post.timestamp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = post.username,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(Modifier.height(12.dp))
 
             Text(
                 text = post.message,
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-
-                Text(
-                    text = formatTimestamp(post.timestamp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-
-                // Spacer to push everything else to the right
-                Spacer(modifier = Modifier.weight(1f))
-
-                IconButton(onClick = onLikeClick) {
-                    Icon(
-                        imageVector = Icons.Default.ThumbUp,
-                        contentDescription = if (isLiked) "Unlike" else "Like",
-                        tint = if (isLiked) MaterialTheme.colorScheme.primary else Color.Gray
-                    )
-                }
-
-                Text("$likeCount ${if (likeCount == 1) "like" else "likes"}")
-
-                Spacer(Modifier.width(8.dp))
-
-                Icon(Icons.Default.Message, contentDescription = "Comments")
-
-                Spacer(Modifier.width(4.dp))
-
-                Text("$commentCount ${if (commentCount == 1) "comment" else "comments"}")
-            }
-
             if (post.tags.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     post.tags.forEach { tag ->
-                        AssistChip(
-                            onClick = {
-                                onTagClick?.invoke(tag)
-                            },
-                            label = { Text(text = "$tag") }
-                        )
+                        EchoTagChip(tag = tag, onClick = onTagClick?.let { { it(tag) } })
                     }
                 }
             }
 
+            Spacer(Modifier.height(12.dp))
+
+            // Like + comment footer
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clickable { onLikeClick() }
+                        .padding(vertical = 4.dp, horizontal = 2.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (isLiked) "Unlike" else "Like",
+                        tint = if (isLiked) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = likeCount.toString(),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(Modifier.width(20.dp))
+
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.Comment,
+                    contentDescription = "Comments",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = commentCount.toString(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun PreviewPostCard() {
-    PostCard(
-        post = Post(
-            id = "1",
-            authorId = "preview_uid",
-            username = "preview_user",
-            message = "This is a preview of a post in Echo.",
-            timestamp = System.currentTimeMillis(),
-            latitude = null,
-            longitude = null,
-            tags = listOf("cs101", "finals"),
-            likeCount = 5,
-            commentCount = 2,
-            likedByCurrentUser = true
-        ),
-        isLiked = true,
-        likeCount = 5,
-        commentCount = 2,
-        onLikeClick = {},
-        onClick = {}
-    )
+private fun PreviewPostCard() {
+    EchoTheme {
+        PostCard(
+            post = Post(
+                id = "1",
+                authorId = "preview_uid",
+                username = "Sarah Jenkins",
+                message = "Just tried the new Blue Bottle on Front St! Best latte in the neighborhood.",
+                timestamp = System.currentTimeMillis() - 3 * 60 * 60 * 1000,
+                latitude = null,
+                longitude = null,
+                tags = listOf("coffee", "newopening"),
+                likeCount = 24,
+                commentCount = 5,
+                likedByCurrentUser = true
+            ),
+            isLiked = true,
+            likeCount = 24,
+            commentCount = 5,
+            onLikeClick = {},
+            onClick = {}
+        )
+    }
 }
-

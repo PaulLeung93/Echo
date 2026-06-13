@@ -16,6 +16,9 @@ local.properties
 local.defaults.properties
 secrets.properties
 
+# Stitch design exploration screenshots (not part of the app)
+.stitch_shots/
+
 # Firebase emulator / CLI artifacts (rules and config are tracked; these are not)
 .firebase/
 *-debug.log

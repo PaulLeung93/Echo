@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -64,7 +65,7 @@ fun CreatePostScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Create Post") }
+                title = { Text("Share an echo") }
             )
         },
         snackbarHost = {
@@ -84,9 +85,10 @@ fun CreatePostScreen(
                 OutlinedTextField(
                     value = message,
                     onValueChange = { message = it },
-                    label = { Text("What's on your mind?") },
+                    label = { Text("What's happening around you?") },
                     maxLines = 5,
                     singleLine = false,
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(150.dp)
@@ -191,7 +193,10 @@ fun CreatePostScreen(
                         )
                     },
                     enabled = !uiState.isLoading,
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(percent = 50),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
                 ) {
                     if (uiState.isLoading) {
                         CircularProgressIndicator(
