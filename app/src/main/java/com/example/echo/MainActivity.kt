@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
                 val authViewModel: AuthViewModel = androidx.hilt.navigation.compose.hiltViewModel()
                 val authUiState by authViewModel.uiState.collectAsState()
                 val isUserAuthenticated = authUiState.currentUser != null
+                val canCreate = isUserAuthenticated && authUiState.currentUser?.isAnonymous != true
 
                 Scaffold(
                     bottomBar = {
@@ -55,7 +56,9 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 },
-                                isUserAuthenticated = isUserAuthenticated
+                                isUserAuthenticated = isUserAuthenticated,
+                                canCreate = canCreate,
+                                onCreateClick = { navController.navigate("create_post") }
                             )
                         }
                     }

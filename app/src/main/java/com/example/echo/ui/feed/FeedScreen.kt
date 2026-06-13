@@ -192,19 +192,6 @@ fun FeedScreen(
             }
         }
 
-        // --- Floating Action Button ---
-        if (isUserAuthenticated && !isGuest) {
-            FloatingActionButton(
-                onClick = { navController.navigate(Destinations.CREATE_POST) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Create Post", tint = Color.White)
-            }
-        }
-
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter)
