@@ -4,8 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -58,7 +59,7 @@ fun PostDetailScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onPrimary)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -141,7 +142,8 @@ fun PostDetailScreen(
                     OutlinedTextField(
                         value = newComment,
                         onValueChange = { newComment = it },
-                        placeholder = { Text("Write a comment.") },
+                        placeholder = { Text("Write a comment…") },
+                        shape = MaterialTheme.shapes.large,
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -165,7 +167,8 @@ fun PostDetailScreen(
                                 }
                             }
                         },
-                        enabled = newComment.isNotBlank()
+                        enabled = newComment.isNotBlank(),
+                        shape = RoundedCornerShape(percent = 50)
                     ) {
                         Text("Send")
                     }

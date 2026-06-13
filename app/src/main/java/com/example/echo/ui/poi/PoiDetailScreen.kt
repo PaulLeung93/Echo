@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -235,12 +236,14 @@ private fun CommentComposer(
                 onValueChange = onValueChange,
                 placeholder = { Text(stringResource(R.string.write_comment_hint)) },
                 enabled = canComment,
+                shape = MaterialTheme.shapes.large,
                 modifier = Modifier.weight(1f)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Button(
                 onClick = onSend,
-                enabled = canComment && value.isNotBlank()
+                enabled = canComment && value.isNotBlank(),
+                shape = RoundedCornerShape(percent = 50)
             ) {
                 Text(stringResource(R.string.send))
             }
