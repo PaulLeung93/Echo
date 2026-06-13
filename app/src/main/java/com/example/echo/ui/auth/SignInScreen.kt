@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavHostController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.echo.R
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.common.TopSnackbarHost
@@ -60,7 +61,9 @@ fun SignInScreen(
             when (event) {
                 is AuthUiEvent.NavigateToHome -> {
                     navController.navigate(Destinations.FEED) {
-                        popUpTo(Destinations.SIGN_IN) { inclusive = true }
+                        // Clear the entire auth back stack so Feed becomes the root
+                        // (back from Feed should exit, not return to sign-in).
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                     }
                 }
                 is AuthUiEvent.ShowError -> {

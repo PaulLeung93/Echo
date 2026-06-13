@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// Echo Cloud Storage rules.
+//
+// The app has no Storage feature yet (no uploads or downloads in the client),
+// so the bucket is locked down entirely. When image upload lands, replace the
+// deny-all below with auth-scoped rules enforcing owner paths plus size/type
+// limits (ROADMAP Phase 3: "Storage rules for image uploads").
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

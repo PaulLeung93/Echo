@@ -15,3 +15,10 @@
 local.properties
 local.defaults.properties
 secrets.properties
+
+# Firebase emulator / CLI artifacts (rules and config are tracked; these are not)
+.firebase/
+*-debug.log
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

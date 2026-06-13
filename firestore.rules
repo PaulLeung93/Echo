@@ -1,0 +1,139 @@
+rules_version = '2';
+
+// Echo Firestore security rules.
+//
+// Threat model & guarantees:
+//   - Authorship cannot be spoofed: posts/comments are owned by the stable
+//     Firebase Auth uid (`authorId`), set to request.auth.uid at create time.
+//   - Guests (anonymous auth) can read but cannot write.
+//   - POIs are seeded server-side and are read-only to clients, except the
+//     denormalized `commentCount` which may move by one when commenting.
+//   - Comments are immutable once written; only the author may delete.
+//
+// Known limitation (tracked in ROADMAP Phase 3): the 5km proximity rule and
+// per-user rate limiting are NOT enforced here. Firestore rules have no trusted
+// source for the caller's physical location, and per-user time-window limits
+// need server state. Those require a Cloud Function (or App Check + callable)
+// and remain client-side-gated only until then.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Email/password and Google users only — excludes anonymous "guest" sessions.
+    function isNotAnonymous() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Keys whose values differ between the stored doc and the incoming write.
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // A comment document is well-formed and attributed to the caller.
+    function isValidNewComment() {
+      let d = request.resource.data;
+      return d.authorId == request.auth.uid
+        && d.username == request.auth.token.email
+        && d.message is string
+        && d.message.size() > 0
+        && d.message.size() <= 1000
+        && d.timestamp is int
+        && d.keys().hasOnly(['authorId', 'username', 'message', 'timestamp']);
+    }
+
+    // The like array changed by exactly the caller's own uid (added or removed),
+    // with nothing else touched. Uses set semantics to ignore order/duplicates.
+    function togglesOwnLikeOnly() {
+      let before = resource.data.get('likes', []).toSet();
+      let after = request.resource.data.likes.toSet();
+      let me = [request.auth.uid].toSet();
+      return (after.difference(before) == me && before.difference(after).size() == 0)
+          || (before.difference(after) == me && after.difference(before).size() == 0);
+    }
+
+    // commentCount moved by exactly +/-1 (a single comment added or removed).
+    function commentCountMovedByOne() {
+      let before = resource.data.get('commentCount', 0);
+      return request.resource.data.commentCount == before + 1
+          || request.resource.data.commentCount == before - 1;
+    }
+
+    // ----- Posts -----
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+
+      allow create: if isNotAnonymous()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.username == request.auth.token.email
+        && request.resource.data.id == postId
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 1000
+        && request.resource.data.timestamp is int
+        && request.resource.data.tags is list
+        && request.resource.data.likeCount == 0
+        && request.resource.data.commentCount == 0
+        && request.resource.data.likes.size() == 0
+        && request.resource.data.keys().hasOnly([
+             'id', 'authorId', 'username', 'message', 'timestamp',
+             'tags', 'likeCount', 'commentCount', 'likes',
+             'latitude', 'longitude'
+           ]);
+
+      // All post writes require a real (non-guest) account. Guests can read only.
+      allow update: if isNotAnonymous() && (
+        // (a) Author edits only the message body.
+        (request.auth.uid == resource.data.authorId
+          && changedKeys().hasOnly(['message'])
+          && request.resource.data.message is string
+          && request.resource.data.message.size() > 0
+          && request.resource.data.message.size() <= 1000)
+        // (b) A signed-in user toggles their own like; likeCount stays consistent.
+        || (changedKeys().hasOnly(['likes', 'likeCount'])
+          && request.resource.data.likeCount == request.resource.data.likes.size()
+          && togglesOwnLikeOnly())
+        // (c) Comment add/remove moves the denormalized commentCount by one.
+        || (changedKeys().hasOnly(['commentCount']) && commentCountMovedByOne())
+      );
+
+      allow delete: if isNotAnonymous() && request.auth.uid == resource.data.authorId;
+
+      // ----- Comments on a post -----
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isNotAnonymous() && isValidNewComment();
+        allow update: if false; // comments are immutable
+        allow delete: if isSignedIn() && request.auth.uid == resource.data.authorId;
+      }
+    }
+
+    // ----- Points of Interest (seeded server-side) -----
+    match /pois/{poiId} {
+      allow read: if isSignedIn();
+      allow create, delete: if false; // managed out-of-band, never by clients
+
+      // Only the denormalized commentCount may change, by +/-1 (commenting requires
+      // a real account, so guests never reach this).
+      allow update: if isNotAnonymous()
+        && changedKeys().hasOnly(['commentCount'])
+        && commentCountMovedByOne();
+
+      // ----- Comments on a POI -----
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isNotAnonymous() && isValidNewComment();
+        allow update: if false; // comments are immutable
+        allow delete: if isSignedIn() && request.auth.uid == resource.data.authorId;
+      }
+    }
+
+    // Deny everything not explicitly matched above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

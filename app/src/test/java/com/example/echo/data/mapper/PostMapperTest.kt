@@ -123,18 +123,20 @@ class PostMapperTest {
     @Test
     fun `given parameters, when toFirestoreMap called, then map contains all required fields`() {
         // Given
+        val authorId = "uid-123"
         val username = "test@test.com"
         val message = "Hello World"
         val latitude = 40.7128
         val longitude = -74.0060
         val tags = listOf("tag1", "tag2")
         val postId = "newPost123"
-        
+
         // When
-        val result = mapper.toFirestoreMap(username, message, latitude, longitude, tags, postId)
-        
+        val result = mapper.toFirestoreMap(authorId, username, message, latitude, longitude, tags, postId)
+
         // Then
         assertEquals(postId, result["id"])
+        assertEquals(authorId, result["authorId"])
         assertEquals(username, result["username"])
         assertEquals(message, result["message"])
         assertEquals(tags, result["tags"])
@@ -147,13 +149,14 @@ class PostMapperTest {
     @Test
     fun `given null location, when toFirestoreMap called, then map does not contain location fields`() {
         // Given
+        val authorId = "uid-123"
         val username = "test@test.com"
         val message = "Hello World"
         val tags = listOf("tag1")
         val postId = "newPost123"
-        
+
         // When
-        val result = mapper.toFirestoreMap(username, message, null, null, tags, postId)
+        val result = mapper.toFirestoreMap(authorId, username, message, null, null, tags, postId)
         
         // Then
         assertFalse(result.containsKey("latitude"))

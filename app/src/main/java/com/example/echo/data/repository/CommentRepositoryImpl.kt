@@ -65,20 +65,22 @@ class CommentRepositoryImpl @Inject constructor(
             }
             
             val commentMap = commentMapper.toFirestoreMap(
+                authorId = currentUser.uid,
                 username = currentUser.email ?: "anonymous",
                 message = message
             )
-            
+
             val docRef = getCommentsCollection(postId).add(commentMap).await()
-            
+
             // Update comment count on post
             firestore.collection(Constants.COLLECTION_POSTS)
                 .document(postId)
                 .update("commentCount", com.google.firebase.firestore.FieldValue.increment(1))
                 .await()
-            
+
             Comment(
                 id = docRef.id,
+                authorId = currentUser.uid,
                 username = currentUser.email ?: "anonymous",
                 message = message,
                 timestamp = System.currentTimeMillis()
@@ -132,20 +134,22 @@ class CommentRepositoryImpl @Inject constructor(
             }
             
             val commentMap = commentMapper.toFirestoreMap(
+                authorId = currentUser.uid,
                 username = currentUser.email ?: "anonymous",
                 message = message
             )
-            
+
             val docRef = getPoiCommentsCollection(poiId).add(commentMap).await()
-            
+
             // Update comment count on POI
             firestore.collection(Constants.COLLECTION_POIS)
                 .document(poiId)
                 .update("commentCount", com.google.firebase.firestore.FieldValue.increment(1))
                 .await()
-            
+
             Comment(
                 id = docRef.id,
+                authorId = currentUser.uid,
                 username = currentUser.email ?: "anonymous",
                 message = message,
                 timestamp = System.currentTimeMillis()

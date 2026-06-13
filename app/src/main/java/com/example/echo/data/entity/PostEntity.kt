@@ -7,6 +7,8 @@ package com.example.echo.data.entity
  */
 data class PostEntity(
     val id: String = "",
+    /** Stable Firebase Auth uid of the author. Used for non-spoofable ownership in security rules. */
+    val authorId: String = "",
     val username: String = "",
     val message: String = "",
     val timestamp: Long = 0L,

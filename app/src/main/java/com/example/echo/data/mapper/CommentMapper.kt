@@ -17,6 +17,7 @@ class CommentMapper @Inject constructor() {
     fun toDomain(entity: CommentEntity): Comment {
         return Comment(
             id = entity.id ?: "",
+            authorId = entity.authorId,
             username = entity.username,
             message = entity.message,
             timestamp = entity.timestamp
@@ -34,12 +35,14 @@ class CommentMapper @Inject constructor() {
     
     /**
      * Create a map representation for Firestore from comment parameters.
+     * @param authorId The stable Firebase Auth uid of the author (used for ownership in security rules).
      * @param username The username of the commenter.
      * @param message The comment message.
      * @return Map representation for Firestore document.
      */
-    fun toFirestoreMap(username: String, message: String): Map<String, Any> {
+    fun toFirestoreMap(authorId: String, username: String, message: String): Map<String, Any> {
         return mapOf(
+            "authorId" to authorId,
             "username" to username,
             "message" to message,
             "timestamp" to System.currentTimeMillis()

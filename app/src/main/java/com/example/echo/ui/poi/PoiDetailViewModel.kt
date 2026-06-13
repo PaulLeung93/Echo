@@ -36,6 +36,7 @@ class PoiDetailViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(
         PoiDetailUiState(
+            currentUserId = auth.currentUser?.uid,
             currentUserEmail = auth.currentUser?.email,
             isGuest = auth.currentUser?.isAnonymous != false
         )

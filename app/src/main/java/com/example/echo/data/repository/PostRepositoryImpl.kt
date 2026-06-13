@@ -7,7 +7,6 @@ import com.example.echo.domain.model.Post
 import com.example.echo.domain.repository.PostRepository
 import com.example.echo.utils.Constants
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.CoroutineDispatcher
@@ -158,6 +157,7 @@ class PostRepositoryImpl @Inject constructor(
             
             val newDocRef = postsCollection.document()
             val postMap = postMapper.toFirestoreMap(
+                authorId = currentUser.uid,
                 username = currentUser.email ?: "anonymous",
                 message = message,
                 latitude = latitude,
@@ -188,24 +188,30 @@ class PostRepositoryImpl @Inject constructor(
     }
     
     override suspend fun toggleLike(postId: String): Boolean = withContext(ioDispatcher) {
-        val userId = auth.currentUser?.uid 
+        val currentUser = auth.currentUser
             ?: throw IllegalStateException("User must be signed in to like a post")
-        
+        if (currentUser.isAnonymous) {
+            throw IllegalStateException("Sign in to like posts")
+        }
+        val userId = currentUser.uid
+
         val docRef = postsCollection.document(postId)
         val doc = docRef.get().await()
         val entity = doc.toObject(PostEntity::class.java) 
             ?: throw IllegalStateException("Post not found")
         
         val isCurrentlyLiked = entity.likes.contains(userId)
-        
-        if (isCurrentlyLiked) {
-            docRef.update(Constants.FIELD_LIKES, FieldValue.arrayRemove(userId)).await()
-            docRef.update("likeCount", FieldValue.increment(-1)).await()
-        } else {
-            docRef.update(Constants.FIELD_LIKES, FieldValue.arrayUnion(userId)).await()
-            docRef.update("likeCount", FieldValue.increment(1)).await()
-        }
-        
+
+        // Update likes and the denormalized likeCount atomically (single write) so they
+        // can never drift and so security rules can require likeCount == likes.size().
+        val newLikes = if (isCurrentlyLiked) entity.likes - userId else entity.likes + userId
+        docRef.update(
+            mapOf(
+                Constants.FIELD_LIKES to newLikes,
+                "likeCount" to newLikes.size
+            )
+        ).await()
+
         !isCurrentlyLiked
     }
     

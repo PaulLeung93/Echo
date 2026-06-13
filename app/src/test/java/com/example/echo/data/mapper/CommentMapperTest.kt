@@ -22,16 +22,18 @@ class CommentMapperTest {
         // Given
         val entity = CommentEntity(
             id = "comment1",
+            authorId = "uid-123",
             username = "user@test.com",
             message = "This is a comment",
             timestamp = 1234567890L
         )
-        
+
         // When
         val result = mapper.toDomain(entity)
-        
+
         // Then
         assertEquals("comment1", result.id)
+        assertEquals("uid-123", result.authorId)
         assertEquals("user@test.com", result.username)
         assertEquals("This is a comment", result.message)
         assertEquals(1234567890L, result.timestamp)
@@ -74,13 +76,15 @@ class CommentMapperTest {
     @Test
     fun `given parameters, when toFirestoreMap called, then map contains all fields`() {
         // Given
+        val authorId = "uid-123"
         val username = "test@test.com"
         val message = "Test comment message"
-        
+
         // When
-        val result = mapper.toFirestoreMap(username, message)
-        
+        val result = mapper.toFirestoreMap(authorId, username, message)
+
         // Then
+        assertEquals(authorId, result["authorId"])
         assertEquals(username, result["username"])
         assertEquals(message, result["message"])
         assertTrue(result.containsKey("timestamp"))

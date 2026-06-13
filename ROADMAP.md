@@ -107,15 +107,50 @@ is the source of truth). Remove the competing half-migration and dead code.
 These are the items that separate a demo from a publishable app.
 
 ### Security & data integrity
-- [ ] **Firestore Security Rules.** Author and deploy rules so users can only
-      write their own posts/comments, can't spoof authorship, and POIs are
-      read-only to clients. *Do not ship with open/test rules.*
-- [ ] **Server-side proximity & rate limiting.** Client-side checks are
-      bypassable. Enforce the 5km comment rule and abuse/rate limits in
-      Firestore rules or a Cloud Function.
-- [ ] **Storage rules** for image uploads (size/type/auth limits).
+- [x] **Stable `authorId` (uid) refactor** *(prerequisite, 2026-06-12).* Posts
+      and comments now persist the author's Firebase `uid` as `authorId` (set at
+      create time), threaded through entities → mappers → domain models. This is
+      what makes non-spoofable ownership rules possible (email alone is mutable
+      and was the old ownership key). POI comment delete in the UI now checks
+      `authorId == uid` instead of email. `toggleLike` was made a single atomic
+      write so `likeCount == likes.size()` can be enforced.
+- [x] **Firestore Security Rules** *(authored, emulator-validated, and
+      **DEPLOYED** to `echo-2b5ba` 2026-06-12; `firestore.rules`).* Reads require
+      sign-in; creates require non-anonymous auth + `authorId ==
+      request.auth.uid` + `username == token.email` (no spoofing) + field
+      validation; posts/comments are deletable only by their author; comments
+      are immutable; POIs are read-only except a ±1 `commentCount` move; likes
+      restricted to adding/removing **self**. The cloud compiled and released
+      the rules; they are now enforcing in production. `firebase.json`,
+      `.firebaserc`, `firestore.indexes.json` are in place for future deploys
+      (`firebase deploy --only firestore:rules`).
+      *Update (2026-06-12): tightened all post/POI **write** guards to
+      `isNotAnonymous()` so guests can read but cannot like/edit/delete (a guest
+      could previously toggle likes); re-deployed.*
+- [x] **Storage rules** *(authored 2026-06-12; `storage.rules`).* The app has
+      **no Storage feature yet** (no client uploads/downloads), so the bucket is
+      locked down **deny-all**. **⚠ Not deployed:** Firebase Storage has not been
+      provisioned on `echo-2b5ba` (no "Get Started" in the console), so there's
+      nothing to deploy to and nothing using it. When image upload lands:
+      provision Storage, swap in auth-scoped owner-path + size/type rules, then
+      `firebase deploy --only storage`.
+- [ ] **Server-side proximity & rate limiting** *(deferred to a Cloud Function —
+      cannot be done in rules).* Firestore rules have **no trusted source** for
+      the caller's physical location, and per-user time-window rate limits need
+      server state, so neither the 5km rule nor abuse limits can be enforced in
+      `firestore.rules`. Both remain **client-side-gated only** until a Cloud
+      Function (or App Check + callable that derives/validates location
+      server-side) is added. This is the one genuinely unfinished security item.
 
 ### Robustness
+- [x] **Guest write-gating fixed** *(2026-06-12).* Guests could like posts (and
+      the Create Post FAB showed for them). Now: guests are blocked from liking
+      in the repo + rules, the Feed shows a "Sign in to like posts" snackbar
+      instead of a silent no-op, and the FAB is hidden for guests.
+- [x] **Auth back-stack fixed** *(2026-06-12).* After sign-**up**, the sign-in
+      screen was left under Feed, so Back from Feed returned to it. Both SignIn
+      and SignUp now `popUpTo(findStartDestination, inclusive)` so Feed is the
+      root and Back exits the app.
 - [ ] **Auth edge cases**: account-exists-with-different-credential, expired
       sessions, Google sign-in cancel, network loss, password-reset failures.
 - [ ] **Consistent loading / empty / error states** across Feed, Map, Profile,
@@ -123,6 +158,23 @@ These are the items that separate a demo from a publishable app.
 - [ ] **Location permission UX**: runtime request, rationale, and a graceful
       degraded mode when the user denies location.
 - [ ] **Crash & analytics**: wire up Firebase Crashlytics.
+
+> **Manual verification (2026-06-12, Pixel_9_Pro emulator).** Drove the app
+> end-to-end against the live rules: feed reads, like toggle (both directions),
+> guest-blocked create, authed create-post, post-comment add, POI comment
+> add/delete (proximity-gated, in range), and session persistence — all pass,
+> no `PERMISSION_DENIED`. Two environment notes: (1) the Google **Map screen
+> ANRs under software GPU** rendering (`Input dispatching timed out`) — heavy
+> map render on the emulator, not a logic bug; recheck on a real device. (2)
+> The map renders blank tiles under *host* GPU but fine under `swiftshader`.
+
+### UI completeness (folds into the planned UI refactor)
+- [ ] **Wire up delete/edit for posts and post-comments.** `ProfileViewModel`
+      exposes `deletePost`/`updatePost` but `ProfileScreen` never calls them, and
+      `PostDetailScreen` renders `CommentCard(comment)` without an `onDelete`, so
+      **posts and post-comments currently have no delete/edit UI** (only POI
+      comments do). The use cases + repo methods + security rules already support
+      it — this is purely UI wiring, deferred to the upcoming UI refactor.
 
 ### Build & release
 - [ ] **R8/ProGuard**: enable minify + shrink for release, add keep rules,

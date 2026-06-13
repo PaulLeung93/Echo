@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.echo.R
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.common.TopSnackbarHost
@@ -58,7 +59,9 @@ fun SignUpScreen(
             when (event) {
                 is AuthUiEvent.NavigateToHome -> {
                     navController.navigate(Destinations.FEED) {
-                        popUpTo(Destinations.SIGN_UP) { inclusive = true }
+                        // Clear the entire auth back stack (incl. the sign-in screen
+                        // underneath) so Feed becomes the root.
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                     }
                 }
                 is AuthUiEvent.ShowError -> {

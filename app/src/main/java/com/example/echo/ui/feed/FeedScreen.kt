@@ -23,6 +23,7 @@ import com.example.echo.components.PostCard
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,6 +37,10 @@ fun FeedScreen(
     
     val authState by authViewModel.uiState.collectAsState()
     val isUserAuthenticated = authState.currentUser != null
+    val isGuest = authState.currentUser?.isAnonymous == true
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     var showFilterDialog by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
@@ -148,7 +153,15 @@ fun FeedScreen(
                                         isLiked = post.likedByCurrentUser,
                                         likeCount = post.likeCount,
                                         commentCount = post.commentCount,
-                                        onLikeClick = { feedViewModel.toggleLike(post.id) },
+                                        onLikeClick = {
+                                            if (isGuest) {
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar("Sign in to like posts")
+                                                }
+                                            } else {
+                                                feedViewModel.toggleLike(post.id)
+                                            }
+                                        },
                                         onClick = {
                                             navController.navigate("${Constants.ROUTE_POST_DETAILS}/${post.id}")
                                         },
@@ -167,7 +180,7 @@ fun FeedScreen(
         }
 
         // --- Floating Action Button ---
-        if (isUserAuthenticated) {
+        if (isUserAuthenticated && !isGuest) {
             FloatingActionButton(
                 onClick = { navController.navigate(Destinations.CREATE_POST) },
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -178,6 +191,11 @@ fun FeedScreen(
                 Icon(Icons.Default.Add, contentDescription = "Create Post", tint = Color.White)
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
     // --- Filter Dialog ---

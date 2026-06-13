@@ -13,6 +13,8 @@ import com.example.echo.domain.model.Poi
 data class PoiDetailUiState(
     val poi: Poi? = null,
     val comments: List<Comment> = emptyList(),
+    /** Stable uid of the signed-in user; used for non-spoofable comment ownership. */
+    val currentUserId: String? = null,
     val currentUserEmail: String? = null,
     val isLoading: Boolean = false,
     /** Terminal load error (POI failed to load). Transient action errors use uiEvent. */

@@ -19,6 +19,7 @@ class PostMapper @Inject constructor() {
     fun toDomain(entity: PostEntity, currentUserId: String?): Post {
         return Post(
             id = entity.id,
+            authorId = entity.authorId,
             username = entity.username,
             message = entity.message,
             timestamp = entity.timestamp,
@@ -43,6 +44,7 @@ class PostMapper @Inject constructor() {
     
     /**
      * Create a map representation for Firestore from post creation parameters.
+     * @param authorId The stable Firebase Auth uid of the author (used for ownership in security rules).
      * @param username The username of the post author.
      * @param message The post message content.
      * @param latitude Optional latitude coordinate.
@@ -52,6 +54,7 @@ class PostMapper @Inject constructor() {
      * @return Map representation for Firestore document.
      */
     fun toFirestoreMap(
+        authorId: String,
         username: String,
         message: String,
         latitude: Double?,
@@ -61,6 +64,7 @@ class PostMapper @Inject constructor() {
     ): Map<String, Any?> {
         return buildMap {
             put("id", postId)
+            put("authorId", authorId)
             put("username", username)
             put("message", message)
             put("timestamp", System.currentTimeMillis())

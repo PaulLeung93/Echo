@@ -125,6 +125,7 @@ fun PreviewPostCard() {
     PostCard(
         post = Post(
             id = "1",
+            authorId = "preview_uid",
             username = "preview_user",
             message = "This is a preview of a post in Echo.",
             timestamp = System.currentTimeMillis(),

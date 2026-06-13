@@ -155,9 +155,12 @@ fun PoiDetailScreen(
                             }
                         } else {
                             items(uiState.comments, key = { it.id }) { comment ->
+                                val isOwnComment = uiState.currentUserId != null &&
+                                    comment.authorId.isNotEmpty() &&
+                                    comment.authorId == uiState.currentUserId
                                 CommentCard(
                                     comment = comment,
-                                    onDelete = if (comment.username == uiState.currentUserEmail) {
+                                    onDelete = if (isOwnComment) {
                                         { viewModel.deleteComment(comment.id) }
                                     } else null
                                 )
