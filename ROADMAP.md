@@ -156,8 +156,27 @@ These are the items that separate a demo from a publishable app.
 - [ ] **Consistent loading / empty / error states** across Feed, Map, Profile,
       PostDetail, PoiDetail (some screens have them, others don't).
 - [ ] **Location permission UX**: runtime request, rationale, and a graceful
-      degraded mode when the user denies location.
+      degraded mode when the user denies location. *(Partial: Create Post now
+      shows "location unavailable" gracefully, but still doesn't **request**
+      permission at runtime.)*
 - [ ] **Crash & analytics**: wire up Firebase Crashlytics.
+
+> **Finding (2026-06-13) — writes hang silently on a token-refresh failure
+> (recommended next item).** After ~8h signed in, the 1-hour Firebase ID token
+> expired and couldn't refresh: `securetoken.googleapis.com … GrantToken are
+> blocked` → Firestore writes failed `UNAUTHENTICATED` and **retried forever**
+> (the Post button just spun — no error, no timeout). *Root cause (resolved,
+> console-side):* the Android API key's **API restrictions** allowed Identity
+> Toolkit (sign-in) but not the **Token Service API** (refresh); fixed by removing
+> the redundant API restriction (the key already restricts by Android app +
+> SHA-1). Re-verified on-device: token refresh works, the stuck write flushed,
+> and new writes (post/like) succeed. **Still open — app-side:** writes should
+> **time out + surface an error**, and an expired/invalid session should prompt
+> re-login, instead of spinning forever. This is the concrete, observed instance
+> of the "expired sessions / network loss / consistent error states" items above
+> and is the recommended next thing to build. ⚠ **Before launch:** also register
+> the **release / Play App Signing upload SHA-1** on the key, or production hits
+> the same wall the first time a token needs refreshing.
 
 > **Manual verification (2026-06-12, Pixel_9_Pro emulator).** Drove the app
 > end-to-end against the live rules: feed reads, like toggle (both directions),
@@ -168,13 +187,16 @@ These are the items that separate a demo from a publishable app.
 > map render on the emulator, not a logic bug; recheck on a real device. (2)
 > The map renders blank tiles under *host* GPU but fine under `swiftshader`.
 
-### UI completeness (folds into the planned UI refactor)
-- [ ] **Wire up delete/edit for posts and post-comments.** `ProfileViewModel`
-      exposes `deletePost`/`updatePost` but `ProfileScreen` never calls them, and
-      `PostDetailScreen` renders `CommentCard(comment)` without an `onDelete`, so
-      **posts and post-comments currently have no delete/edit UI** (only POI
-      comments do). The use cases + repo methods + security rules already support
-      it — this is purely UI wiring, deferred to the upcoming UI refactor.
+### UI completeness
+- [x] **Post edit/delete wired** *(done in the UI Rebrand, 2026-06-13).* Profile
+      posts now have a "⋮" menu → **Edit** (prefilled dialog) / **Delete**
+      (confirm), calling the existing `ProfileViewModel.updatePost`/`deletePost`.
+      The "⋮" is an optional `PostCard` affordance, so the Feed stays clean. See
+      the **UI Rebrand** section below.
+- [ ] **Post-comment delete still unwired** — `PostDetailScreen` renders
+      `CommentCard(comment)` without an `onDelete` (POI comments have it; post
+      comments don't). Small follow-up: pass an owner-gated delete + a
+      `PostDetailViewModel` delete method.
 
 ### Build & release
 - [ ] **R8/ProGuard**: enable minify + shrink for release, add keep rules,
@@ -192,6 +214,50 @@ These are the items that separate a demo from a publishable app.
 
 ---
 
+## 🎨 Phase 3.5 — Neighborhood UI Rebrand — ✅ COMPLETE (2026-06-13)
+
+A full visual rebrand + brand identity for Echo, designed in **Stitch** (Google)
+and built into the app. Direction chosen: warm, **light-first "Neighborhood"**
+(coral primary, teal secondary, sunny-yellow accent, cream canvas); audience =
+young urban folks + neighbors of all ages. Stitch project:
+`projects/11588814282991010539`. Every step was verified on the Pixel_9_Pro
+emulator (swiftshader) and committed/pushed to `master`.
+
+- [x] **Design system → Compose tokens.** New warm palette, rounded soft shapes,
+      and a **Newsreader** (serif headlines) + **Plus Jakarta Sans** (body) type
+      scale — bundled as variable TTFs in `res/font` (downloadable Google Fonts
+      were dropped: the certs resource isn't shipped by the deps).
+      ([Color.kt](app/src/main/java/com/example/echo/ui/theme/Color.kt),
+      [Type.kt](app/src/main/java/com/example/echo/ui/theme/Type.kt),
+      [Shape.kt](app/src/main/java/com/example/echo/ui/theme/Shape.kt),
+      [Theme.kt](app/src/main/java/com/example/echo/ui/theme/Theme.kt))
+- [x] **Brand mark + launch.** New Echo "ping" logo (concentric coral/teal ripple
+      rings) as a vector ([echo_logo.xml](app/src/main/res/drawable/echo_logo.xml));
+      rebranded the adaptive **launcher icon** (cream bg) and the system + in-app
+      **splash** (cream, replacing the old blue radar-pin); reused on Sign In.
+      *(API 24–25 still fall back to the old webp icon — regenerate later if those
+      versions matter.)*
+- [x] **Reusable components:** `AuthorAvatar` (initials), `EchoTagChip`,
+      reskinned `PostCard` (warm card, avatar header, heart-style like, optional
+      "⋮" edit/delete menu, optional distance badge) and `CommentCard`.
+- [x] **All screens reskinned:** Feed, Sign In, Sign Up, Create Post, Profile,
+      POI Detail, Post Detail, Splash. Bottom nav gained a **center Create**
+      button (the old corner FAB was removed).
+- [x] **Distance badges** — each located post shows a teal "X m away · time" pill
+      (the signature hyperlocal touch). `FeedViewModel` fetches the user's location
+      via `LocationProvider`; `LocationProviderImpl` switched to **HIGH_ACCURACY**
+      GPS (balanced/network returned null on a cold start, so no badges showed).
+- [x] **Create Post location reliability** — moved off FusedLocation's null-prone
+      `lastLocation` (read directly in the composable) to `LocationProvider`
+      (high-accuracy) in the ViewModel, with "getting location / attached /
+      unavailable" status and Post disabled while resolving. Verified to attach a
+      fix on a **cold launch** (the old path returned null there).
+
+> **Profile edit/delete** (the original "UI completeness" item) was completed as
+> part of this rebrand — see Phase 3 → UI completeness.
+
+---
+
 ## 🛍️ Phase 4 — Store listing & compliance
 
 - [ ] **Privacy Policy** (required — the app uses location + auth + user data).
@@ -199,7 +265,8 @@ These are the items that separate a demo from a publishable app.
 - [ ] **Store assets**: app icon, feature graphic, phone/tablet screenshots,
       short + full description.
 - [ ] **Refresh README media** — the `docs/gifs/*` referenced in README should
-      reflect the final UI (including POI comments).
+      reflect the **rebranded Neighborhood UI** (new logo, coral/cream theme,
+      distance badges, center-Create nav), not the old navy look.
 - [ ] **App content rating** questionnaire + target audience declaration.
 
 ---
@@ -245,6 +312,18 @@ Deferred until shipped; captured so they aren't lost.
 ---
 
 ### Suggested order of attack
-**Phase 0 → 1 → 2** get you back to a clean, compiling, feature-complete state
-(this is the bulk of the "finishing where you left off" work). **Phase 3** is
-the largest and most important block for actually publishing. **4–5** follow.
+**Phases 0–2, the Phase 3 security/data-integrity block, and the 3.5 UI Rebrand
+are ✅ done.** Remaining path to launch:
+1. **Finish Phase 3 Robustness** — start with the observed **write / expired-
+   session failure handling** (see the 2026-06-13 finding: writes should time out
+   + surface an error and prompt re-login, not spin forever), then Crashlytics,
+   consistent loading/error states, and runtime location-permission UX.
+2. **Phase 3 Build & release** — R8 + keep rules, release signing, a signed AAB,
+   edge-to-edge / target API, and remove the `PoiRepository` debug logging. This
+   is the hard gate to actually publishing.
+3. **Phase 4 store prep** — privacy policy, Data Safety form, app content rating,
+   and fresh screenshots (which can now show off the new UI).
+
+**Still open from earlier phases:** server-side proximity & rate limiting (needs a
+Cloud Function), post-comment delete UI, and the test harness. **Phase 5** is
+post-launch.
