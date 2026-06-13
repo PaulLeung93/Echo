@@ -1,17 +1,25 @@
 package com.example.echo.domain.repository
 
 import com.example.echo.domain.model.User
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Repository interface for Authentication operations.
  * Defines the contract for auth-related data access.
  */
 interface AuthRepository {
-    
+
     /**
      * Get the currently signed-in user, or null if not signed in.
      */
     fun getCurrentUser(): User?
+
+    /**
+     * Observe the signed-in user reactively. Emits the current user immediately,
+     * then again whenever auth state changes — including when Firebase signs the
+     * user out on an expired/revoked session. Null when signed out.
+     */
+    fun authState(): Flow<User?>
     
     /**
      * Check if a user is currently signed in.

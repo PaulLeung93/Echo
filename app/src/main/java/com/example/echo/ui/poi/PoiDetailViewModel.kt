@@ -107,12 +107,9 @@ class PoiDetailViewModel @Inject constructor(
 
     fun addComment(message: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
-            try {
-                addPoiCommentUseCase(poiId, message)
-                onSuccess()
-            } catch (e: Exception) {
-                _uiEvent.send(e.message ?: "Failed to add comment")
-            }
+            addPoiCommentUseCase(poiId, message)
+                .onSuccess { onSuccess() }
+                .onFailure { e -> _uiEvent.send(e.message ?: "Couldn't post your comment. Please try again.") }
         }
     }
 

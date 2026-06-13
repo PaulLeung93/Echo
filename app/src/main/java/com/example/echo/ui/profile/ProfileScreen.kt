@@ -48,9 +48,15 @@ fun ProfileScreen(
 
     var postToEdit by remember { mutableStateOf<Post?>(null) }
     var postToDelete by remember { mutableStateOf<Post?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { message -> snackbarHostState.showSnackbar(message) }
+    }
 
     val displayName = userEmail.substringBefore("@")
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("My Profile", color = MaterialTheme.colorScheme.onPrimary) },
@@ -137,6 +143,12 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
     // Edit dialog

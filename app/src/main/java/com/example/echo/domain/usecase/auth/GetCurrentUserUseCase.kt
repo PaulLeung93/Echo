@@ -2,6 +2,7 @@ package com.example.echo.domain.usecase.auth
 
 import com.example.echo.domain.model.User
 import com.example.echo.domain.repository.AuthRepository
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 /**
@@ -15,6 +16,9 @@ class GetCurrentUserUseCase @Inject constructor(
      * @return The current User, or null if not signed in.
      */
     operator fun invoke(): User? = authRepository.getCurrentUser()
+
+    /** Observe the signed-in user reactively (null when the session ends). */
+    fun authState(): Flow<User?> = authRepository.authState()
     
     /**
      * Check if a user is currently signed in.

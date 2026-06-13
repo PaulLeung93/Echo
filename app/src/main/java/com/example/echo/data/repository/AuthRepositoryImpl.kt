@@ -8,6 +8,9 @@ import com.example.echo.utils.mapFirebaseErrorMessage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -24,7 +27,15 @@ class AuthRepositoryImpl @Inject constructor(
 ) : AuthRepository {
     
     override fun getCurrentUser(): User? = userMapper.toDomain(auth.currentUser)
-    
+
+    override fun authState(): Flow<User?> = callbackFlow {
+        val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+            trySend(userMapper.toDomain(firebaseAuth.currentUser))
+        }
+        auth.addAuthStateListener(listener)
+        awaitClose { auth.removeAuthStateListener(listener) }
+    }
+
     override fun isSignedIn(): Boolean = auth.currentUser != null
     
     override fun isAuthenticated(): Boolean = auth.currentUser?.isAnonymous == false

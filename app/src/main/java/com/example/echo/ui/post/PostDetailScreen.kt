@@ -43,6 +43,10 @@ fun PostDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { message -> snackbarHostState.showSnackbar(message) }
+    }
+
     // Scroll up when a new comment is added
     LaunchedEffect(uiState.comments.size, commentJustAdded) {
         if (commentJustAdded && uiState.comments.isNotEmpty()) {

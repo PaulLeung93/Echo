@@ -8,6 +8,7 @@ import com.example.echo.domain.usecase.post.GetPostsByUsernameUseCase
 import com.example.echo.domain.usecase.post.ToggleLikeUseCase
 import com.example.echo.domain.usecase.post.UpdatePostUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -42,32 +43,30 @@ class ProfileViewModel @Inject constructor(
         MutableStateFlow(ProfileUiState(error = "User not logged in")).asStateFlow()
     }
 
+    /** One-shot messages (e.g. a failed delete/edit) shown as snackbars. */
+    private val _uiEvent = Channel<String>()
+    val uiEvent = _uiEvent.receiveAsFlow()
+
     fun deletePost(postId: String) {
         viewModelScope.launch {
-            try {
-                deletePostUseCase(postId)
-            } catch (e: Exception) {
-                // handle error
+            deletePostUseCase(postId).onFailure { e ->
+                _uiEvent.send(e.message ?: "Couldn't delete the post. Please try again.")
             }
         }
     }
 
     fun updatePost(postId: String, newMessage: String) {
         viewModelScope.launch {
-            try {
-                updatePostUseCase(postId, newMessage)
-            } catch (e: Exception) {
-                // handle error
+            updatePostUseCase(postId, newMessage).onFailure { e ->
+                _uiEvent.send(e.message ?: "Couldn't update the post. Please try again.")
             }
         }
     }
 
     fun toggleLike(postId: String) {
         viewModelScope.launch {
-            try {
-                toggleLikeUseCase(postId)
-            } catch (e: Exception) {
-                // handle error
+            toggleLikeUseCase(postId).onFailure { e ->
+                _uiEvent.send(e.message ?: "Couldn't update your like. Please try again.")
             }
         }
     }

@@ -29,6 +29,14 @@ class AuthViewModel @Inject constructor(
 
     init {
         checkUserSession()
+        // Keep currentUser in sync with Firebase reactively, so an expired/revoked
+        // session (Firebase signs the user out) is noticed at runtime — RootNavHost
+        // then routes back to Sign In.
+        viewModelScope.launch {
+            getCurrentUserUseCase.authState().collect { user ->
+                _uiState.update { it.copy(currentUser = user) }
+            }
+        }
     }
 
     fun checkUserSession() {

@@ -8,6 +8,7 @@ import com.example.echo.domain.usecase.comment.GetCommentsUseCase
 import com.example.echo.domain.usecase.post.GetPostFlowUseCase
 import com.example.echo.domain.usecase.post.ToggleLikeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -25,6 +26,11 @@ class PostDetailViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(PostDetailUiState(isLoading = true))
     val uiState: StateFlow<PostDetailUiState> = _uiState.asStateFlow()
+
+    /** Transient action errors (failed like/comment) — shown as a snackbar, not
+     *  the terminal `error` field which would replace the whole screen. */
+    private val _uiEvent = Channel<String>()
+    val uiEvent = _uiEvent.receiveAsFlow()
 
     init {
         loadPostDetail()
@@ -51,22 +57,19 @@ class PostDetailViewModel @Inject constructor(
 
     fun toggleLike() {
         viewModelScope.launch {
-            try {
-                toggleLikeUseCase(postId)
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
+            toggleLikeUseCase(postId).onFailure { e ->
+                _uiEvent.send(e.message ?: "Couldn't update your like. Please try again.")
             }
         }
     }
 
     fun addComment(text: String, onComplete: () -> Unit) {
         viewModelScope.launch {
-            try {
-                addCommentUseCase(postId, text)
-                onComplete()
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
-            }
+            addCommentUseCase(postId, text)
+                .onSuccess { onComplete() }
+                .onFailure { e ->
+                    _uiEvent.send(e.message ?: "Couldn't post your comment. Please try again.")
+                }
         }
     }
 }
