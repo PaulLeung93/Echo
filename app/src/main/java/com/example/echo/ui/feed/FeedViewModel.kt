@@ -9,6 +9,7 @@ import com.example.echo.domain.usecase.post.GetPostsByTagUseCase
 import com.example.echo.domain.usecase.post.ToggleLikeUseCase
 import com.example.echo.domain.usecase.post.RefreshPostsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -54,6 +55,10 @@ class FeedViewModel @Inject constructor(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    /** One-shot messages (e.g. a failed like) shown as snackbars. */
+    private val _uiEvent = Channel<String>()
+    val uiEvent = _uiEvent.receiveAsFlow()
+
     fun refreshPosts() {
         viewModelScope.launch {
             _isRefreshing.value = true
@@ -75,10 +80,8 @@ class FeedViewModel @Inject constructor(
 
     fun toggleLike(postId: String) {
         viewModelScope.launch {
-            try {
-                toggleLikeUseCase(postId)
-            } catch (e: Exception) {
-                // Potential error handling channel
+            toggleLikeUseCase(postId).onFailure { e ->
+                _uiEvent.send(e.message ?: "Couldn't update your like. Please try again.")
             }
         }
     }

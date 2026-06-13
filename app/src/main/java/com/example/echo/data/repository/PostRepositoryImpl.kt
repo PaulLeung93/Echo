@@ -2,6 +2,7 @@ package com.example.echo.data.repository
 
 import com.example.echo.data.entity.PostEntity
 import com.example.echo.data.mapper.PostMapper
+import com.example.echo.data.withWriteTimeout
 import com.example.echo.di.IoDispatcher
 import com.example.echo.domain.model.Post
 import com.example.echo.domain.repository.PostRepository
@@ -166,7 +167,7 @@ class PostRepositoryImpl @Inject constructor(
                 postId = newDocRef.id
             )
             
-            newDocRef.set(postMap).await()
+            withWriteTimeout { newDocRef.set(postMap).await() }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -174,16 +175,20 @@ class PostRepositoryImpl @Inject constructor(
     }
     
     override suspend fun updatePost(postId: String, newMessage: String): Unit = withContext(ioDispatcher) {
-        postsCollection.document(postId)
-            .update("message", newMessage)
-            .await()
+        withWriteTimeout {
+            postsCollection.document(postId)
+                .update("message", newMessage)
+                .await()
+        }
         Unit
     }
-    
+
     override suspend fun deletePost(postId: String): Unit = withContext(ioDispatcher) {
-        postsCollection.document(postId)
-            .delete()
-            .await()
+        withWriteTimeout {
+            postsCollection.document(postId)
+                .delete()
+                .await()
+        }
         Unit
     }
     
@@ -194,25 +199,27 @@ class PostRepositoryImpl @Inject constructor(
             throw IllegalStateException("Sign in to like posts")
         }
         val userId = currentUser.uid
-
         val docRef = postsCollection.document(postId)
-        val doc = docRef.get().await()
-        val entity = doc.toObject(PostEntity::class.java) 
-            ?: throw IllegalStateException("Post not found")
-        
-        val isCurrentlyLiked = entity.likes.contains(userId)
 
-        // Update likes and the denormalized likeCount atomically (single write) so they
-        // can never drift and so security rules can require likeCount == likes.size().
-        val newLikes = if (isCurrentlyLiked) entity.likes - userId else entity.likes + userId
-        docRef.update(
-            mapOf(
-                Constants.FIELD_LIKES to newLikes,
-                "likeCount" to newLikes.size
-            )
-        ).await()
+        withWriteTimeout {
+            val doc = docRef.get().await()
+            val entity = doc.toObject(PostEntity::class.java)
+                ?: throw IllegalStateException("Post not found")
 
-        !isCurrentlyLiked
+            val isCurrentlyLiked = entity.likes.contains(userId)
+
+            // Update likes and the denormalized likeCount atomically (single write) so they
+            // can never drift and so security rules can require likeCount == likes.size().
+            val newLikes = if (isCurrentlyLiked) entity.likes - userId else entity.likes + userId
+            docRef.update(
+                mapOf(
+                    Constants.FIELD_LIKES to newLikes,
+                    "likeCount" to newLikes.size
+                )
+            ).await()
+
+            !isCurrentlyLiked
+        }
     }
     
     override suspend fun refreshPosts(): Result<Unit> {

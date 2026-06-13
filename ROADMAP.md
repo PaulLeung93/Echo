@@ -177,6 +177,16 @@ These are the items that separate a demo from a publishable app.
 > and is the recommended next thing to build. ⚠ **Before launch:** also register
 > the **release / Play App Signing upload SHA-1** on the key, or production hits
 > the same wall the first time a token needs refreshing.
+>
+> **Partly addressed (2026-06-13):** added `withWriteTimeout` ([WriteTimeout.kt](app/src/main/java/com/example/echo/data/WriteTimeout.kt))
+> wrapping **all post/comment writes** (create/update/delete/like/comment) — a
+> hung write now fails after 10s with a retryable "Couldn't reach the server"
+> error instead of spinning forever; `FeedViewModel` now surfaces like failures
+> via a snackbar (it previously swallowed them). Verified: no regression on
+> normal writes, and offline writes still resolve locally (no false timeout).
+> **Still open:** detect an expired/invalid session and **prompt re-login** (vs. a
+> generic error), and extend error-surfacing to the remaining VMs (`ProfileViewModel`
+> edit/delete and `PostDetailViewModel` comments still swallow failures).
 
 > **Manual verification (2026-06-12, Pixel_9_Pro emulator).** Drove the app
 > end-to-end against the live rules: feed reads, like toggle (both directions),

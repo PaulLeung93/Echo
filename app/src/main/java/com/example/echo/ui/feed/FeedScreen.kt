@@ -49,6 +49,10 @@ fun FeedScreen(
     var showFilterDialog by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
 
+    LaunchedEffect(Unit) {
+        feedViewModel.uiEvent.collect { message -> snackbarHostState.showSnackbar(message) }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // --- Top App Bar ---

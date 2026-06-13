@@ -2,6 +2,7 @@ package com.example.echo.data.repository
 
 import com.example.echo.data.entity.CommentEntity
 import com.example.echo.data.mapper.CommentMapper
+import com.example.echo.data.withWriteTimeout
 import com.example.echo.di.IoDispatcher
 import com.example.echo.domain.model.Comment
 import com.example.echo.domain.repository.CommentRepository
@@ -70,7 +71,7 @@ class CommentRepositoryImpl @Inject constructor(
                 message = message
             )
 
-            val docRef = getCommentsCollection(postId).add(commentMap).await()
+            val docRef = withWriteTimeout { getCommentsCollection(postId).add(commentMap).await() }
 
             // Update comment count on post
             firestore.collection(Constants.COLLECTION_POSTS)
@@ -89,7 +90,7 @@ class CommentRepositoryImpl @Inject constructor(
     
     override suspend fun deleteComment(postId: String, commentId: String): Unit = 
         withContext(ioDispatcher) {
-            getCommentsCollection(postId).document(commentId).delete().await()
+            withWriteTimeout { getCommentsCollection(postId).document(commentId).delete().await() }
             
             // Update comment count on post
             firestore.collection(Constants.COLLECTION_POSTS)
@@ -139,7 +140,7 @@ class CommentRepositoryImpl @Inject constructor(
                 message = message
             )
 
-            val docRef = getPoiCommentsCollection(poiId).add(commentMap).await()
+            val docRef = withWriteTimeout { getPoiCommentsCollection(poiId).add(commentMap).await() }
 
             // Update comment count on POI
             firestore.collection(Constants.COLLECTION_POIS)
@@ -158,7 +159,7 @@ class CommentRepositoryImpl @Inject constructor(
 
     override suspend fun deleteCommentFromPoi(poiId: String, commentId: String): Unit = 
         withContext(ioDispatcher) {
-            getPoiCommentsCollection(poiId).document(commentId).delete().await()
+            withWriteTimeout { getPoiCommentsCollection(poiId).document(commentId).delete().await() }
             
             // Update comment count on POI
             firestore.collection(Constants.COLLECTION_POIS)
