@@ -9,4 +9,8 @@
     <color name="white">#FFFFFFFF</color>
     <color name="NavyBlue">#FF001F54</color>
 
+    <!-- Echo Neighborhood brand -->
+    <color name="echo_cream">#FFFFF6EF</color>
+    <color name="echo_coral">#FFFF6F4D</color>
+    <color name="echo_teal">#FF1FB6A6</color>
 </resources>
