@@ -183,10 +183,12 @@ These are the items that separate a demo from a publishable app.
       (`Shimmer` / `PostCardSkeleton` / `AlertCardSkeleton`) now back Feed,
       Profile, Alerts, and PostDetail (empty + error). Map and PoiDetail use
       inline states.
-- [ ] **Location permission UX**: runtime request, rationale, and a graceful
-      degraded mode when the user denies location. *(Partial: Create Post now
-      shows "location unavailable" gracefully, but still doesn't **request**
-      permission at runtime.)*
+- [x] **Location permission UX** *(2026-06-13).* In-context runtime request with
+      a rationale: toggling "Share your location" on **Create Post** now shows a
+      rationale dialog → system request, with an "Open Settings" path when
+      permanently denied; location is only enabled once granted. **Map** already
+      requests at runtime (with a "Grant Permission" screen), and **Feed**
+      degrades gracefully (no distance badges without permission).
 - [ ] **Crash & analytics**: wire up Firebase Crashlytics.
 
 > **Finding (2026-06-13) — writes hang silently on a token-refresh failure
@@ -376,10 +378,9 @@ Deferred until shipped; captured so they aren't lost.
 **Phases 0–2, the Phase 3 security/data-integrity block, and the 3.5 UI Rebrand
 are ✅ done.** Remaining path to launch:
 1. **Finish Phase 3 Robustness** — write timeouts ✅, expired-session re-login ✅,
-   and consistent loading/empty/error states ✅ are now done. Remaining:
-   **Crashlytics**, **runtime location-permission UX** (request + rationale +
-   degraded mode — currently only Map requests it), the remaining **auth edge
-   cases**, and the small **post-comment delete** UI.
+   consistent loading/empty/error states ✅, and location-permission UX ✅ are now
+   done. Remaining: **Crashlytics**, the remaining **auth edge cases**, and the
+   small **post-comment delete** UI.
 2. **Phase 3 Build & release** — R8 + keep rules, release signing, a signed AAB,
    edge-to-edge / target API, and remove the `PoiRepository` debug logging. This
    is the hard gate to actually publishing.

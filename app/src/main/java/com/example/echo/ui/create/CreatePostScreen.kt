@@ -1,5 +1,9 @@
 package com.example.echo.ui.create
 
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,15 +19,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.echo.navigation.Destinations
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.shouldShowRationale
 import kotlinx.coroutines.launch
 
 import androidx.hilt.navigation.compose.hiltViewModel
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalPermissionsApi::class)
 @Composable
 fun CreatePostScreen(
     navController: NavHostController,
@@ -32,11 +41,26 @@ fun CreatePostScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var message by remember { mutableStateOf("") }
     var newTag by remember { mutableStateOf("") }
     val tags = remember { mutableStateListOf<String>() }
     val maxTags = 3
+
+    // Location permission, requested in-context when the user opts to share it.
+    val locationPermission = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
+    var showLocationRationale by remember { mutableStateOf(false) }
+    var hasAskedLocation by remember { mutableStateOf(false) }
+    var pendingLocationRequest by remember { mutableStateOf(false) }
+
+    // Once the user grants permission (from our request), turn location on.
+    LaunchedEffect(locationPermission.status.isGranted) {
+        if (locationPermission.status.isGranted && pendingLocationRequest) {
+            pendingLocationRequest = false
+            viewModel.setIncludeLocation(true)
+        }
+    }
 
     fun addTag() {
         val trimmed = newTag.trim().lowercase()
@@ -139,7 +163,13 @@ fun CreatePostScreen(
                 isLoading = uiState.isLocationLoading,
                 unavailable = uiState.locationUnavailable,
                 attached = uiState.includeLocation && uiState.latitude != null,
-                onToggle = { viewModel.setIncludeLocation(it) }
+                onToggle = { checked ->
+                    when {
+                        !checked -> viewModel.setIncludeLocation(false)
+                        locationPermission.status.isGranted -> viewModel.setIncludeLocation(true)
+                        else -> showLocationRationale = true
+                    }
+                }
             )
 
             // --- Tags ---
@@ -186,6 +216,47 @@ fun CreatePostScreen(
                 )
             }
         }
+    }
+
+    // --- Location permission rationale / settings prompt ---
+    if (showLocationRationale) {
+        val permanentlyDenied = hasAskedLocation && !locationPermission.status.shouldShowRationale
+        AlertDialog(
+            onDismissRequest = { showLocationRationale = false },
+            icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+            title = { Text("Share your location?") },
+            text = {
+                Text(
+                    if (permanentlyDenied) {
+                        "Location is turned off for Echo. Enable it in Settings to tag where this echo is from."
+                    } else {
+                        "Echo uses your location to tag where this echo is from, so neighbors nearby can find it. It's only attached when you turn this on."
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLocationRationale = false
+                    if (permanentlyDenied) {
+                        context.startActivity(
+                            Intent(
+                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Uri.fromParts("package", context.packageName, null)
+                            )
+                        )
+                    } else {
+                        hasAskedLocation = true
+                        pendingLocationRequest = true
+                        locationPermission.launchPermissionRequest()
+                    }
+                }) {
+                    Text(if (permanentlyDenied) "Open Settings" else "Allow")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLocationRationale = false }) { Text("Not now") }
+            }
+        )
     }
 }
 
