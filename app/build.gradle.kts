@@ -146,6 +146,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
+    // DataStore (user preferences: theme, notifications)
+    implementation("androidx.datastore:datastore-preferences:1.1.7")
+
     // Serialization (for type-safe navigation)
     implementation(libs.kotlinx.serialization.json)
 
