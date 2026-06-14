@@ -2,6 +2,11 @@ package com.example.echo.ui.maps
 
 import android.Manifest
 import android.util.Log
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -70,6 +75,16 @@ fun MapScreen(
     // Captured for use inside the GoogleMap content lambda (no MaterialTheme there).
     val radiusStroke = MaterialTheme.colorScheme.primary
     val radiusFill = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+    val rippleColor = MaterialTheme.colorScheme.primaryContainer
+
+    // Pulsing "echo" ripple around the user's location (2s loop, fades out).
+    val rippleTransition = rememberInfiniteTransition(label = "mapRipple")
+    val ripple by rippleTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 2000, easing = LinearEasing)),
+        label = "ripple"
+    )
 
     // Get last known location on launch
     LaunchedEffect(Unit) {
@@ -131,6 +146,15 @@ fun MapScreen(
                         strokeColor = radiusStroke,
                         strokeWidth = 3f,
                         fillColor = radiusFill
+                    )
+                    // Pulsing coral ripple at the user's location (expands + fades).
+                    // Sized to read at neighbourhood zoom (meters don't scale with
+                    // zoom, so this is a deliberate visible radius, not the 5km gate).
+                    Circle(
+                        center = loc,
+                        radius = 60.0 + 440.0 * ripple,
+                        strokeWidth = 0f,
+                        fillColor = rippleColor.copy(alpha = 0.5f * (1f - ripple))
                     )
                 }
 
