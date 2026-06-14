@@ -131,6 +131,50 @@ service cloud.firestore {
       }
     }
 
+    // Valid username: 3–20 chars, lowercase letters/digits/underscore, no
+    // leading/trailing underscore (mirrors isValidUsername in the app).
+    function isValidUsername(name) {
+      return name is string && name.matches('^[a-z0-9][a-z0-9_]{1,18}[a-z0-9]$');
+    }
+
+    // ----- User profiles -----
+    match /users/{uid} {
+      // Any signed-in user can read profiles (to show names/usernames).
+      allow read: if isSignedIn();
+
+      allow create: if isNotAnonymous()
+        && uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && isValidUsername(request.resource.data.username)
+        && request.resource.data.firstName is string
+        && request.resource.data.firstName.size() > 0
+        && request.resource.data.lastName is string
+        && request.resource.data.keys().hasOnly(
+             ['uid', 'username', 'firstName', 'lastName', 'email', 'createdAt']
+           );
+
+      // Owner may edit their name later; username/uid/email are immutable in v1.
+      allow update: if isNotAnonymous()
+        && uid == request.auth.uid
+        && changedKeys().hasOnly(['firstName', 'lastName']);
+
+      allow delete: if false;
+    }
+
+    // ----- Username reservations (enforce uniqueness) -----
+    // Doc id is the lowercased handle; the doc just maps it to a uid. Create
+    // only succeeds on a non-existent doc (a set on an existing one is an update,
+    // which is denied), so handles are unique and permanent.
+    match /usernames/{handle} {
+      allow read: if isSignedIn();
+      allow create: if isNotAnonymous()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid'])
+        && isValidUsername(handle);
+      allow update, delete: if false;
+    }
+
     // Deny everything not explicitly matched above.
     match /{document=**} {
       allow read, write: if false;

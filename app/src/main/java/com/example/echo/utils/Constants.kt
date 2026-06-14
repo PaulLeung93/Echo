@@ -9,6 +9,8 @@ object Constants {
     const val COLLECTION_POSTS = "posts"
     const val COLLECTION_POIS = "pois"
     const val COLLECTION_COMMENTS = "comments"
+    const val COLLECTION_USERS = "users"
+    const val COLLECTION_USERNAMES = "usernames"
 
 
     // Firestore Fields
