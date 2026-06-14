@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.echo.data.preferences.UserPreferencesRepository
 import com.example.echo.navigation.RootNavHost
 import com.example.echo.ui.auth.AuthViewModel
 import com.example.echo.ui.common.BottomNavigationBar
@@ -25,12 +26,16 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    @Inject
+    lateinit var preferences: UserPreferencesRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         setContent {
-            EchoTheme {
+            val darkMode by preferences.darkMode.collectAsState(initial = false)
+            EchoTheme(darkTheme = darkMode) {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
