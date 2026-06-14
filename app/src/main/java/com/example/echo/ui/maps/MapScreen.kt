@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Comment
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
@@ -36,6 +37,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.*
 import com.google.maps.android.compose.*
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -62,6 +64,7 @@ fun MapScreen(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val uiState by mapViewModel.uiState.collectAsState()
 
     // Captured for use inside the GoogleMap content lambda (no MaterialTheme there).
@@ -112,7 +115,12 @@ fun MapScreen(
                     isMyLocationEnabled = true,
                     mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style)
                 ),
-                uiSettings = MapUiSettings(zoomControlsEnabled = false),
+                uiSettings = MapUiSettings(
+                    zoomControlsEnabled = false,
+                    // Use our own bottom-right recenter button instead of the
+                    // native top-right one (which collides with the search bar).
+                    myLocationButtonEnabled = false
+                ),
                 onMapClick = { mapViewModel.clearSelectedPost() }
             ) {
                 // The user's 5km interaction radius (where they can comment).
@@ -215,6 +223,49 @@ fun MapScreen(
                 .statusBarsPadding()
                 .padding(16.dp)
         )
+
+        // --- Recenter button (bottom-right; lifts above a selection card) ---
+        if (locationPermissionState.status.isGranted) {
+            val hasSelection = uiState.selectedPost != null ||
+                uiState.selectedCluster != null ||
+                uiState.selectedPoi != null
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 4.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = if (hasSelection) 200.dp else 16.dp)
+                    .size(48.dp)
+                    .clickable {
+                        scope.launch {
+                            var target = userLocation
+                            if (target == null && locationPermissionState.status.isGranted) {
+                                target = try {
+                                    fusedLocationClient.lastLocation.await()
+                                        ?.let { LatLng(it.latitude, it.longitude) }
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }
+                            if (target != null) {
+                                userLocation = target
+                                cameraPositionState.animate(
+                                    CameraUpdateFactory.newLatLngZoom(target, 14f)
+                                )
+                            }
+                        }
+                    }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.MyLocation,
+                        contentDescription = "Recenter on my location",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
 
         // --- Selected post / cluster / POI card overlays ---
         uiState.selectedCluster?.let { cluster ->
