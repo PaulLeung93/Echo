@@ -143,10 +143,24 @@ fun CompleteProfileScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            // Dynamic helper line: carries the reason for Taken / Invalid / Error,
+            // otherwise the format hint.
+            val isError = state.usernameStatus == UsernameStatus.Taken ||
+                state.usernameStatus == UsernameStatus.Invalid
+            val helperText = when (state.usernameStatus) {
+                UsernameStatus.Taken -> "That username is taken — try another."
+                UsernameStatus.Invalid -> "Use 3–20 letters, numbers or underscores (no spaces)."
+                UsernameStatus.Error -> "Couldn't check availability. Check your connection and try again."
+                else -> "3–20 characters: letters, numbers and underscores. This is how neighbors will see you."
+            }
             Text(
-                text = "3–20 characters: letters, numbers and underscores. This is how neighbors will see you.",
+                text = helperText,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (isError) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -190,7 +204,7 @@ private fun UsernameTrailing(state: CompleteProfileViewModel.State) {
         ) {
             Icon(
                 Icons.Filled.CheckCircle,
-                contentDescription = null,
+                contentDescription = "Available",
                 tint = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.size(18.dp)
             )
@@ -202,16 +216,12 @@ private fun UsernameTrailing(state: CompleteProfileViewModel.State) {
             )
             Spacer(Modifier.width(12.dp))
         }
-        state.usernameStatus == UsernameStatus.Taken -> Text(
-            "Taken",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.padding(end = 12.dp)
-        )
-        state.usernameStatus == UsernameStatus.Error -> Icon(
+        // Taken / Invalid: red cue; the helper line below explains why.
+        state.usernameStatus == UsernameStatus.Taken ||
+            state.usernameStatus == UsernameStatus.Invalid -> Icon(
             Icons.Filled.ErrorOutline,
-            contentDescription = "Couldn't check",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            contentDescription = "Unavailable",
+            tint = MaterialTheme.colorScheme.error,
             modifier = Modifier.size(18.dp)
         )
         else -> {}
