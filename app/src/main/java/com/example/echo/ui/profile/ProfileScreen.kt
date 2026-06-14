@@ -1,6 +1,7 @@
 package com.example.echo.ui.profile
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -75,7 +76,17 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    AuthorAvatar(name = displayName, size = 88.dp)
+                    // Avatar with a soft cream ring + shadow (wireframe style).
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        shadowElevation = 4.dp,
+                        modifier = Modifier.size(96.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            AuthorAvatar(name = displayName, size = 84.dp)
+                        }
+                    }
                     Spacer(Modifier.height(12.dp))
                     Text(
                         text = displayName,
@@ -83,7 +94,7 @@ fun ProfileScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = userEmail,
+                        text = "@$displayName",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -102,7 +113,7 @@ fun ProfileScreen(
 
             item {
                 Text(
-                    text = "Your echoes",
+                    text = "Your posts",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -202,7 +213,8 @@ fun ProfileScreen(
 private fun StatTile(label: String, value: Int, accent: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
     Surface(
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = 1.dp,
         modifier = modifier
     ) {
         Column(
