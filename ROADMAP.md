@@ -262,12 +262,16 @@ These are the items that separate a demo from a publishable app.
       class) → split into `src/debug` + `src/release` `installAppCheck()`; and the
       Crashlytics auto **mapping-file upload** failed offline → disabled
       (`mappingFileUploadEnabled = false`; upload explicitly when publishing).
-- [~] **Release signing** — config is **prepped**: a gitignored
-      `keystore.properties` (template: `keystore.properties.example`) drives the
-      release `signingConfig`, falling back to the debug key so the minified build
-      stays installable for testing. **Still needs you:** create an upload
-      keystore, add `keystore.properties`, (recommended) enrol in **Play App
-      Signing**, then `./gradlew bundleRelease` for a signed **AAB**.
+- [x] **Release signing + signed AAB** *(2026-06-14).* Upload keystore created
+      (`echo-upload.jks`, alias `echo-upload`); a gitignored `keystore.properties`
+      (template: `keystore.properties.example`) drives the release `signingConfig`.
+      **`./gradlew bundleRelease` produces a signed, R8-minified AAB**
+      (`app/build/outputs/bundle/release/app-release.aab`) — verified with
+      `jarsigner -verify` → "jar verified". Release SHA-1
+      `86:B0:45:…:37:4D` / SHA-256 `B9:F9:1F:…:8D:CC`. **Still to do at publish
+      time:** enrol in **Play App Signing** when creating the listing, and
+      register the release (and Play app-signing) fingerprints on the Maps/API
+      key + App Check.
 - [ ] **Target latest required API** and verify **edge-to-edge** (enforced on
       Android 15+). *(The `edge-to-edge` skill can assist.)*
 - [x] **Remove debug logging** in `PoiRepository` *(2026-06-13)* — the verbose
