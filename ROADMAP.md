@@ -272,8 +272,14 @@ These are the items that separate a demo from a publishable app.
       time:** enrol in **Play App Signing** when creating the listing, and
       register the release (and Play app-signing) fingerprints on the Maps/API
       key + App Check.
-- [ ] **Target latest required API** and verify **edge-to-edge** (enforced on
-      Android 15+). *(The `edge-to-edge` skill can assist.)*
+- [x] **Target API + edge-to-edge verified** *(2026-06-14).* `targetSdk`/
+      `compileSdk = 35` (above Play's min-34 requirement). `enableEdgeToEdge()`
+      is called and there are **no deprecated inset APIs** (`statusBarColor`,
+      `SYSTEM_UI_FLAG`, etc.); `themes.xml` has no system-bar color overrides.
+      Confirmed on-device: M3 `TopAppBar`s consume the status-bar inset and the
+      bottom nav uses `navigationBarsPadding()`, so system bars never obscure
+      content (top bar draws under the status bar by design, nav sits above the
+      gesture pill).
 - [x] **Remove debug logging** in `PoiRepository` *(2026-06-13)* — the verbose
       `Log.d/w/e` POI-listener block (added in cd5f797) is gone; parse failures
       now fall through to `null` silently.
