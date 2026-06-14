@@ -6,6 +6,7 @@ import com.example.echo.domain.usecase.auth.*
 import com.example.echo.domain.usecase.user.GetCurrentUserProfileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -41,8 +42,24 @@ class AuthViewModel @Inject constructor(
                 // (drives RootNavHost's cold-launch routing). Guests never do.
                 if (user != null && !user.isAnonymous) {
                     _uiState.update { it.copy(needsProfileSetup = null) }
-                    val profile = getCurrentUserProfileUseCase()
-                    _uiState.update { it.copy(needsProfileSetup = profile == null) }
+                    // Retry transient read errors so we never mistake a failed
+                    // read for "no profile" (which would wrongly force an existing
+                    // user through profile setup). After a few tries, fail open to
+                    // the app — new users are still routed to setup via sign-up.
+                    var attempts = 0
+                    while (true) {
+                        val result = getCurrentUserProfileUseCase()
+                        if (result.isSuccess) {
+                            _uiState.update { it.copy(needsProfileSetup = result.getOrNull() == null) }
+                            break
+                        }
+                        attempts++
+                        if (attempts >= 3) {
+                            _uiState.update { it.copy(needsProfileSetup = false) }
+                            break
+                        }
+                        delay(800)
+                    }
                 } else {
                     _uiState.update { it.copy(needsProfileSetup = false) }
                 }

@@ -178,10 +178,13 @@ class PostRepositoryImpl @Inject constructor(
             }
 
             // Posts are attributed to the user's chosen handle, validated against
-            // their profile by the security rules.
-            val username = userRepository.getCurrentUserProfile()?.username
+            // their profile by the security rules. Distinguish a read error from a
+            // genuinely missing profile so the user sees the right message.
+            val profileResult = userRepository.getCurrentUserProfile()
+            val username = profileResult.getOrNull()?.username
                 ?: return@withContext Result.failure(
-                    IllegalStateException("Please finish setting up your profile before posting.")
+                    profileResult.exceptionOrNull()
+                        ?: IllegalStateException("Please finish setting up your profile before posting.")
                 )
 
             val newDocRef = postsCollection.document()

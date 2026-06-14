@@ -96,14 +96,15 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getCurrentUserProfile(): UserProfile? = withContext(ioDispatcher) {
-        val uid = auth.currentUser?.uid ?: return@withContext null
+    override suspend fun getCurrentUserProfile(): Result<UserProfile?> = withContext(ioDispatcher) {
+        val uid = auth.currentUser?.uid ?: return@withContext Result.success(null)
         try {
-            usersCollection.document(uid).get().await()
+            val profile = usersCollection.document(uid).get().await()
                 .toObject(UserProfileEntity::class.java)
                 ?.toDomain()
+            Result.success(profile)
         } catch (e: Exception) {
-            null
+            Result.failure(e)
         }
     }
 

@@ -19,8 +19,14 @@ interface UserRepository {
      */
     suspend fun createProfile(firstName: String, lastName: String, username: String): Result<UserProfile>
 
-    /** One-shot read of the current user's profile, or null if none exists. */
-    suspend fun getCurrentUserProfile(): UserProfile?
+    /**
+     * One-shot read of the current user's profile.
+     * - `success(profile)` — the profile exists.
+     * - `success(null)` — confirmed: no profile (or not signed in).
+     * - `failure(e)` — couldn't read (network/transient); distinct from "absent"
+     *   so callers don't mistake a read error for a missing profile.
+     */
+    suspend fun getCurrentUserProfile(): Result<UserProfile?>
 
     /** Observe the current user's profile (null when signed out or no profile yet). */
     fun observeCurrentUserProfile(): Flow<UserProfile?>

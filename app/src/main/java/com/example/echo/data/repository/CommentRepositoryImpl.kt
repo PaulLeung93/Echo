@@ -34,9 +34,12 @@ class CommentRepositoryImpl @Inject constructor(
 ) : CommentRepository {
 
     /** The caller's chosen handle (validated by the rules), or fail if no profile. */
-    private suspend fun requireUsername(): String =
-        userRepository.getCurrentUserProfile()?.username
-            ?: throw IllegalStateException("Please finish setting up your profile before commenting.")
+    private suspend fun requireUsername(): String {
+        val result = userRepository.getCurrentUserProfile()
+        return result.getOrNull()?.username
+            ?: throw (result.exceptionOrNull()
+                ?: IllegalStateException("Please finish setting up your profile before commenting."))
+    }
 
     private fun getCommentsCollection(postId: String) =
         firestore.collection(Constants.COLLECTION_POSTS)
