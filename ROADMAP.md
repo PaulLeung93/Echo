@@ -410,9 +410,31 @@ Deferred until shipped; captured so they aren't lost.
       per-SMS cost (and Identity Platform for true MFA). The anti-bad-actor goal
       is largely met for free by App Check + Play Integrity (already in the app).
       Revisit if/when Blaze is on the table.
-- [ ] Avatar upload, bio. *(Display name + username now done, see above.)*
-- [ ] Post history with stats (total likes/comments).
-- [ ] Settings screen (notification prefs, dark mode toggle, account deletion).
+- [x] **Bio** *(2026-06-14).* Added a `bio` field (≤160 chars) to the profile
+      schema (`UserProfile` + `users/{uid}`). A new **Edit profile** screen
+      (coral top bar, reachable from the Profile top-bar pencil) edits first/last
+      name + bio with a live character counter; `@username` is shown read-only
+      (handles are permanent). Rules: `users create` now requires `bio`, and a
+      new owner-only `users update` permits changing only `firstName/lastName/bio`.
+      ⚠️ **Requires the firestore.rules deploy** — the create rule now lists `bio`
+      in `hasOnly`, so the app update and `firebase deploy --only firestore:rules`
+      must ship together or new sign-ups break.
+- [~] Avatar upload — *blocked on the free (Spark) plan:* image uploads need
+      Firebase **Storage**, which requires Blaze. The Edit profile screen keeps
+      the initials avatar with a "Photo uploads coming soon" caption as the
+      placeholder. Revisit if/when Blaze is on the table (same gate as SMS 2FA).
+- [x] **Post history with stats** *(already shipped).* The Profile screen shows
+      Posts / total Likes / total Comments stat tiles plus the full post list
+      (`ProfileViewModel` sums `likeCount`/`commentCount` across the user's posts).
+- [x] **Settings screen** *(2026-06-14).* Reachable from the Profile top-bar gear.
+      Sections: **Appearance** (dark-mode toggle — warm dark theme, persisted via
+      Jetpack DataStore and applied app-wide through `EchoTheme(darkTheme=…)`);
+      **Notifications** (a persisted preference toggle, stored for when FCM lands);
+      **Account** (Sign out; Delete account — confirm dialog → deletes the
+      `usernames/{handle}` reservation + `users/{uid}` doc + the Auth user, with a
+      re-auth prompt if the login is stale). ⚠️ Account deletion **requires the
+      firestore.rules deploy** (the new owner-only `delete` rules on `users` and
+      `usernames`).
 
 ### Technical
 - [ ] Offline cache / Room layer for feed resilience.
