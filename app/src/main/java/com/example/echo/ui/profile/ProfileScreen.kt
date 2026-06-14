@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.echo.components.AuthorAvatar
 import com.example.echo.components.PostCard
+import com.example.echo.components.PostCardSkeleton
 import com.example.echo.domain.model.Post
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.auth.AuthViewModel
@@ -120,10 +121,8 @@ fun ProfileScreen(
             }
 
             when {
-                uiState.isLoading && uiState.userPosts.isEmpty() -> item {
-                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+                uiState.isLoading && uiState.userPosts.isEmpty() -> items(3) {
+                    PostCardSkeleton()
                 }
                 uiState.error != null -> item {
                     Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {

@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import com.example.echo.components.AlertCardSkeleton
 import com.example.echo.utils.Constants
 import com.example.echo.utils.formatTimestamp
 
@@ -47,7 +48,14 @@ fun AlertsScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             when {
                 uiState.isLoading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        repeat(5) { AlertCardSkeleton() }
+                    }
                 }
                 uiState.alerts.isEmpty() -> {
                     Text(
