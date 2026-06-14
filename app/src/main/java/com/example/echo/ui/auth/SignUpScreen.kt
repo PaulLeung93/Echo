@@ -55,6 +55,13 @@ fun SignUpScreen(
     LaunchedEffect(Unit) {
         authViewModel.uiEvent.collect { event ->
             when (event) {
+                is AuthUiEvent.NavigateToCompleteProfile -> {
+                    // New account → collect name + username next. Clear the auth
+                    // back stack so Back can't return to sign-up/sign-in.
+                    navController.navigate(Destinations.COMPLETE_PROFILE) {
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                    }
+                }
                 is AuthUiEvent.NavigateToHome -> {
                     navController.navigate(Destinations.FEED) {
                         // Clear the entire auth back stack (incl. the sign-in screen

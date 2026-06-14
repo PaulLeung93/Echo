@@ -1,0 +1,219 @@
+package com.example.echo.ui.auth
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import com.example.echo.domain.usecase.user.UsernameStatus
+import com.example.echo.navigation.Destinations
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CompleteProfileScreen(
+    navController: NavHostController,
+    authViewModel: AuthViewModel,
+    viewModel: CompleteProfileViewModel = hiltViewModel()
+) {
+    val state by viewModel.state.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(state.error) {
+        state.error?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "Complete your profile",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            Surface(color = MaterialTheme.colorScheme.background) {
+                Button(
+                    onClick = {
+                        viewModel.submit {
+                            authViewModel.onProfileCompleted()
+                            navController.navigate(Destinations.FEED) {
+                                popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                            }
+                        }
+                    },
+                    enabled = state.canSubmit,
+                    shape = RoundedCornerShape(percent = 50),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                        .height(54.dp)
+                ) {
+                    if (state.isSubmitting) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else {
+                        Text("Create profile", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "Tell your neighbors who you are.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            InitialsAvatar(firstName = state.firstName, lastName = state.lastName)
+
+            OutlinedTextField(
+                value = state.firstName,
+                onValueChange = viewModel::onFirstNameChange,
+                label = { Text("First name") },
+                singleLine = true,
+                shape = MaterialTheme.shapes.large,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words,
+                    imeAction = ImeAction.Next
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = state.lastName,
+                onValueChange = viewModel::onLastNameChange,
+                label = { Text("Last name") },
+                singleLine = true,
+                shape = MaterialTheme.shapes.large,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words,
+                    imeAction = ImeAction.Next
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = state.username,
+                onValueChange = viewModel::onUsernameChange,
+                label = { Text("Username") },
+                singleLine = true,
+                shape = MaterialTheme.shapes.large,
+                prefix = { Text("@") },
+                trailingIcon = { UsernameTrailing(state) },
+                isError = state.usernameStatus == UsernameStatus.Taken ||
+                    state.usernameStatus == UsernameStatus.Invalid,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Text(
+                text = "3–20 characters: letters, numbers and underscores. This is how neighbors will see you.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+/** Coral circle with up to two initials, derived from the name as it's typed. */
+@Composable
+private fun InitialsAvatar(firstName: String, lastName: String) {
+    val initials = buildString {
+        firstName.firstOrNull()?.let { append(it.uppercaseChar()) }
+        lastName.firstOrNull()?.let { append(it.uppercaseChar()) }
+    }.ifEmpty { "?" }
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primary,
+        shadowElevation = 4.dp,
+        modifier = Modifier.size(96.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = initials,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+        }
+    }
+}
+
+/** Right-side availability indicator for the username field. */
+@Composable
+private fun UsernameTrailing(state: CompleteProfileViewModel.State) {
+    when {
+        state.isCheckingUsername -> CircularProgressIndicator(
+            strokeWidth = 2.dp,
+            modifier = Modifier.size(18.dp)
+        )
+        state.usernameStatus == UsernameStatus.Available -> Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                "Available",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.secondary
+            )
+            Spacer(Modifier.width(12.dp))
+        }
+        state.usernameStatus == UsernameStatus.Taken -> Text(
+            "Taken",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(end = 12.dp)
+        )
+        state.usernameStatus == UsernameStatus.Error -> Icon(
+            Icons.Filled.ErrorOutline,
+            contentDescription = "Couldn't check",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
+        else -> {}
+    }
+}

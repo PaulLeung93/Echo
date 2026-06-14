@@ -1,8 +1,12 @@
 package com.example.echo.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavHostController
 import com.example.echo.ui.auth.AuthViewModel
 import com.example.echo.ui.splash.SplashScreen
@@ -14,19 +18,38 @@ fun RootNavHost(
     webClientId: String
 ) {
     val uiState by authViewModel.uiState.collectAsState()
+    val user = uiState.currentUser
 
-    // We can assume user is signed in if currentUser is not null
-    // You might want to add an isInitialSessionCheckComplete flag to AuthUiState for better splash handling
-    val startDestination = if (uiState.currentUser != null) {
-        Destinations.FEED
-    } else {
-        Destinations.SIGN_IN
+    // Resolve where the app should start. For a signed-in, non-anonymous user we
+    // must know whether they've set up a profile yet (FEED vs COMPLETE_PROFILE),
+    // which is an async check — null means "still checking, show the splash".
+    val resolvedStart: String? = when {
+        user == null -> Destinations.SIGN_IN
+        user.isAnonymous -> Destinations.FEED
+        uiState.needsProfileSetup == null -> null
+        uiState.needsProfileSetup == true -> Destinations.COMPLETE_PROFILE
+        else -> Destinations.FEED
     }
 
-    AppNavGraph(
-        navController = navController,
-        authViewModel = authViewModel,
-        webClientId = webClientId,
-        startDestination = startDestination
-    )
+    // The NavHost's start destination is fixed at first composition, so capture
+    // the first resolved value. Runtime auth changes (sign in/up/out) are handled
+    // by explicit navigation from the screens, not by changing this.
+    var initialStart by remember { mutableStateOf(resolvedStart) }
+    LaunchedEffect(resolvedStart) {
+        if (initialStart == null && resolvedStart != null) {
+            initialStart = resolvedStart
+        }
+    }
+
+    val start = initialStart
+    if (start == null) {
+        SplashScreen()
+    } else {
+        AppNavGraph(
+            navController = navController,
+            authViewModel = authViewModel,
+            webClientId = webClientId,
+            startDestination = start
+        )
+    }
 }

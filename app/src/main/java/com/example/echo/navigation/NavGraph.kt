@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.echo.ui.auth.*
 import com.example.echo.ui.alerts.AlertsScreen
+import com.example.echo.ui.auth.CompleteProfileScreen
 import com.example.echo.ui.create.CreatePostScreen
 import com.example.echo.ui.feed.FeedScreen
 import com.example.echo.ui.maps.MapScreen
@@ -26,6 +27,7 @@ object Destinations {
     const val PROFILE = Constants.ROUTE_PROFILE
     const val POI_DETAILS = Constants.ROUTE_POI_DETAILS
     const val ALERTS = Constants.ROUTE_ALERTS
+    const val COMPLETE_PROFILE = Constants.ROUTE_COMPLETE_PROFILE
 }
 
 @Composable
@@ -113,6 +115,14 @@ fun AppNavGraph(
         // Alerts Screen
         composable(Destinations.ALERTS) {
             AlertsScreen(navController = navController)
+        }
+
+        // Complete Profile (post-sign-up: name + username)
+        composable(Destinations.COMPLETE_PROFILE) {
+            CompleteProfileScreen(
+                navController = navController,
+                authViewModel = authViewModel
+            )
         }
     }
 }

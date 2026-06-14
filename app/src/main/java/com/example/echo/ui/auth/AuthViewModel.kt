@@ -3,6 +3,7 @@ package com.example.echo.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.echo.domain.usecase.auth.*
+import com.example.echo.domain.usecase.user.GetCurrentUserProfileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -18,7 +19,8 @@ class AuthViewModel @Inject constructor(
     private val fetchSignInMethodsUseCase: FetchSignInMethodsUseCase,
     private val signOutUseCase: SignOutUseCase,
     private val sendPasswordResetEmailUseCase: SendPasswordResetEmailUseCase,
-    private val getCurrentUserUseCase: GetCurrentUserUseCase
+    private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val getCurrentUserProfileUseCase: GetCurrentUserProfileUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -35,8 +37,22 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             getCurrentUserUseCase.authState().collect { user ->
                 _uiState.update { it.copy(currentUser = user) }
+                // Decide whether this user still needs to set up a profile
+                // (drives RootNavHost's cold-launch routing). Guests never do.
+                if (user != null && !user.isAnonymous) {
+                    _uiState.update { it.copy(needsProfileSetup = null) }
+                    val profile = getCurrentUserProfileUseCase()
+                    _uiState.update { it.copy(needsProfileSetup = profile == null) }
+                } else {
+                    _uiState.update { it.copy(needsProfileSetup = false) }
+                }
             }
         }
+    }
+
+    /** Called after the profile is created so routing reflects it immediately. */
+    fun onProfileCompleted() {
+        _uiState.update { it.copy(needsProfileSetup = false) }
     }
 
     fun checkUserSession() {
@@ -80,8 +96,9 @@ class AuthViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             signUpWithEmailUseCase(email, password)
                 .onSuccess { user ->
-                    _uiState.update { it.copy(isLoading = false, currentUser = user) }
-                    _uiEvent.send(AuthUiEvent.NavigateToHome)
+                    // New account → must set up a profile before reaching the app.
+                    _uiState.update { it.copy(isLoading = false, currentUser = user, needsProfileSetup = true) }
+                    _uiEvent.send(AuthUiEvent.NavigateToCompleteProfile)
                 }
                 .onFailure { error ->
                     _uiState.update { it.copy(isLoading = false, error = error.message) }
