@@ -75,7 +75,7 @@ fun MapScreen(
     // Captured for use inside the GoogleMap content lambda (no MaterialTheme there).
     val radiusStroke = MaterialTheme.colorScheme.primary
     val radiusFill = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-    val rippleColor = MaterialTheme.colorScheme.primaryContainer
+    val rippleColor = MaterialTheme.colorScheme.primary
 
     // Pulsing "echo" ripple around the user's location (2s loop, fades out).
     val rippleTransition = rememberInfiniteTransition(label = "mapRipple")
