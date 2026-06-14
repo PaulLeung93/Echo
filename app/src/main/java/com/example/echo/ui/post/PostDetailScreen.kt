@@ -1,12 +1,14 @@
 package com.example.echo.ui.post
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -59,7 +61,7 @@ fun PostDetailScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("Post Details", color = MaterialTheme.colorScheme.onPrimary)
+                    Text("Post", color = MaterialTheme.colorScheme.onPrimary)
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
@@ -110,7 +112,7 @@ fun PostDetailScreen(
                         )
 
                         Text(
-                            text = "Comments",
+                            text = "Comments (${uiState.comments.size})",
                             style = MaterialTheme.typography.titleMedium
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -128,7 +130,11 @@ fun PostDetailScreen(
                         }
                     } else {
                         items(uiState.comments, key = { it.id ?: it.hashCode() }) { comment ->
-                            CommentCard(comment)
+                            CommentCard(
+                                comment = comment,
+                                isAuthor = comment.authorId.isNotEmpty() &&
+                                    comment.authorId == post.authorId
+                            )
                             Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
@@ -152,29 +158,40 @@ fun PostDetailScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    Button(
-                        onClick = {
-                            val now = System.currentTimeMillis()
-                            val recent = commentTimestamps.filter { now - it < WINDOW_MS }
-
-                            if (recent.size >= MAX_COMMENTS) {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("You're commenting too fast. Please wait a bit.")
-                                }
-                            } else {
-                                commentTimestamps.add(now)
-                                if (newComment.isNotBlank()) {
+                    val canSend = newComment.isNotBlank()
+                    Surface(
+                        shape = CircleShape,
+                        color = if (canSend) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                        },
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clickable(enabled = canSend) {
+                                val now = System.currentTimeMillis()
+                                val recent = commentTimestamps.filter { now - it < WINDOW_MS }
+                                if (recent.size >= MAX_COMMENTS) {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar("You're commenting too fast. Please wait a bit.")
+                                    }
+                                } else {
+                                    commentTimestamps.add(now)
                                     viewModel.addComment(newComment) {
                                         newComment = ""
                                         commentJustAdded = true
                                     }
                                 }
                             }
-                        },
-                        enabled = newComment.isNotBlank(),
-                        shape = RoundedCornerShape(percent = 50)
                     ) {
-                        Text("Send")
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send comment",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                 }
             }

@@ -31,11 +31,16 @@ import com.example.echo.utils.formatTimestamp
 @Composable
 fun CommentCard(
     comment: Comment,
-    onDelete: (() -> Unit)? = null
+    onDelete: (() -> Unit)? = null,
+    isAuthor: Boolean = false
 ) {
     Surface(
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = if (isAuthor) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -51,6 +56,10 @@ fun CommentCard(
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                    if (isAuthor) {
+                        Spacer(Modifier.width(6.dp))
+                        AuthorBadge()
+                    }
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = formatTimestamp(comment.timestamp),
@@ -76,5 +85,21 @@ fun CommentCard(
                 }
             }
         }
+    }
+}
+
+/** Small coral "AUTHOR" pill marking the original poster's own comments. */
+@Composable
+private fun AuthorBadge() {
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.primary
+    ) {
+        Text(
+            text = "AUTHOR",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+        )
     }
 }
