@@ -251,9 +251,23 @@ These are the items that separate a demo from a publishable app.
       Firestore rules.
 
 ### Build & release
-- [ ] **R8/ProGuard**: enable minify + shrink for release, add keep rules,
-      verify the release build runs. *(The `r8-analyzer` skill can audit rules.)*
-- [ ] **Release signing** config + a signed AAB build.
+- [x] **R8/ProGuard** *(2026-06-14).* `isMinifyEnabled` + `isShrinkResources`
+      on for release; keep rules added for the Firestore entities
+      (`data.entity.**`, deserialized reflectively via `toObject`) plus
+      `SourceFile`/`LineNumberTable` for readable Crashlytics traces.
+      **Verified:** `assembleRelease` builds and the minified APK **runs on
+      device** — Feed loads (proves Firestore reflection + Hilt + Compose survive
+      shrinking). *Two release-only bugs were caught & fixed in the process:* the
+      App Check **debug** provider was referenced from `main` (a `debugImplementation`
+      class) → split into `src/debug` + `src/release` `installAppCheck()`; and the
+      Crashlytics auto **mapping-file upload** failed offline → disabled
+      (`mappingFileUploadEnabled = false`; upload explicitly when publishing).
+- [~] **Release signing** — config is **prepped**: a gitignored
+      `keystore.properties` (template: `keystore.properties.example`) drives the
+      release `signingConfig`, falling back to the debug key so the minified build
+      stays installable for testing. **Still needs you:** create an upload
+      keystore, add `keystore.properties`, (recommended) enrol in **Play App
+      Signing**, then `./gradlew bundleRelease` for a signed **AAB**.
 - [ ] **Target latest required API** and verify **edge-to-edge** (enforced on
       Android 15+). *(The `edge-to-edge` skill can assist.)*
 - [x] **Remove debug logging** in `PoiRepository` *(2026-06-13)* — the verbose

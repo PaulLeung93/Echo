@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -9,6 +11,18 @@ plugins {
     id("com.google.gms.google-services")
     alias(libs.plugins.firebase.crashlytics)
 }
+
+// Optional release signing — drop a keystore.properties in the project root
+// (gitignored) with storeFile / storePassword / keyAlias / keyPassword to sign
+// release builds. Without it, release falls back to the debug key so the
+// minified build is still installable for testing.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+val hasReleaseKeystore = keystorePropertiesFile.exists()
 
 android {
     namespace = "com.example.echo"
@@ -29,13 +43,38 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Don't auto-upload the R8 mapping file on every release build (it
+            // needs network/credentials and fails offline). Upload explicitly
+            // when publishing via ./gradlew uploadCrashlyticsMappingFileRelease.
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
+            // Real release key when keystore.properties is present; otherwise the
+            // debug key so a minified release build stays installable for testing.
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {

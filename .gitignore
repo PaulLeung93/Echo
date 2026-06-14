@@ -16,6 +16,11 @@ local.properties
 local.defaults.properties
 secrets.properties
 
+# Release signing — never commit the keystore or its passwords
+keystore.properties
+*.jks
+*.keystore
+
 # Stitch design exploration screenshots (not part of the app)
 .stitch_shots/
 

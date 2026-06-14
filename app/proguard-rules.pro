@@ -19,3 +19,20 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# ---------------------------------------------------------------------------
+# Echo keep rules
+# ---------------------------------------------------------------------------
+
+# Keep readable crash stack traces (Crashlytics deobfuscates with the mapping
+# file once uploaded). Also keep annotations/signatures Firestore relies on.
+-keepattributes SourceFile,LineNumberTable
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+
+# Firestore deserializes documents into these entities via reflection
+# (DocumentSnapshot.toObject). R8 must NOT rename/strip their no-arg
+# constructor, fields, or accessors, or deserialization returns empty objects.
+-keep class com.example.echo.data.entity.** { *; }
+-keepclassmembers class com.example.echo.data.entity.** {
+    *;
+}
