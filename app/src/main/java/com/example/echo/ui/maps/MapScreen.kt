@@ -2,26 +2,33 @@ package com.example.echo.ui.maps
 
 import android.Manifest
 import android.util.Log
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Comment
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Message
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.echo.R
 import com.example.echo.components.PostCard
+import com.example.echo.domain.model.Coordinates
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.common.TopSnackbarHost
+import com.example.echo.utils.Constants
+import com.example.echo.utils.distanceMeters
+import com.example.echo.utils.formatDistance
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -29,7 +36,6 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.*
 import com.google.maps.android.compose.*
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -47,7 +53,6 @@ fun MapScreen(
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
     var showTagDialog by remember { mutableStateOf(false) }
     var showTypeDialog by remember { mutableStateOf(false) }
-    var menuExpanded by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
     var filterAttempted by remember { mutableStateOf(false) }
 
@@ -57,9 +62,11 @@ fun MapScreen(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
-
     val uiState by mapViewModel.uiState.collectAsState()
+
+    // Captured for use inside the GoogleMap content lambda (no MaterialTheme there).
+    val radiusStroke = MaterialTheme.colorScheme.primary
+    val radiusFill = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
 
     // Get last known location on launch
     LaunchedEffect(Unit) {
@@ -95,246 +102,186 @@ fun MapScreen(
         }
     }
 
-    // --- Layout ---
+    // --- Layout: full-screen map with floating controls ---
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // --- Top App Bar ---
-            TopAppBar(
-                title = {
-                    if (uiState.currentTag != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Filtered: #${uiState.currentTag}",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                            IconButton(
-                                onClick = {
-                                    mapViewModel.clearTagFilter()
-                                    tagInput = ""
-                                },
-                                colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = "Clear Filter")
+        if (locationPermissionState.status.isGranted) {
+            GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState,
+                properties = MapProperties(
+                    isMyLocationEnabled = true,
+                    mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style)
+                ),
+                uiSettings = MapUiSettings(zoomControlsEnabled = false),
+                onMapClick = { mapViewModel.clearSelectedPost() }
+            ) {
+                // The user's 5km interaction radius (where they can comment).
+                userLocation?.let { loc ->
+                    Circle(
+                        center = loc,
+                        radius = Constants.PROXIMITY_RADIUS_METERS,
+                        strokeColor = radiusStroke,
+                        strokeWidth = 3f,
+                        fillColor = radiusFill
+                    )
+                }
+
+                // Cluster markers for user posts
+                uiState.clusters.forEach { cluster ->
+                    val count = cluster.posts.size
+                    if (count > 1) {
+                        val isSelected = uiState.selectedCluster?.position == cluster.position
+                        Marker(
+                            state = MarkerState(cluster.position),
+                            title = "$count posts",
+                            icon = BitmapDescriptorFactory.fromBitmap(
+                                createClusterIcon(
+                                    context,
+                                    count,
+                                    scale = if (isSelected) 1.5f else 1.0f
+                                )
+                            ),
+                            onClick = {
+                                mapViewModel.onClusterClick(cluster, cameraPositionState)
+                                true
                             }
-                        }
+                        )
                     } else {
-                        Text("Echo", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimary)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { menuExpanded = true }, colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)) {
-                        Icon(Icons.Default.FilterList, contentDescription = "Filter Options")
-                    }
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Filter by Tags") },
+                        val post = cluster.posts.first()
+                        val isSelected = uiState.selectedPost?.id == post.id
+                        Marker(
+                            state = MarkerState(cluster.position),
+                            title = post.username,
+                            snippet = post.message,
                             onClick = {
-                                menuExpanded = false
-                                showTagDialog = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Filter by Marker Type") },
-                            onClick = {
-                                menuExpanded = false
-                                showTypeDialog = true
-                            }
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
-            )
-
-            // --- Google Map Layer ---
-            Box(modifier = Modifier.weight(1f)) {
-                if (locationPermissionState.status.isGranted) {
-                    GoogleMap(
-                        modifier = Modifier.fillMaxSize(),
-                        cameraPositionState = cameraPositionState,
-                        properties = MapProperties(
-                            isMyLocationEnabled = true,
-                            mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style)
-                        ),
-                        uiSettings = MapUiSettings(zoomControlsEnabled = false),
-                        onMapClick = { mapViewModel.clearSelectedPost() }
-                    ) {
-                        // Cluster markers for user posts
-                        uiState.clusters.forEach { cluster ->
-                            val count = cluster.posts.size
-                            if (count > 1) {
-                                val isSelected = uiState.selectedCluster?.position == cluster.position
-                                Marker(
-                                    state = MarkerState(cluster.position),
-                                    title = "$count posts",
-                                    icon = BitmapDescriptorFactory.fromBitmap(
-                                        createClusterIcon(
-                                            context, 
-                                            count, 
-                                            scale = if (isSelected) 1.5f else 1.0f
-                                        )
-                                    ),
-                                    onClick = {
-                                        mapViewModel.onClusterClick(cluster, cameraPositionState)
-                                        true
-                                    }
-                                )
-                            } else {
-                                val post = cluster.posts.first()
-                                val isSelected = uiState.selectedPost?.id == post.id
-                                Marker(
-                                    state = MarkerState(cluster.position),
-                                    title = post.username,
-                                    snippet = post.message,
-                                    onClick = {
-                                        mapViewModel.setSelectedPost(post, cameraPositionState)
-                                        true
-                                    },
-                                    icon = bitmapDescriptorFromVector(
-                                        context, 
-                                        R.drawable.ic_default,
-                                        scale = if (isSelected) 1.5f else 1.0f
-                                    )
-                                )
-                            }
-                        }
-
-                        // POI markers
-                        uiState.pois.forEach { poi ->
-                            val latLng = LatLng(poi.latitude, poi.longitude)
-                            val isSelected = uiState.selectedPoi?.id == poi.id
-                            Marker(
-                                state = MarkerState(position = latLng),
-                                title = poi.name,
-                                snippet = "${poi.description} • ${poi.commentCount} comments",
-                                onClick = {
-                                    mapViewModel.setSelectedPoi(poi, cameraPositionState)
-                                    true
-                                },
-                                icon = when (poi.type.lowercase()) {
-                                    "college" -> bitmapDescriptorFromVector(context, R.drawable.ic_college, scale = if (isSelected) 1.5f else 1.0f)
-                                    "park" -> bitmapDescriptorFromVector(context, R.drawable.ic_park, scale = if (isSelected) 1.5f else 1.0f)
-                                    "landmark" -> bitmapDescriptorFromVector(context, R.drawable.ic_landmark, scale = if (isSelected) 1.5f else 1.0f)
-                                    else -> BitmapDescriptorFactory.defaultMarker()
-                                }
+                                mapViewModel.setSelectedPost(post, cameraPositionState)
+                                true
+                            },
+                            icon = bitmapDescriptorFromVector(
+                                context,
+                                R.drawable.ic_default,
+                                scale = if (isSelected) 1.5f else 1.0f
                             )
-                        }
-                    }
-                } else {
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(32.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("Location permission is required to show your current location.")
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { locationPermissionState.launchPermissionRequest() }) {
-                            Text("Grant Permission")
-                        }
+                        )
                     }
                 }
 
-                // Post preview card / Carousel
-                uiState.selectedCluster?.let { cluster ->
-                    val pagerState = rememberPagerState(pageCount = { cluster.posts.size })
-                    
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 16.dp),
-                        contentPadding = PaddingValues(horizontal = 32.dp),
-                        pageSpacing = 16.dp
-                    ) { page ->
-                        val post = cluster.posts[page]
-                        PostCard(
-                            post = post,
-                            isLiked = post.likedByCurrentUser,
-                            likeCount = post.likeCount,
-                            commentCount = post.commentCount,
-                            onLikeClick = { mapViewModel.toggleLike(post.id) },
-                            onClick = {
-                                navController.navigate("${com.example.echo.utils.Constants.ROUTE_POST_DETAILS}/${post.id}")
-                            },
-                            onTagClick = { tag ->
-                                tagInput = tag
-                                mapViewModel.setTagFilter(tag, cameraPositionState)
-                            }
-                        )
-                    }
-
-                    // Update selected post when page changes
-                    LaunchedEffect(pagerState.currentPage) {
-                        mapViewModel.onSelectedPostChanged(cluster.posts[pagerState.currentPage])
-                    }
-                } ?: uiState.selectedPost?.let { post ->
-                    PostCard(
-                        post = post,
-                        isLiked = post.likedByCurrentUser,
-                        likeCount = post.likeCount,
-                        commentCount = post.commentCount,
-                        onLikeClick = { mapViewModel.toggleLike(post.id) },
+                // POI markers
+                uiState.pois.forEach { poi ->
+                    val latLng = LatLng(poi.latitude, poi.longitude)
+                    val isSelected = uiState.selectedPoi?.id == poi.id
+                    Marker(
+                        state = MarkerState(position = latLng),
+                        title = poi.name,
+                        snippet = "${poi.description} • ${poi.commentCount} comments",
                         onClick = {
-                            navController.navigate("${com.example.echo.utils.Constants.ROUTE_POST_DETAILS}/${post.id}")
+                            mapViewModel.setSelectedPoi(poi, cameraPositionState)
+                            true
                         },
-                        onTagClick = { tag ->
-                            tagInput = tag
-                            mapViewModel.setTagFilter(tag, cameraPositionState)
-                        },
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
-                    )
-                } ?: uiState.selectedPoi?.let { poi ->
-                    Card(
-                        onClick = {
-                            navController.navigate("${Destinations.POI_DETAILS}/${poi.id}")
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(16.dp)
-                            .fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = poi.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = poi.description,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Category: ${poi.type.replaceFirstChar { it.uppercase() }}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Message,
-                                    contentDescription = "Comments",
-                                    tint = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "${poi.commentCount} ${if (poi.commentCount == 1) "comment" else "comments"}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                            }
+                        icon = when (poi.type.lowercase()) {
+                            "college" -> bitmapDescriptorFromVector(context, R.drawable.ic_college, scale = if (isSelected) 1.5f else 1.0f)
+                            "park" -> bitmapDescriptorFromVector(context, R.drawable.ic_park, scale = if (isSelected) 1.5f else 1.0f)
+                            "landmark" -> bitmapDescriptorFromVector(context, R.drawable.ic_landmark, scale = if (isSelected) 1.5f else 1.0f)
+                            else -> BitmapDescriptorFactory.defaultMarker()
                         }
-                    }
+                    )
                 }
             }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(32.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Location permission is required to show your current location.")
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = { locationPermissionState.launchPermissionRequest() }) {
+                    Text("Grant Permission")
+                }
+            }
+        }
+
+        // --- Floating search + filter bar ---
+        MapSearchBar(
+            activeTag = uiState.currentTag,
+            onSearchClick = { showTagDialog = true },
+            onClearTag = {
+                mapViewModel.clearTagFilter()
+                tagInput = ""
+            },
+            onFilterClick = { showTypeDialog = true },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(16.dp)
+        )
+
+        // --- Selected post / cluster / POI card overlays ---
+        uiState.selectedCluster?.let { cluster ->
+            val pagerState = rememberPagerState(pageCount = { cluster.posts.size })
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp),
+                contentPadding = PaddingValues(horizontal = 32.dp),
+                pageSpacing = 16.dp
+            ) { page ->
+                val post = cluster.posts[page]
+                PostCard(
+                    post = post,
+                    isLiked = post.likedByCurrentUser,
+                    likeCount = post.likeCount,
+                    commentCount = post.commentCount,
+                    onLikeClick = { mapViewModel.toggleLike(post.id) },
+                    onClick = {
+                        navController.navigate("${Constants.ROUTE_POST_DETAILS}/${post.id}")
+                    },
+                    onTagClick = { tag ->
+                        tagInput = tag
+                        mapViewModel.setTagFilter(tag, cameraPositionState)
+                    }
+                )
+            }
+
+            LaunchedEffect(pagerState.currentPage) {
+                mapViewModel.onSelectedPostChanged(cluster.posts[pagerState.currentPage])
+            }
+        } ?: uiState.selectedPost?.let { post ->
+            PostCard(
+                post = post,
+                isLiked = post.likedByCurrentUser,
+                likeCount = post.likeCount,
+                commentCount = post.commentCount,
+                onLikeClick = { mapViewModel.toggleLike(post.id) },
+                onClick = {
+                    navController.navigate("${Constants.ROUTE_POST_DETAILS}/${post.id}")
+                },
+                onTagClick = { tag ->
+                    tagInput = tag
+                    mapViewModel.setTagFilter(tag, cameraPositionState)
+                },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+            )
+        } ?: uiState.selectedPoi?.let { poi ->
+            val distanceLabel = userLocation?.let {
+                formatDistance(
+                    distanceMeters(
+                        Coordinates(it.latitude, it.longitude),
+                        Coordinates(poi.latitude, poi.longitude)
+                    )
+                )
+            }
+            PoiPreviewCard(
+                name = poi.name,
+                description = poi.description,
+                type = poi.type,
+                commentCount = poi.commentCount,
+                distanceLabel = distanceLabel,
+                onClick = { navController.navigate("${Destinations.POI_DETAILS}/${poi.id}") },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+            )
         }
 
         TopSnackbarHost(snackbarHostState = snackbarHostState)
@@ -384,5 +331,152 @@ fun MapScreen(
                 mapViewModel.filterByMarkerTypes(selectedTypes)
             }
         )
+    }
+}
+
+/** Floating search pill + circular filter button over the map (wireframe style). */
+@Composable
+private fun MapSearchBar(
+    activeTag: String?,
+    onSearchClick: () -> Unit,
+    onClearTag: () -> Unit,
+    onFilterClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 4.dp,
+            modifier = Modifier
+                .weight(1f)
+                .clickable { onSearchClick() }
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(10.dp))
+                if (activeTag != null) {
+                    Text(
+                        text = "#$activeTag",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Clear filter",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clickable { onClearTag() }
+                    )
+                } else {
+                    Text(
+                        text = "Search your neighborhood…",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 4.dp,
+            modifier = Modifier
+                .size(52.dp)
+                .clickable { onFilterClick() }
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Default.Tune,
+                    contentDescription = "Filters",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/** Bottom card for a selected POI: type chip + distance, name, description, comments. */
+@Composable
+private fun PoiPreviewCard(
+    name: String,
+    description: String,
+    type: String,
+    commentCount: Int,
+    distanceLabel: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ) {
+                    Text(
+                        text = type.replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                    )
+                }
+                if (distanceLabel != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "• $distanceLabel",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = name,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.Comment,
+                    contentDescription = "Comments",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = commentCount.toString(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
