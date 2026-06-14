@@ -173,10 +173,16 @@ These are the items that separate a demo from a publishable app.
       screen was left under Feed, so Back from Feed returned to it. Both SignIn
       and SignUp now `popUpTo(findStartDestination, inclusive)` so Feed is the
       root and Back exits the app.
-- [ ] **Auth edge cases**: account-exists-with-different-credential, expired
-      sessions, Google sign-in cancel, network loss, password-reset failures.
-- [ ] **Consistent loading / empty / error states** across Feed, Map, Profile,
-      PostDetail, PoiDetail (some screens have them, others don't).
+- [~] **Auth edge cases**: **expired sessions ✅** (2026-06-13 — reactive
+      `AuthRepository.authState()` / `AuthStateListener` drives
+      `AuthViewModel.currentUser`, so RootNavHost routes back to Sign In on
+      session loss). Still open: account-exists-with-different-credential,
+      Google sign-in cancel, network loss, password-reset failures.
+- [x] **Consistent loading / empty / error states** *(2026-06-13).* Shared
+      `EmptyState` (icon + title + subtitle, error tint) and shimmer skeletons
+      (`Shimmer` / `PostCardSkeleton` / `AlertCardSkeleton`) now back Feed,
+      Profile, Alerts, and PostDetail (empty + error). Map and PoiDetail use
+      inline states.
 - [ ] **Location permission UX**: runtime request, rationale, and a graceful
       degraded mode when the user denies location. *(Partial: Create Post now
       shows "location unavailable" gracefully, but still doesn't **request**
@@ -206,9 +212,13 @@ These are the items that separate a demo from a publishable app.
 > error instead of spinning forever; `FeedViewModel` now surfaces like failures
 > via a snackbar (it previously swallowed them). Verified: no regression on
 > normal writes, and offline writes still resolve locally (no false timeout).
-> **Still open:** detect an expired/invalid session and **prompt re-login** (vs. a
-> generic error), and extend error-surfacing to the remaining VMs (`ProfileViewModel`
-> edit/delete and `PostDetailViewModel` comments still swallow failures).
+> **Resolved (2026-06-13):** expired/invalid sessions now **prompt re-login** — a
+> reactive `AuthStateListener` (`AuthRepository.authState()`) drives
+> `AuthViewModel.currentUser`, so RootNavHost routes back to Sign In on session
+> loss. Error-surfacing was extended to the remaining VMs: `ProfileViewModel`
+> (edit/delete/like) and `PostDetailViewModel` / `PoiDetailViewModel` (comments)
+> now route failures to snackbars via a `uiEvent` channel instead of swallowing
+> them.
 
 > **Manual verification (2026-06-12, Pixel_9_Pro emulator).** Drove the app
 > end-to-end against the live rules: feed reads, like toggle (both directions),
@@ -331,7 +341,9 @@ Deferred until shipped; captured so they aren't lost.
 - [ ] Bookmarks/saved posts.
 
 ### Map & Location
-- [ ] Richer map: clustering tuning, search, "recenter on me".
+- [~] Richer map: **"recenter on me" ✅** (bottom-right FAB, 2026-06-13) + a
+      floating search/filter bar over a full-screen map. Still want clustering
+      tuning and real free-text search (the bar currently opens the tag filter).
 - [ ] GeoFire interaction radius limit — restrict which posts/POIs a user can
       see or interact with based on a configurable distance from their current
       location (extend the existing 5km comment-proximity rule to broader
@@ -363,10 +375,11 @@ Deferred until shipped; captured so they aren't lost.
 ### Suggested order of attack
 **Phases 0–2, the Phase 3 security/data-integrity block, and the 3.5 UI Rebrand
 are ✅ done.** Remaining path to launch:
-1. **Finish Phase 3 Robustness** — start with the observed **write / expired-
-   session failure handling** (see the 2026-06-13 finding: writes should time out
-   + surface an error and prompt re-login, not spin forever), then Crashlytics,
-   consistent loading/error states, and runtime location-permission UX.
+1. **Finish Phase 3 Robustness** — write timeouts ✅, expired-session re-login ✅,
+   and consistent loading/empty/error states ✅ are now done. Remaining:
+   **Crashlytics**, **runtime location-permission UX** (request + rationale +
+   degraded mode — currently only Map requests it), the remaining **auth edge
+   cases**, and the small **post-comment delete** UI.
 2. **Phase 3 Build & release** — R8 + keep rules, release signing, a signed AAB,
    edge-to-edge / target API, and remove the `PoiRepository` debug logging. This
    is the hard gate to actually publishing.
