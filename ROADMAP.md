@@ -397,7 +397,20 @@ Deferred until shipped; captured so they aren't lost.
       24h, possibly via a scheduled Cloud Function.
 
 ### Profile & Account
-- [ ] Avatar upload, bio/display name.
+- [x] **Usernames + real names** *(2026-06-14).* Multi-step sign-up: after the
+      email/password step, a **Complete Profile** screen collects first/last name
+      and a unique **@username** (live availability check). Backed by
+      `users/{uid}` + a `usernames/{handle}` reservation (atomic transaction;
+      rules enforce uniqueness + format + owner-write). A completion gate routes
+      profile-less accounts there on launch. New posts/comments use the @handle
+      (validated by rules via `get(users/uid).username`); old content is left
+      as-is. Profile shows "First Last" + @handle; own-posts query by uid.
+      Verified end-to-end on device against deployed rules.
+- [ ] **SMS 2FA / phone verification** — *deferred:* requires the Blaze plan +
+      per-SMS cost (and Identity Platform for true MFA). The anti-bad-actor goal
+      is largely met for free by App Check + Play Integrity (already in the app).
+      Revisit if/when Blaze is on the table.
+- [ ] Avatar upload, bio. *(Display name + username now done, see above.)*
 - [ ] Post history with stats (total likes/comments).
 - [ ] Settings screen (notification prefs, dark mode toggle, account deletion).
 
