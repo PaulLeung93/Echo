@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(
                     bottomBar = {
-                        if (currentRoute in listOf("feed", "map", "profile")) {
+                        if (currentRoute in listOf("feed", "map", "alerts", "profile")) {
                             BottomNavigationBar(
                                 selectedTab = currentRoute ?: "feed",
                                 onTabSelected = { route ->
