@@ -1,6 +1,7 @@
 package com.example.echo.ui.common
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -34,6 +35,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -57,72 +60,82 @@ fun BottomNavigationBar(
 ) {
     val context = LocalContext.current
 
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 10.dp,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(top = 14.dp, bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 10.dp,
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
         ) {
-            NavTab(
-                label = "Feed",
-                selectedIcon = Icons.Filled.Home,
-                unselectedIcon = Icons.Outlined.Home,
-                selected = selectedTab == "feed",
-                onClick = { onTabSelected("feed") }
-            )
-            NavTab(
-                label = "Map",
-                selectedIcon = Icons.Filled.Map,
-                unselectedIcon = Icons.Outlined.Map,
-                selected = selectedTab == "map",
-                onClick = { onTabSelected("map") }
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(top = 14.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NavTab(
+                    label = "Feed",
+                    selectedIcon = Icons.Filled.Home,
+                    unselectedIcon = Icons.Outlined.Home,
+                    selected = selectedTab == "feed",
+                    onClick = { onTabSelected("feed") }
+                )
+                NavTab(
+                    label = "Map",
+                    selectedIcon = Icons.Filled.Map,
+                    unselectedIcon = Icons.Outlined.Map,
+                    selected = selectedTab == "map",
+                    onClick = { onTabSelected("map") }
+                )
 
-            // Center "Create" — a raised coral circle with a white "+".
-            CreateTab(
-                enabled = canCreate,
-                onClick = {
-                    if (canCreate) {
-                        onCreateClick()
-                    } else {
-                        Toast.makeText(context, "Please sign in to share an echo.", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            )
+                // Center slot — the Create FAB is overlaid here (see below).
+                Spacer(Modifier.weight(1f))
 
-            NavTab(
-                label = "Alerts",
-                selectedIcon = Icons.Filled.Notifications,
-                unselectedIcon = Icons.Outlined.Notifications,
-                selected = selectedTab == "alerts",
-                onClick = {
-                    if (isUserAuthenticated) {
-                        onTabSelected("alerts")
-                    } else {
-                        Toast.makeText(context, "Please sign in to see your alerts.", Toast.LENGTH_SHORT).show()
+                NavTab(
+                    label = "Alerts",
+                    selectedIcon = Icons.Filled.Notifications,
+                    unselectedIcon = Icons.Outlined.Notifications,
+                    selected = selectedTab == "alerts",
+                    onClick = {
+                        if (isUserAuthenticated) {
+                            onTabSelected("alerts")
+                        } else {
+                            Toast.makeText(context, "Please sign in to see your alerts.", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                }
-            )
-            NavTab(
-                label = "Profile",
-                selectedIcon = Icons.Filled.Person,
-                unselectedIcon = Icons.Outlined.Person,
-                selected = selectedTab == "profile",
-                onClick = {
-                    if (isUserAuthenticated) {
-                        onTabSelected("profile")
-                    } else {
-                        Toast.makeText(context, "Please sign in to access your profile.", Toast.LENGTH_SHORT).show()
+                )
+                NavTab(
+                    label = "Profile",
+                    selectedIcon = Icons.Filled.Person,
+                    unselectedIcon = Icons.Outlined.Person,
+                    selected = selectedTab == "profile",
+                    onClick = {
+                        if (isUserAuthenticated) {
+                            onTabSelected("profile")
+                        } else {
+                            Toast.makeText(context, "Please sign in to access your profile.", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                }
-            )
+                )
+            }
         }
+
+        // Center "Create" — a raised coral circle with a white "+". Drawn as an
+        // overlay (sibling of the bar Surface, not inside it) so the bar's
+        // rounded-corner clip can't cut the raised circle into an odd shape.
+        CreateFab(
+            enabled = canCreate,
+            onClick = {
+                if (canCreate) {
+                    onCreateClick()
+                } else {
+                    Toast.makeText(context, "Please sign in to share an echo.", Toast.LENGTH_SHORT).show()
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = (-14).dp)
+        )
     }
 }
 
@@ -167,31 +180,28 @@ private fun RowScope.NavTab(
     }
 }
 
-/** Center create action: a raised coral circle with a white "+". */
+/** Center create action: a single raised coral circle with a white "+". */
 @Composable
-private fun RowScope.CreateTab(enabled: Boolean, onClick: () -> Unit) {
-    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-        Surface(
-            shape = CircleShape,
-            color = if (enabled) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-            },
-            shadowElevation = 6.dp,
-            modifier = Modifier
-                .offset(y = (-12).dp)
-                .size(52.dp)
-                .clickable(onClick = onClick)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = "Create post",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
+private fun CreateFab(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val color = if (enabled) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+    }
+    Box(
+        modifier = modifier
+            .size(56.dp)
+            .shadow(8.dp, CircleShape)
+            .clip(CircleShape)
+            .background(color)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Add,
+            contentDescription = "Create post",
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(28.dp)
+        )
     }
 }
