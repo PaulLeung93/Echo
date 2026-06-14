@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -20,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.example.echo.components.AlertCardSkeleton
+import com.example.echo.components.EmptyState
 import com.example.echo.utils.Constants
 import com.example.echo.utils.formatTimestamp
 
@@ -57,16 +60,19 @@ fun AlertsScreen(
                         repeat(5) { AlertCardSkeleton() }
                     }
                 }
+                uiState.error != null -> {
+                    EmptyState(
+                        icon = Icons.Outlined.NotificationsOff,
+                        title = uiState.error!!,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
                 uiState.alerts.isEmpty() -> {
-                    Text(
-                        text = uiState.error
-                            ?: "You're all caught up 🎉\nWe'll let you know when there's activity on your echoes.",
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(32.dp)
+                    EmptyState(
+                        icon = Icons.Outlined.NotificationsNone,
+                        title = "You're all caught up",
+                        subtitle = "We'll let you know when there's activity on your echoes.",
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
                 else -> {

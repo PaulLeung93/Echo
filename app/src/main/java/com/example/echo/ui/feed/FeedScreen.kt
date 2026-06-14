@@ -8,6 +8,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +26,7 @@ import com.example.echo.ui.auth.AuthViewModel
 import com.example.echo.utils.Constants
 import com.example.echo.utils.distanceMeters
 import com.example.echo.utils.formatDistance
+import com.example.echo.components.EmptyState
 import com.example.echo.components.PostCard
 import com.example.echo.components.PostCardSkeleton
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -133,16 +136,13 @@ fun FeedScreen(
                         repeat(5) { PostCardSkeleton() }
                     }
                 } else if (uiState.error != null) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = uiState.error ?: "Unknown error",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
+                    EmptyState(
+                        icon = Icons.Outlined.CloudOff,
+                        title = "Couldn't load the feed",
+                        subtitle = uiState.error,
+                        isError = true,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 } else {
                     SwipeRefresh(
                         state = rememberSwipeRefreshState(isRefreshing),
@@ -154,19 +154,14 @@ fun FeedScreen(
                         ) {
                             if (uiState.posts.isEmpty()) {
                                 item {
-                                    Box(
+                                    EmptyState(
+                                        icon = Icons.Outlined.Forum,
+                                        title = "No echoes yet",
+                                        subtitle = "Be the first to share something with your neighborhood.",
                                         modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(top = 100.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "No posts yet.\nBe the first to share something!",
-                                            textAlign = TextAlign.Center,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                        )
-                                    }
+                                            .fillMaxWidth()
+                                            .padding(top = 64.dp)
+                                    )
                                 }
                             } else {
                                 items(uiState.posts) { post ->

@@ -11,7 +11,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.outlined.CloudOff
 import com.example.echo.components.AuthorAvatar
+import com.example.echo.components.EmptyState
 import com.example.echo.components.PostCard
 import com.example.echo.components.PostCardSkeleton
 import com.example.echo.domain.model.Post
@@ -125,19 +129,21 @@ fun ProfileScreen(
                     PostCardSkeleton()
                 }
                 uiState.error != null -> item {
-                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text(uiState.error ?: "Error loading posts", color = MaterialTheme.colorScheme.error)
-                    }
+                    EmptyState(
+                        icon = Icons.Outlined.CloudOff,
+                        title = "Couldn't load your posts",
+                        subtitle = uiState.error,
+                        isError = true,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp)
+                    )
                 }
                 uiState.userPosts.isEmpty() -> item {
-                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            "You haven't shared an echo yet.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    EmptyState(
+                        icon = Icons.Outlined.Article,
+                        title = "No posts yet",
+                        subtitle = "Echoes you share will show up here.",
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp)
+                    )
                 }
                 else -> items(uiState.userPosts, key = { it.id }) { post ->
                     PostCard(

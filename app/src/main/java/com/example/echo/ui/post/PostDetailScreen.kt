@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.echo.components.PostCard
 import com.example.echo.components.CommentCard
+import com.example.echo.components.EmptyState
 import com.example.echo.navigation.Destinations
 import com.example.echo.domain.model.Comment
 import com.example.echo.domain.model.Post
@@ -84,13 +87,13 @@ fun PostDetailScreen(
                     CircularProgressIndicator()
                 }
             } else if (uiState.error != null) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = uiState.error ?: "Unknown error",
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center
-                    )
-                }
+                EmptyState(
+                    icon = Icons.Outlined.CloudOff,
+                    title = "Couldn't load this post",
+                    subtitle = uiState.error,
+                    isError = true,
+                    modifier = Modifier.fillMaxSize()
+                )
             } else if (uiState.post != null) {
                 val post = uiState.post!!
                 LazyColumn(
@@ -120,12 +123,11 @@ fun PostDetailScreen(
 
                     if (uiState.comments.isEmpty()) {
                         item {
-                            Text(
-                                text = "No comments yet.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
+                            EmptyState(
+                                icon = Icons.Outlined.ChatBubbleOutline,
+                                title = "No comments yet",
+                                subtitle = "Be the first to comment.",
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp)
                             )
                         }
                     } else {
