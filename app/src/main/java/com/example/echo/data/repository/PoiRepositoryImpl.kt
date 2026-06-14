@@ -29,17 +29,9 @@ class PoiRepositoryImpl @Inject constructor(
     override fun getPois(): Flow<List<Poi>> = callbackFlow {
         val listener = poisCollection.addSnapshotListener { snapshot, error ->
             if (error != null) {
-                android.util.Log.e("PoiRepository", "Firestore Listener FAILED", error)
                 close(error)
                 return@addSnapshotListener
             }
-// In PoiRepositoryImpl.kt inside the listener
-
-            val source = if (snapshot != null && snapshot.metadata.isFromCache) "LOCAL CACHE" else "SERVER"
-            android.util.Log.d("PoiRepository", "Data fetched from: $source")
-
-            val docCount = snapshot?.documents?.size ?: 0
-            android.util.Log.d("PoiRepository", "Fetched $docCount documents from Firestore")
 
             val entities = snapshot?.documents?.mapNotNull { doc ->
                 try {
@@ -59,22 +51,12 @@ class PoiRepositoryImpl @Inject constructor(
                             commentCount = commentCount
                         )
                     } else {
-                        android.util.Log.w("PoiRepository", "Missing fields for POI: ${doc.id}")
                         null
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("PoiRepository", "Error parsing POI: ${doc.id}", e)
                     null
                 }
             } ?: emptyList()
-
-            // --- NEW LOGGING BLOCK ---
-            android.util.Log.d("PoiRepository", "--- START POI LIST ---")
-            entities.forEach { poi ->
-                android.util.Log.d("PoiRepository", "POI: ${poi.name} | Type: ${poi.type} | Loc: ${poi.location.latitude},${poi.location.longitude}")
-            }
-            android.util.Log.d("PoiRepository", "--- END POI LIST ---")
-            // -------------------------
 
             val pois = poiMapper.toDomainList(entities)
             trySend(pois)

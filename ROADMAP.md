@@ -237,10 +237,11 @@ These are the items that separate a demo from a publishable app.
       (confirm), calling the existing `ProfileViewModel.updatePost`/`deletePost`.
       The "⋮" is an optional `PostCard` affordance, so the Feed stays clean. See
       the **UI Rebrand** section below.
-- [ ] **Post-comment delete still unwired** — `PostDetailScreen` renders
-      `CommentCard(comment)` without an `onDelete` (POI comments have it; post
-      comments don't). Small follow-up: pass an owner-gated delete + a
-      `PostDetailViewModel` delete method.
+- [x] **Post-comment delete wired** *(2026-06-13).* New `DeleteCommentUseCase`;
+      `PostDetailViewModel` exposes `currentUserId` + a `deleteComment` method,
+      and `PostDetailScreen` shows the trash affordance only on the viewer's own
+      comments (matching the POI pattern). Ownership is also enforced by the
+      Firestore rules.
 
 ### Build & release
 - [ ] **R8/ProGuard**: enable minify + shrink for release, add keep rules,
@@ -248,8 +249,9 @@ These are the items that separate a demo from a publishable app.
 - [ ] **Release signing** config + a signed AAB build.
 - [ ] **Target latest required API** and verify **edge-to-edge** (enforced on
       Android 15+). *(The `edge-to-edge` skill can assist.)*
-- [ ] **Remove debug logging** added in `PoiRepository` (commit cd5f797) before
-      release.
+- [x] **Remove debug logging** in `PoiRepository` *(2026-06-13)* — the verbose
+      `Log.d/w/e` POI-listener block (added in cd5f797) is gone; parse failures
+      now fall through to `null` silently.
 
 ### Quality bar (architecture says "testable" — currently no tests)
 - [ ] **Establish a test harness** (unit tests for use cases/mappers, ViewModel

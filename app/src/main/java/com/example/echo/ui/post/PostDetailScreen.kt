@@ -132,10 +132,18 @@ fun PostDetailScreen(
                         }
                     } else {
                         items(uiState.comments, key = { it.id ?: it.hashCode() }) { comment ->
+                            val isOwnComment = uiState.currentUserId != null &&
+                                comment.authorId.isNotEmpty() &&
+                                comment.authorId == uiState.currentUserId
                             CommentCard(
                                 comment = comment,
                                 isAuthor = comment.authorId.isNotEmpty() &&
-                                    comment.authorId == post.authorId
+                                    comment.authorId == post.authorId,
+                                onDelete = if (isOwnComment) {
+                                    { viewModel.deleteComment(comment.id) }
+                                } else {
+                                    null
+                                }
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                         }
