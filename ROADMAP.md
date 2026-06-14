@@ -308,7 +308,22 @@ emulator (swiftshader) and committed/pushed to `master`.
 Deferred until shipped; captured so they aren't lost.
 
 ### Social & Engagement
-- [ ] Push notifications (replies, nearby activity) via FCM.
+- [~] **In-app Alerts — v1 shipped.** The `Alerts` tab + `AlertsScreen` /
+      `AlertsViewModel` (`ui/alerts/`) surface a feed of engagement (likes /
+      comments) on the user's *own* posts, derived from existing post data — no
+      notifications backend. Tapping an alert opens that post. **Enrichment path
+      (all behind this same UI):**
+  - [ ] **Per-event alerts** ("Sarah commented on your post") instead of the
+        current post-level rollup ("1 like on your echo"). Needs either an
+        `events`/`notifications` collection written on like/comment, or a
+        client-side diff of comment streams.
+  - [ ] **Proximity alerts** ("something new posted near you") — feed the Alerts
+        screen from recent posts within the user's radius (reuses
+        `LocationProvider` + `distanceMeters`); see *Geofenced alerts* below.
+  - [ ] **Unread state** — track last-seen timestamp to badge the Alerts tab and
+        distinguish new vs. seen.
+- [ ] Push notifications (replies, nearby activity) via FCM — would mirror the
+      in-app Alerts feed above to the system tray.
 - [ ] Post editing/deletion polish + report/block (moderation — may become
       required depending on Play policy for UGC apps).
 - [ ] Direct messaging or threaded replies to comments.
@@ -321,7 +336,9 @@ Deferred until shipped; captured so they aren't lost.
       see or interact with based on a configurable distance from their current
       location (extend the existing 5km comment-proximity rule to broader
       feed/map visibility).
-- [ ] Geofenced alerts ("something new posted near you").
+- [ ] Geofenced alerts ("something new posted near you") — would populate the
+      existing **Alerts** screen (see *In-app Alerts* under Social & Engagement)
+      rather than a new surface.
 - [ ] User-submitted POIs (vs. only the seeded list).
 - [ ] Location link on each post — tapping a post opens the map centered on
       that post's location (deep link from PostDetail → MapScreen).
