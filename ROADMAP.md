@@ -189,7 +189,14 @@ These are the items that separate a demo from a publishable app.
       permanently denied; location is only enabled once granted. **Map** already
       requests at runtime (with a "Grant Permission" screen), and **Feed**
       degrades gracefully (no distance badges without permission).
-- [ ] **Crash & analytics**: wire up Firebase Crashlytics.
+- [x] **Crash reporting**: Firebase Crashlytics wired *(2026-06-14)* — Gradle
+      plugin + SDK added; `EchoApplication` sets
+      `isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG` so only **release**
+      builds report (dev crashes don't pollute the dashboard). Verified on-device:
+      Firebase initializes and the Crashlytics dependency registers
+      (`FirebaseSessions: Dependency to CRASHLYTICS added`). *Remaining: confirm a
+      real release crash lands in the console, and (optional) upload mapping files
+      once R8 is enabled.*
 
 > **Finding (2026-06-13) — writes hang silently on a token-refresh failure
 > (recommended next item).** After ~8h signed in, the 1-hour Firebase ID token
@@ -380,9 +387,10 @@ Deferred until shipped; captured so they aren't lost.
 **Phases 0–2, the Phase 3 security/data-integrity block, and the 3.5 UI Rebrand
 are ✅ done.** Remaining path to launch:
 1. **Finish Phase 3 Robustness** — write timeouts ✅, expired-session re-login ✅,
-   consistent loading/empty/error states ✅, and location-permission UX ✅ are now
-   done. Remaining: **Crashlytics**, the remaining **auth edge cases**, and the
-   small **post-comment delete** UI.
+   loading/empty/error states ✅, location-permission UX ✅, post-comment delete ✅,
+   and Crashlytics ✅ are now done. Remaining: the lower-priority **auth edge
+   cases** (account-exists-with-different-credential, Google cancel, network
+   loss, password-reset failures).
 2. **Phase 3 Build & release** — R8 + keep rules, release signing, a signed AAB,
    edge-to-edge / target API, and remove the `PoiRepository` debug logging. This
    is the hard gate to actually publishing.

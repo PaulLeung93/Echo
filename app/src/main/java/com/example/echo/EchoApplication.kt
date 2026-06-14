@@ -4,6 +4,7 @@ import android.app.Application
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.HiltAndroidApp
 
 /**
@@ -14,6 +15,10 @@ class EchoApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Crashlytics: report uncaught crashes in release builds only, so local
+        // dev/debug crashes don't pollute the production dashboard.
+        FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
 
         // App Check attests that requests to Firebase (Auth, Firestore, and any
         // callable Cloud Functions) come from the genuine, unmodified app — the

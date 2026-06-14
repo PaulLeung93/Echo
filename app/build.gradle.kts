@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
     id("com.google.gms.google-services")
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
@@ -86,6 +87,8 @@ dependencies {
     // Play Integrity in release; a debug provider locally (token registered in console).
     implementation(libs.firebase.appcheck.playintegrity)
     debugImplementation(libs.firebase.appcheck.debug)
+    // Crashlytics — uncaught-crash + non-fatal reporting (release only; see EchoApplication).
+    implementation(libs.firebase.crashlytics)
     implementation(libs.google.auth)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.accompanist.swiperefresh)
