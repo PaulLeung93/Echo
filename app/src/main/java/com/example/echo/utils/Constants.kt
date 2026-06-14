@@ -32,4 +32,6 @@ object Constants {
     const val ROUTE_POI_DETAILS = "poi_details"
     const val ROUTE_ALERTS = "alerts"
     const val ROUTE_COMPLETE_PROFILE = "complete_profile"
+    const val ROUTE_EDIT_PROFILE = "edit_profile"
+    const val ROUTE_SETTINGS = "settings"
 }

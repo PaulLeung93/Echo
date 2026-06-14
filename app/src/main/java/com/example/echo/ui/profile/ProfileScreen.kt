@@ -14,6 +14,8 @@ import androidx.navigation.NavHostController
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Settings
 import com.example.echo.components.AuthorAvatar
 import com.example.echo.components.EmptyState
 import com.example.echo.components.PostCard
@@ -70,6 +72,22 @@ fun ProfileScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("My Profile", color = MaterialTheme.colorScheme.onPrimary) },
+            actions = {
+                IconButton(onClick = { navController.navigate(Destinations.EDIT_PROFILE) }) {
+                    Icon(
+                        Icons.Outlined.Edit,
+                        contentDescription = "Edit profile",
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+                IconButton(onClick = { navController.navigate(Destinations.SETTINGS) }) {
+                    Icon(
+                        Icons.Outlined.Settings,
+                        contentDescription = "Settings",
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
         )
 
@@ -107,6 +125,16 @@ fun ProfileScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    profile?.bio?.takeIf { it.isNotBlank() }?.let { bio ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = bio,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
                     Spacer(Modifier.height(16.dp))
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),

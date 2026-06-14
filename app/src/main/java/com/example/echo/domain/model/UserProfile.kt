@@ -9,7 +9,8 @@ data class UserProfile(
     val username: String,
     val firstName: String,
     val lastName: String,
-    val email: String
+    val email: String,
+    val bio: String = ""
 ) {
     /** "First Last", trimmed (handles a missing last name gracefully). */
     val fullName: String get() = listOf(firstName, lastName).filter { it.isNotBlank() }.joinToString(" ")

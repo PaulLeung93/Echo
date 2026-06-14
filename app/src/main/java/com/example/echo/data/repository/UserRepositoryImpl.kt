@@ -67,6 +67,7 @@ class UserRepositoryImpl @Inject constructor(
                         "firstName" to firstName.trim(),
                         "lastName" to lastName.trim(),
                         "email" to email,
+                        "bio" to "",
                         "createdAt" to FieldValue.serverTimestamp()
                     )
                 )
@@ -108,6 +109,35 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updateProfile(
+        firstName: String,
+        lastName: String,
+        bio: String
+    ): Result<Unit> = withContext(ioDispatcher) {
+        val user = auth.currentUser
+            ?: return@withContext Result.failure(IllegalStateException("You must be signed in."))
+        try {
+            usersCollection.document(user.uid).update(
+                mapOf(
+                    "firstName" to firstName.trim(),
+                    "lastName" to lastName.trim(),
+                    "bio" to bio.trim()
+                )
+            ).await()
+            runCatching {
+                user.updateProfile(
+                    userProfileChangeRequest {
+                        displayName = listOf(firstName.trim(), lastName.trim())
+                            .filter { it.isNotBlank() }.joinToString(" ")
+                    }
+                ).await()
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override fun observeCurrentUserProfile(): Flow<UserProfile?> = callbackFlow {
         val uid = auth.currentUser?.uid
         if (uid == null) {
@@ -125,6 +155,28 @@ class UserRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }.flowOn(ioDispatcher)
 
+    override suspend fun deleteAccount(): Result<Unit> = withContext(ioDispatcher) {
+        val user = auth.currentUser
+            ?: return@withContext Result.failure(IllegalStateException("You must be signed in."))
+        try {
+            val uid = user.uid
+            // Release the username reservation and delete the profile (best-effort
+            // so a missing doc doesn't block the auth deletion).
+            val handle = runCatching {
+                usersCollection.document(uid).get().await().getString("username")
+            }.getOrNull()
+            if (!handle.isNullOrBlank()) {
+                runCatching { usernamesCollection.document(handle).delete().await() }
+            }
+            runCatching { usersCollection.document(uid).delete().await() }
+            // Delete the Firebase Auth account (may require a recent login).
+            user.delete().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     private fun UserProfileEntity.toDomain(): UserProfile? {
         if (uid.isBlank() || username.isBlank()) return null
         return UserProfile(
@@ -132,7 +184,8 @@ class UserRepositoryImpl @Inject constructor(
             username = username,
             firstName = firstName,
             lastName = lastName,
-            email = email
+            email = email,
+            bio = bio
         )
     }
 }

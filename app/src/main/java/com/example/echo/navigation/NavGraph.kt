@@ -13,7 +13,9 @@ import com.example.echo.ui.feed.FeedScreen
 import com.example.echo.ui.maps.MapScreen
 import com.example.echo.ui.poi.PoiDetailScreen
 import com.example.echo.ui.post.PostDetailScreen
+import com.example.echo.ui.profile.EditProfileScreen
 import com.example.echo.ui.profile.ProfileScreen
+import com.example.echo.ui.settings.SettingsScreen
 import com.example.echo.utils.Constants
 
 object Destinations {
@@ -28,6 +30,8 @@ object Destinations {
     const val POI_DETAILS = Constants.ROUTE_POI_DETAILS
     const val ALERTS = Constants.ROUTE_ALERTS
     const val COMPLETE_PROFILE = Constants.ROUTE_COMPLETE_PROFILE
+    const val EDIT_PROFILE = Constants.ROUTE_EDIT_PROFILE
+    const val SETTINGS = Constants.ROUTE_SETTINGS
 }
 
 @Composable
@@ -123,6 +127,16 @@ fun AppNavGraph(
                 navController = navController,
                 authViewModel = authViewModel
             )
+        }
+
+        // Edit Profile (name + bio)
+        composable(Destinations.EDIT_PROFILE) {
+            EditProfileScreen(navController = navController)
+        }
+
+        // Settings (appearance, notifications, account)
+        composable(Destinations.SETTINGS) {
+            SettingsScreen(navController = navController, authViewModel = authViewModel)
         }
     }
 }

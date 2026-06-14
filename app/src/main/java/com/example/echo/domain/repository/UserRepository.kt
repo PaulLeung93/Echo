@@ -19,6 +19,9 @@ interface UserRepository {
      */
     suspend fun createProfile(firstName: String, lastName: String, username: String): Result<UserProfile>
 
+    /** Update the current user's editable profile fields (name + bio). */
+    suspend fun updateProfile(firstName: String, lastName: String, bio: String): Result<Unit>
+
     /**
      * One-shot read of the current user's profile.
      * - `success(profile)` — the profile exists.
@@ -30,4 +33,11 @@ interface UserRepository {
 
     /** Observe the current user's profile (null when signed out or no profile yet). */
     fun observeCurrentUserProfile(): Flow<UserProfile?>
+
+    /**
+     * Permanently delete the current user: releases their username, deletes the
+     * profile doc, then deletes the Firebase Auth account. May fail with a
+     * recent-login-required error if the session is old.
+     */
+    suspend fun deleteAccount(): Result<Unit>
 }
