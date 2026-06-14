@@ -25,6 +25,7 @@ import com.example.echo.utils.Constants
 import com.example.echo.utils.distanceMeters
 import com.example.echo.utils.formatDistance
 import com.example.echo.components.PostCard
+import com.example.echo.components.PostCardSkeleton
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
@@ -123,11 +124,13 @@ fun FeedScreen(
             // --- Main Feed Content ---
             Box(modifier = Modifier.fillMaxSize()) {
                 if (uiState.isLoading && uiState.posts.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        CircularProgressIndicator()
+                        repeat(5) { PostCardSkeleton() }
                     }
                 } else if (uiState.error != null) {
                     Box(
