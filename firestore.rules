@@ -33,11 +33,19 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
 
+    // The caller's chosen handle from their profile. Used to validate that a
+    // post/comment's denormalized `username` is the author's real handle (not
+    // spoofed). Requires the user to have completed their profile (the app's
+    // completion gate guarantees this before they can post/comment).
+    function profileUsername() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username;
+    }
+
     // A comment document is well-formed and attributed to the caller.
     function isValidNewComment() {
       let d = request.resource.data;
       return d.authorId == request.auth.uid
-        && d.username == request.auth.token.email
+        && d.username == profileUsername()
         && d.message is string
         && d.message.size() > 0
         && d.message.size() <= 1000
@@ -68,7 +76,7 @@ service cloud.firestore {
 
       allow create: if isNotAnonymous()
         && request.resource.data.authorId == request.auth.uid
-        && request.resource.data.username == request.auth.token.email
+        && request.resource.data.username == profileUsername()
         && request.resource.data.id == postId
         && request.resource.data.message is string
         && request.resource.data.message.size() > 0

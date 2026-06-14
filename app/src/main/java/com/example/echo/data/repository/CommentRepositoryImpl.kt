@@ -6,6 +6,7 @@ import com.example.echo.data.withWriteTimeout
 import com.example.echo.di.IoDispatcher
 import com.example.echo.domain.model.Comment
 import com.example.echo.domain.repository.CommentRepository
+import com.example.echo.domain.repository.UserRepository
 import com.example.echo.utils.Constants
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -28,10 +29,16 @@ class CommentRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
     private val commentMapper: CommentMapper,
+    private val userRepository: UserRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : CommentRepository {
-    
-    private fun getCommentsCollection(postId: String) = 
+
+    /** The caller's chosen handle (validated by the rules), or fail if no profile. */
+    private suspend fun requireUsername(): String =
+        userRepository.getCurrentUserProfile()?.username
+            ?: throw IllegalStateException("Please finish setting up your profile before commenting.")
+
+    private fun getCommentsCollection(postId: String) =
         firestore.collection(Constants.COLLECTION_POSTS)
             .document(postId)
             .collection(Constants.COLLECTION_COMMENTS)
@@ -64,10 +71,11 @@ class CommentRepositoryImpl @Inject constructor(
             if (currentUser.isAnonymous) {
                 throw IllegalStateException("Anonymous users cannot comment")
             }
-            
+
+            val username = requireUsername()
             val commentMap = commentMapper.toFirestoreMap(
                 authorId = currentUser.uid,
-                username = currentUser.email ?: "anonymous",
+                username = username,
                 message = message
             )
 
@@ -82,7 +90,7 @@ class CommentRepositoryImpl @Inject constructor(
             Comment(
                 id = docRef.id,
                 authorId = currentUser.uid,
-                username = currentUser.email ?: "anonymous",
+                username = username,
                 message = message,
                 timestamp = System.currentTimeMillis()
             )
@@ -133,10 +141,11 @@ class CommentRepositoryImpl @Inject constructor(
             if (currentUser.isAnonymous) {
                 throw IllegalStateException("Anonymous users cannot comment")
             }
-            
+
+            val username = requireUsername()
             val commentMap = commentMapper.toFirestoreMap(
                 authorId = currentUser.uid,
-                username = currentUser.email ?: "anonymous",
+                username = username,
                 message = message
             )
 
@@ -151,7 +160,7 @@ class CommentRepositoryImpl @Inject constructor(
             Comment(
                 id = docRef.id,
                 authorId = currentUser.uid,
-                username = currentUser.email ?: "anonymous",
+                username = username,
                 message = message,
                 timestamp = System.currentTimeMillis()
             )

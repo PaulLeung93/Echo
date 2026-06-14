@@ -6,6 +6,7 @@ import com.example.echo.data.withWriteTimeout
 import com.example.echo.di.IoDispatcher
 import com.example.echo.domain.model.Post
 import com.example.echo.domain.repository.PostRepository
+import com.example.echo.domain.repository.UserRepository
 import com.example.echo.utils.Constants
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -28,6 +29,7 @@ class PostRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
     private val postMapper: PostMapper,
+    private val userRepository: UserRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : PostRepository {
     
@@ -155,11 +157,18 @@ class PostRepositoryImpl @Inject constructor(
             if (currentUser.isAnonymous) {
                 return@withContext Result.failure(IllegalStateException("Anonymous users cannot create posts"))
             }
-            
+
+            // Posts are attributed to the user's chosen handle, validated against
+            // their profile by the security rules.
+            val username = userRepository.getCurrentUserProfile()?.username
+                ?: return@withContext Result.failure(
+                    IllegalStateException("Please finish setting up your profile before posting.")
+                )
+
             val newDocRef = postsCollection.document()
             val postMap = postMapper.toFirestoreMap(
                 authorId = currentUser.uid,
-                username = currentUser.email ?: "anonymous",
+                username = username,
                 message = message,
                 latitude = latitude,
                 longitude = longitude,
