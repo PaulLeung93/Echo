@@ -60,7 +60,11 @@ fun ProfileScreen(
         viewModel.uiEvent.collect { message -> snackbarHostState.showSnackbar(message) }
     }
 
-    val displayName = userEmail.substringBefore("@")
+    // Prefer the real profile (name + @handle); fall back to the email prefix
+    // for pre-profile accounts or while it loads.
+    val profile = uiState.userProfile
+    val displayName = profile?.fullName?.takeIf { it.isNotBlank() } ?: userEmail.substringBefore("@")
+    val handle = profile?.username ?: userEmail.substringBefore("@")
 
     Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -99,7 +103,7 @@ fun ProfileScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "@$displayName",
+                        text = "@$handle",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

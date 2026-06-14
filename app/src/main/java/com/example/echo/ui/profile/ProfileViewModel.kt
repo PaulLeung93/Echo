@@ -4,9 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.echo.domain.usecase.auth.GetCurrentUserUseCase
 import com.example.echo.domain.usecase.post.DeletePostUseCase
-import com.example.echo.domain.usecase.post.GetPostsByUsernameUseCase
+import com.example.echo.domain.usecase.post.GetPostsByAuthorIdUseCase
 import com.example.echo.domain.usecase.post.ToggleLikeUseCase
 import com.example.echo.domain.usecase.post.UpdatePostUseCase
+import com.example.echo.domain.usecase.user.ObserveCurrentUserProfileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -15,21 +16,26 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val getPostsByUsernameUseCase: GetPostsByUsernameUseCase,
+    private val getPostsByAuthorIdUseCase: GetPostsByAuthorIdUseCase,
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val observeCurrentUserProfileUseCase: ObserveCurrentUserProfileUseCase,
     private val deletePostUseCase: DeletePostUseCase,
     private val updatePostUseCase: UpdatePostUseCase,
     private val toggleLikeUseCase: ToggleLikeUseCase
 ) : ViewModel() {
 
     private val user = getCurrentUserUseCase()
-    
-    val uiState: StateFlow<ProfileUiState> = if (user?.email != null) {
-        getPostsByUsernameUseCase(user.email).map { posts ->
+
+    val uiState: StateFlow<ProfileUiState> = if (user != null) {
+        combine(
+            getPostsByAuthorIdUseCase(user.id),
+            observeCurrentUserProfileUseCase()
+        ) { posts, profile ->
             ProfileUiState(
                 userPosts = posts,
                 totalLikes = posts.sumOf { it.likeCount },
                 totalComments = posts.sumOf { it.commentCount },
+                userProfile = profile,
                 isLoading = false
             )
         }.catch { e ->

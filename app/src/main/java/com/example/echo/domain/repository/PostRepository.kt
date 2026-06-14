@@ -30,7 +30,13 @@ interface PostRepository {
      * @param username The user's username (email).
      */
     fun getPostsByUsername(username: String): Flow<List<Post>>
-    
+
+    /**
+     * Get all posts authored by a user, keyed on the stable [authorId] (uid) so
+     * it covers both legacy (email-username) and new (handle-username) posts.
+     */
+    fun getPostsByAuthorId(authorId: String): Flow<List<Post>>
+
     /**
      * Get a single post by ID.
      * @param postId The ID of the post.

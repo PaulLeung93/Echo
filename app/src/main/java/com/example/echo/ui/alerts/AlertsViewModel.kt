@@ -3,7 +3,7 @@ package com.example.echo.ui.alerts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.echo.domain.usecase.auth.GetCurrentUserUseCase
-import com.example.echo.domain.usecase.post.GetPostsByUsernameUseCase
+import com.example.echo.domain.usecase.post.GetPostsByAuthorIdUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -38,13 +38,13 @@ data class AlertsUiState(
 @HiltViewModel
 class AlertsViewModel @Inject constructor(
     getCurrentUserUseCase: GetCurrentUserUseCase,
-    getPostsByUsernameUseCase: GetPostsByUsernameUseCase
+    getPostsByAuthorIdUseCase: GetPostsByAuthorIdUseCase
 ) : ViewModel() {
 
     private val user = getCurrentUserUseCase()
 
-    val uiState: StateFlow<AlertsUiState> = if (user?.email != null) {
-        getPostsByUsernameUseCase(user.email)
+    val uiState: StateFlow<AlertsUiState> = if (user != null) {
+        getPostsByAuthorIdUseCase(user.id)
             .map { posts ->
                 val alerts = posts
                     .filter { it.likeCount > 0 || it.commentCount > 0 }

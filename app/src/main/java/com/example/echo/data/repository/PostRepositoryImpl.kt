@@ -120,7 +120,26 @@ class PostRepositoryImpl @Inject constructor(
         
         awaitClose { listener.remove() }
     }.flowOn(ioDispatcher)
-    
+
+    override fun getPostsByAuthorId(authorId: String): Flow<List<Post>> = callbackFlow {
+        val listener = postsCollection
+            .whereEqualTo("authorId", authorId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val entities = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(PostEntity::class.java)
+                } ?: emptyList()
+                val currentUserId = auth.currentUser?.uid
+                val posts = postMapper.toDomainList(entities, currentUserId)
+                    .sortedByDescending { it.timestamp }
+                trySend(posts)
+            }
+        awaitClose { listener.remove() }
+    }.flowOn(ioDispatcher)
+
     override suspend fun getPostById(postId: String): Post? = withContext(ioDispatcher) {
         val doc = postsCollection.document(postId).get().await()
         val entity = doc.toObject(PostEntity::class.java) ?: return@withContext null
