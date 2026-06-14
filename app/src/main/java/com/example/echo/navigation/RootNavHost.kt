@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import com.example.echo.ui.auth.AuthViewModel
 import com.example.echo.ui.splash.SplashScreen
@@ -38,6 +39,26 @@ fun RootNavHost(
     LaunchedEffect(resolvedStart) {
         if (initialStart == null && resolvedStart != null) {
             initialStart = resolvedStart
+        }
+    }
+
+    // Reactively route to Sign In whenever the session ends at runtime (sign-out
+    // from any screen, or an expired/revoked session) — the NavHost's start
+    // destination only applies on first composition, so this handles the rest.
+    val signedOut = user == null
+    LaunchedEffect(signedOut) {
+        if (signedOut && initialStart != null) {
+            val current = navController.currentDestination?.route
+            val onAuthScreen = current == null ||
+                current.startsWith(Destinations.SIGN_IN) ||
+                current == Destinations.SIGN_UP ||
+                current == Destinations.FORGOT_PASSWORD
+            if (!onAuthScreen) {
+                navController.navigate(Destinations.SIGN_IN) {
+                    popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
         }
     }
 
