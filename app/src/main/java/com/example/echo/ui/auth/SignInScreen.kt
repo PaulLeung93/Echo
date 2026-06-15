@@ -2,6 +2,12 @@ package com.example.echo.ui.auth
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -18,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
@@ -109,13 +116,19 @@ fun SignInScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Brand mark
-            Image(
-                painter = painterResource(R.drawable.echo_logo),
-                contentDescription = null,
-                modifier = Modifier.size(84.dp)
-            )
-            Spacer(Modifier.height(12.dp))
+            // Brand mark with animated "echo" ripple rings emanating from it.
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(150.dp)
+            ) {
+                EchoRipples(Modifier.fillMaxSize())
+                Image(
+                    painter = painterResource(R.drawable.echo_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(84.dp)
+                )
+            }
+            Spacer(Modifier.height(4.dp))
             Text("Echo", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(4.dp))
             Text(
@@ -227,5 +240,31 @@ fun SignInScreen(
             )
         }
         TopSnackbarHost(snackbarHostState = snackbarHostState)
+    }
+}
+
+/** Continuously expanding "echo" rings, sized to fill the box behind the logo. */
+@Composable
+private fun EchoRipples(modifier: Modifier) {
+    val transition = rememberInfiniteTransition(label = "ripple")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(3500, easing = LinearEasing)),
+        label = "phase"
+    )
+    val color = MaterialTheme.colorScheme.primaryContainer
+    Canvas(modifier) {
+        val maxRadius = size.minDimension / 2f
+        val minRadius = maxRadius * 0.5f
+        repeat(3) { i ->
+            val p = (phase + i / 3f) % 1f
+            drawCircle(
+                color = color,
+                radius = minRadius + (maxRadius - minRadius) * p,
+                alpha = (1f - p) * 0.5f,
+                style = Stroke(width = 2.dp.toPx())
+            )
+        }
     }
 }

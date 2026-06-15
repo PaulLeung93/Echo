@@ -13,6 +13,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.echo.data.preferences.UserPreferencesRepository
@@ -77,7 +78,7 @@ class MainActivity : ComponentActivity() {
                         RootNavHost(
                             navController = navController,
                             authViewModel = authViewModel,
-                            webClientId = "YOUR_WEB_CLIENT_ID" // Should be in strings/BuildConfig
+                            webClientId = stringResource(R.string.default_web_client_id)
                         )
                     }
                 }

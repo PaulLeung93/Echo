@@ -448,15 +448,19 @@ Deferred until shipped; captured so they aren't lost.
       the Auth user alive (re-auth path, partial failure), it recreates this trap.
       Confirm deletion is atomic/ordered so the Auth user goes last, and consider
       a guard in routing for the profileless-session case.
-- [ ] **Google account deletion + Google Sign-In config.** Google Sign-In isn't
-      actually wired up: `webClientId` is a hardcoded `"YOUR_WEB_CLIENT_ID"`
-      placeholder and there's no `default_web_client_id` (the `google-services.json`
-      has no web/type-3 OAuth client). So "Continue with Google" can't return a
-      valid ID token, and account deletion for a Google-linked account can't
-      re-authenticate (it shows a "not available yet" message). Fix: add a Web
-      OAuth client in the Firebase Console, re-download `google-services.json`, and
-      read the client id from `R.string.default_web_client_id`. **Needed before
-      Play Store** (Google requires a working account-deletion path).
+- [ ] **Google account deletion + Google Sign-In config.**
+      **Debug sign-in now wired up (2026-06-15):** debug SHA-1 registered in
+      Firebase, `google-services.json` re-downloaded (now has a type-3 web OAuth
+      client), and `MainActivity` reads the id from `R.string.default_web_client_id`
+      instead of the old `"YOUR_WEB_CLIENT_ID"` placeholder. "Continue with Google"
+      should work in debug builds. **Tabled for later (before Play Store):**
+      - Add the **Play App Signing SHA-1** (Play Console → Setup → App signing) to
+        Firebase, or Google Sign-In breaks for published builds.
+      - Verify the **Google account-deletion re-auth path** now that sign-in works
+        (it previously showed a "not available yet" message). Google requires a
+        working account-deletion path before Play Store.
+      - Add the upload-key SHA-256 to Firebase (good hygiene; needed for Credential
+        Manager / App Check Play Integrity if adopted later).
 
 ### Technical
 - [ ] Offline cache / Room layer for feed resilience.
