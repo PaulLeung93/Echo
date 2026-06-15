@@ -13,13 +13,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.echo.ui.theme.Coral
-import com.example.echo.ui.theme.CoralPressed
+import com.example.echo.ui.theme.CoralDim
+import com.example.echo.ui.theme.CoralOrange
 import com.example.echo.ui.theme.SunnyDeep
-import com.example.echo.ui.theme.Teal
+import com.example.echo.ui.theme.TealContainer
 import com.example.echo.ui.theme.TealDeep
 
-private val AvatarColors = listOf(Coral, Teal, TealDeep, SunnyDeep, CoralPressed)
+private val AvatarColors = listOf(CoralOrange, TealContainer, TealDeep, SunnyDeep, CoralDim)
 
 /**
  * A circular avatar showing the first letter of [name] on a deterministic warm

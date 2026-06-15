@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import com.example.echo.domain.model.Post
 import com.example.echo.ui.theme.EchoTheme
+import com.example.echo.ui.theme.WarmAmberBadge
+import com.example.echo.ui.theme.OnWarmAmberBadge
 import com.example.echo.utils.formatTimestamp
 import androidx.compose.ui.tooling.preview.Preview
 
@@ -97,8 +99,8 @@ fun PostCard(
                         Spacer(Modifier.height(2.dp))
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            color = WarmAmberBadge,
+                            contentColor = OnWarmAmberBadge
                         ) {
                             Text(
                                 text = "$distanceLabel · ${formatTimestamp(post.timestamp)}",
