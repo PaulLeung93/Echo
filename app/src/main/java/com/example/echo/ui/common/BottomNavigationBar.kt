@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -186,7 +187,12 @@ private fun CreateFab(enabled: Boolean, onClick: () -> Unit, modifier: Modifier 
     val color = if (enabled) {
         MaterialTheme.colorScheme.primary
     } else {
+        // Disabled (guest) tint. Must stay OPAQUE: a translucent fill here let the
+        // elevation shadow's octagonal tessellation show through the circle — the
+        // "two overlapping shapes" artifact. compositeOver flattens the 45% coral
+        // onto the surface so it looks identically faded but casts a clean circle.
         MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+            .compositeOver(MaterialTheme.colorScheme.surface)
     }
     Box(
         modifier = modifier
