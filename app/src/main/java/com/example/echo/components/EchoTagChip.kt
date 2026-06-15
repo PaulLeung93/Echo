@@ -9,10 +9,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.echo.ui.theme.OnWarmTerracottaChip
+import com.example.echo.ui.theme.WarmTerracottaChip
 
 /**
- * A soft, pill-shaped tag chip (e.g. "#coffee"). Tinted with the secondary
- * (teal) container by default; tap to filter by the tag.
+ *  Tinted with warm terracotta; tap to filter by the tag.
  */
 @Composable
 fun EchoTagChip(
@@ -23,8 +24,8 @@ fun EchoTagChip(
     val label = if (tag.startsWith("#")) tag else "#$tag"
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        color = WarmTerracottaChip,
+        contentColor = OnWarmTerracottaChip,
         modifier = if (onClick != null) modifier.clickable { onClick() } else modifier
     ) {
         Text(

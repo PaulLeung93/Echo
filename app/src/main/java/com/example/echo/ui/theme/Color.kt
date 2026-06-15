@@ -27,13 +27,21 @@ val OnCoral         = Color(0xFFFFF7F6) // on-primary
 val OnCoralContainer = Color(0xFF400700) // on-primary-container
 val InversePrimary  = Color(0xFFFE6E4C) // inverse-primary
 
-// --- Secondary (teal) ---
-val TealDeep        = Color(0xFF006B61) // M3 secondary
+// --- Secondary (sage green — replaces teal as M3 secondary role) ---
+val SageDeep        = Color(0xFF2D5A35) // M3 secondary (dark sage)
+val SageDim         = Color(0xFF224529)
+val SageContainer   = Color(0xFFD6E8D0) // M3 secondary-container (pale sage, same as chip)
+val SageContainerDim = Color(0xFFC2DAB9)
+val OnSage          = Color(0xFFFFFFFF) // on-secondary
+val OnSageContainer = Color(0xFF1E4A1A) // on-secondary-container
+
+// --- Teal (retained as brand tokens; no longer mapped to any M3 role) ---
+val TealDeep        = Color(0xFF006B61)
 val TealDim         = Color(0xFF005E55)
-val TealContainer   = Color(0xFF75F7E6) // M3 secondary-container (distance-badge bg)
+val TealContainer   = Color(0xFF75F7E6)
 val TealContainerDim = Color(0xFF66E9D8)
-val OnTeal          = Color(0xFFE2FFF9) // on-secondary
-val OnTealContainer = Color(0xFF005C53) // on-secondary-container
+val OnTeal          = Color(0xFFE2FFF9)
+val OnTealContainer = Color(0xFF005C53)
 
 // --- Tertiary (sunny yellow / amber) ---
 val SunnyDeep       = Color(0xFF7D5800) // M3 tertiary
@@ -66,6 +74,10 @@ val SurfaceContainerHighest = Color(0xFFF6DFC4)
 // --- Distance badge — warm amber (user-chosen alternative to teal) ---
 val WarmAmberBadge   = Color(0xFFFFE0A0) // badge background
 val OnWarmAmberBadge = Color(0xFF6B4400) // badge text
+
+// --- Tag chips — warm terracotta (rustic, organic neighborhood feel) ---
+val WarmTerracottaChip   = Color(0xFFF5D5C2) // chip background
+val OnWarmTerracottaChip = Color(0xFF6B2400) // chip text
 
 // --- Error — aligned to Stitch (#a8364b / #f97386 / #6e0523) ---
 val EchoError          = Color(0xFFA8364B)

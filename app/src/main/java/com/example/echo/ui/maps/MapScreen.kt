@@ -73,8 +73,6 @@ fun MapScreen(
     val uiState by mapViewModel.uiState.collectAsState()
 
     // Captured for use inside the GoogleMap content lambda (no MaterialTheme there).
-    val radiusStroke = MaterialTheme.colorScheme.primary
-    val radiusFill = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
     val rippleColor = MaterialTheme.colorScheme.primary
 
     // Pulsing "echo" ripple around the user's location (2s loop, fades out).
@@ -85,6 +83,7 @@ fun MapScreen(
         animationSpec = infiniteRepeatable(tween(durationMillis = 2000, easing = LinearEasing)),
         label = "ripple"
     )
+
 
     // Get last known location on launch
     LaunchedEffect(Unit) {
@@ -138,18 +137,8 @@ fun MapScreen(
                 ),
                 onMapClick = { mapViewModel.clearSelectedPost() }
             ) {
-                // The user's 5km interaction radius (where they can comment).
+                // Pulsing coral ripple at the user's location (expands + fades).
                 userLocation?.let { loc ->
-                    Circle(
-                        center = loc,
-                        radius = Constants.PROXIMITY_RADIUS_METERS,
-                        strokeColor = radiusStroke,
-                        strokeWidth = 3f,
-                        fillColor = radiusFill
-                    )
-                    // Pulsing coral ripple at the user's location (expands + fades).
-                    // Sized to read at neighbourhood zoom (meters don't scale with
-                    // zoom, so this is a deliberate visible radius, not the 5km gate).
                     Circle(
                         center = loc,
                         radius = 60.0 + 440.0 * ripple,
