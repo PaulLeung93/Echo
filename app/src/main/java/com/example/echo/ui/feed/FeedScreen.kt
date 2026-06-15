@@ -66,7 +66,7 @@ fun FeedScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // --- Top App Bar ---
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = {
                     if (uiState.currentTag != null) {
                         // Show filtered tag in top bar with option to clear
@@ -89,7 +89,38 @@ fun FeedScreen(
                             }
                         }
                     } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (!neighborhoodName.isNullOrBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(percent = 50),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.LocationOn,
+                                        contentDescription = stringResource(R.string.location_chip_desc),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = neighborhoodName!!,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                navigationIcon = {
+                    if (uiState.currentTag == null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 12.dp)
+                        ) {
                             Icon(
                                 painter = painterResource(R.drawable.echo_logo),
                                 contentDescription = null,
@@ -102,31 +133,6 @@ fun FeedScreen(
                                 style = MaterialTheme.typography.titleLarge,
                                 color = MaterialTheme.colorScheme.onPrimary
                             )
-                            if (!neighborhoodName.isNullOrBlank()) {
-                                Spacer(Modifier.width(8.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(percent = 50),
-                                    color = MaterialTheme.colorScheme.surfaceVariant
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.LocationOn,
-                                            contentDescription = stringResource(R.string.location_chip_desc),
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(
-                                            text = neighborhoodName!!,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-                            }
                         }
                     }
                 },
@@ -150,7 +156,9 @@ fun FeedScreen(
                         Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
             )
 
             // --- Main Feed Content ---
