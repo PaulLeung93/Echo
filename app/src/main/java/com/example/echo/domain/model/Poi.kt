@@ -11,5 +11,7 @@ data class Poi(
     val latitude: Double,
     val longitude: Double,
     val description: String,
-    val commentCount: Int = 0
+    val commentCount: Int = 0,
+    /** Optional curated photo URL for this place; null falls back to a type icon. */
+    val imageUrl: String? = null
 )

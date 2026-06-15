@@ -1,24 +1,52 @@
 package com.example.echo.ui.poi
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.NearMe
+import androidx.compose.material.icons.outlined.Park
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.echo.R
 import com.example.echo.components.CommentCard
+import com.example.echo.domain.model.Poi
 import com.example.echo.utils.Constants
+import com.example.echo.utils.formatDistance
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,90 +86,81 @@ fun PoiDetailScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(stringResource(R.string.poi_details_title), color = MaterialTheme.colorScheme.onPrimary)
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
+            PlaceDetailTopBar(onBack = { navController.popBackStack() })
+        },
+        bottomBar = {
+            if (uiState.poi != null) {
+                CommentComposer(
+                    canComment = uiState.canComment,
+                    gateMessage = commentGateMessage(uiState, proximityKm),
+                    value = newComment,
+                    onValueChange = { newComment = it },
+                    onSend = {
+                        val now = System.currentTimeMillis()
+                        val recent = commentTimestamps.filter { now - it < windowMs }
+                        if (recent.size >= maxComments) {
+                            scope.launch { snackbarHostState.showSnackbar(rateLimitedMessage) }
+                        } else if (newComment.isNotBlank()) {
+                            commentTimestamps.add(now)
+                            viewModel.addComment(newComment) {
+                                newComment = ""
+                                commentJustAdded = true
+                            }
+                        }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
-            )
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp)
-                .padding(top = paddingValues.calculateTopPadding())
+                .padding(paddingValues)
         ) {
             when {
                 uiState.isLoading && uiState.poi == null -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
 
                 uiState.error != null -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = uiState.error ?: stringResource(R.string.unknown_error),
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    Text(
+                        text = uiState.error ?: stringResource(R.string.unknown_error),
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(32.dp)
+                    )
                 }
 
                 uiState.poi != null -> {
                     val poi = uiState.poi!!
                     LazyColumn(
                         state = listState,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 16.dp)
                     ) {
                         item {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 16.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                Spacer(Modifier.height(8.dp))
+                                HeroImage(poi)
+                                Spacer(Modifier.height(20.dp))
+                                TitleRow(poi)
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    text = poi.description,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text(
-                                        text = poi.name,
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    SuggestionChip(
-                                        onClick = { },
-                                        label = { Text(poi.type.replaceFirstChar { it.uppercase() }) }
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = poi.description,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                                Spacer(Modifier.height(20.dp))
+                                ProximityBanner(uiState)
+                                Spacer(Modifier.height(28.dp))
+                                EchoesHeader(count = uiState.comments.size)
+                                Spacer(Modifier.height(16.dp))
                             }
-
-                            Text(
-                                text = stringResource(R.string.comments_header),
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
                         }
 
                         if (uiState.comments.isEmpty()) {
@@ -149,9 +168,11 @@ fun PoiDetailScreen(
                                 Text(
                                     text = stringResource(R.string.no_comments_yet),
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 24.dp)
                                 )
                             }
                         } else {
@@ -161,36 +182,350 @@ fun PoiDetailScreen(
                                     comment.authorId == uiState.currentUserId
                                 CommentCard(
                                     comment = comment,
+                                    isAuthor = isOwnComment,
                                     onDelete = if (isOwnComment) {
                                         { viewModel.deleteComment(comment.id) }
-                                    } else null
+                                    } else null,
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(Modifier.height(12.dp))
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
 
-                    Spacer(modifier = Modifier.height(8.dp))
+@Composable
+private fun PlaceDetailTopBar(onBack: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CircleIconButton(
+            icon = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = stringResource(R.string.back),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            onClick = onBack
+        )
+        CircleIconButton(
+            icon = Icons.Filled.Share,
+            contentDescription = stringResource(R.string.share_place),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            bordered = true,
+            onClick = { /* Share wiring is a separate task. */ }
+        )
+    }
+}
 
-                    CommentComposer(
-                        canComment = uiState.canComment,
-                        gateMessage = commentGateMessage(uiState, proximityKm),
-                        value = newComment,
-                        onValueChange = { newComment = it },
-                        onSend = {
-                            val now = System.currentTimeMillis()
-                            val recent = commentTimestamps.filter { now - it < windowMs }
-                            if (recent.size >= maxComments) {
-                                scope.launch { snackbarHostState.showSnackbar(rateLimitedMessage) }
-                            } else if (newComment.isNotBlank()) {
-                                commentTimestamps.add(now)
-                                viewModel.addComment(newComment) {
-                                    newComment = ""
-                                    commentJustAdded = true
-                                }
-                            }
-                        }
-                    )
+@Composable
+private fun CircleIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    containerColor: androidx.compose.ui.graphics.Color,
+    bordered: Boolean = false,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = CircleShape,
+        color = containerColor,
+        shadowElevation = 1.dp,
+        border = if (bordered) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        } else null,
+        modifier = Modifier
+            .size(40.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeroImage(poi: Poi) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        contentAlignment = Alignment.Center
+    ) {
+        if (!poi.imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(poi.imageUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = stringResource(R.string.poi_photo_desc, poi.name),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            // Type-based fallback (safety net) when a POI has no curated photo.
+            Icon(
+                imageVector = typeIcon(poi.type),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                modifier = Modifier.size(72.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TitleRow(poi: Poi) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = poi.name,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(Modifier.width(12.dp))
+        TypeChip(poi.type)
+    }
+}
+
+@Composable
+private fun TypeChip(type: String) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.padding(top = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = typeIcon(type),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = type.uppercase(),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProximityBanner(uiState: PoiDetailUiState) {
+    val (message, inRange) = proximityMessage(uiState)
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        shadowElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            ProximityRipple(active = inRange)
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+/** The "echo" signature motif: a pulsing ring behind a near-me badge. */
+@Composable
+private fun ProximityRipple(active: Boolean) {
+    val tint = if (active) {
+        MaterialTheme.colorScheme.secondary
+    } else {
+        MaterialTheme.colorScheme.outline
+    }
+    Box(
+        modifier = Modifier.size(40.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (active) {
+            val transition = rememberInfiniteTransition(label = "proximityRipple")
+            val scale by transition.animateFloat(
+                initialValue = 0.6f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    tween(1800, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "scale"
+            )
+            val alpha by transition.animateFloat(
+                initialValue = 0.45f,
+                targetValue = 0f,
+                animationSpec = infiniteRepeatable(
+                    tween(1800, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "alpha"
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .scale(scale)
+                    .clip(CircleShape)
+                    .background(tint.copy(alpha = alpha))
+            )
+        }
+        Surface(
+            shape = CircleShape,
+            color = tint,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.NearMe,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EchoesHeader(count: Int) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Forum,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = stringResource(R.string.echoes_header),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CommentComposer(
+    canComment: Boolean,
+    gateMessage: String?,
+    value: String,
+    onValueChange: (String) -> Unit,
+    onSend: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                // The parent (MainActivity Scaffold) already pads for the navigation
+                // bar, so only handle the keyboard here — excluding the nav-bar inset
+                // it overlaps — to avoid double-padding the bottom.
+                .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars))
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp)
+        ) {
+            if (gateMessage != null) {
+                Text(
+                    text = gateMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    placeholder = { Text(stringResource(R.string.write_comment_hint)) },
+                    enabled = canComment,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                    ),
+                    maxLines = 4,
+                    modifier = Modifier.weight(1f)
+                )
+                val sendEnabled = canComment && value.isNotBlank()
+                Surface(
+                    shape = CircleShape,
+                    color = if (sendEnabled) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                    },
+                    shadowElevation = if (sendEnabled) 3.dp else 0.dp,
+                    modifier = Modifier
+                        .height(48.dp)
+                        .clickable(enabled = sendEnabled, onClick = onSend)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.send),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }
@@ -207,46 +542,21 @@ private fun commentGateMessage(uiState: PoiDetailUiState, proximityKm: Int): Str
     else -> stringResource(R.string.comment_out_of_range, proximityKm)
 }
 
+/** The proximity-banner message and whether the user is in range (drives the accent). */
 @Composable
-private fun CommentComposer(
-    canComment: Boolean,
-    gateMessage: String?,
-    value: String,
-    onValueChange: (String) -> Unit,
-    onSend: () -> Unit
-) {
-    Column(modifier = Modifier.padding(bottom = 16.dp, top = 8.dp)) {
-        if (gateMessage != null) {
-            Text(
-                text = gateMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            )
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            OutlinedTextField(
-                value = value,
-                onValueChange = onValueChange,
-                placeholder = { Text(stringResource(R.string.write_comment_hint)) },
-                enabled = canComment,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(
-                onClick = onSend,
-                enabled = canComment && value.isNotBlank(),
-                shape = RoundedCornerShape(percent = 50)
-            ) {
-                Text(stringResource(R.string.send))
-            }
-        }
-    }
+private fun proximityMessage(uiState: PoiDetailUiState): Pair<String, Boolean> = when {
+    uiState.isGuest -> stringResource(R.string.proximity_guest) to false
+    !uiState.locationChecked -> stringResource(R.string.proximity_locating) to false
+    uiState.distanceMeters == null -> stringResource(R.string.proximity_location_unknown) to false
+    uiState.withinRange ->
+        stringResource(R.string.proximity_in_range, formatDistance(uiState.distanceMeters!!)) to true
+    else ->
+        stringResource(R.string.proximity_out_of_range, formatDistance(uiState.distanceMeters!!)) to false
+}
+
+private fun typeIcon(type: String): ImageVector = when (type.lowercase()) {
+    "park" -> Icons.Outlined.Park
+    "college" -> Icons.Outlined.School
+    "landmark" -> Icons.Outlined.AccountBalance
+    else -> Icons.Outlined.Place
 }

@@ -17,4 +17,14 @@
     <string name="comment_location_unknown">Enable location to comment here.</string>
     <string name="comment_out_of_range">You must be within %1$d km of this place to comment.</string>
     <string name="location_chip_desc">Current neighborhood location</string>
+
+    <!-- Place detail redesign -->
+    <string name="echoes_header">Echoes</string>
+    <string name="share_place">Share place</string>
+    <string name="proximity_in_range">You\'re %1$s — close enough to post here.</string>
+    <string name="proximity_out_of_range">You\'re %1$s — get closer to join the conversation.</string>
+    <string name="proximity_locating">Finding your location…</string>
+    <string name="proximity_location_unknown">Location unavailable — enable it to post here.</string>
+    <string name="proximity_guest">Sign in to join the conversation here.</string>
+    <string name="poi_photo_desc">Photo of %1$s</string>
 </resources>

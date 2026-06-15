@@ -152,6 +152,9 @@ dependencies {
     // Serialization (for type-safe navigation)
     implementation(libs.kotlinx.serialization.json)
 
+    // Image loading (remote POI photos)
+    implementation(libs.coil.compose)
+
     // Testing
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)

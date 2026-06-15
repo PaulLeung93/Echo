@@ -465,6 +465,11 @@ Deferred until shipped; captured so they aren't lost.
 ### Technical
 - [ ] Offline cache / Room layer for feed resilience.
 - [ ] Search/filter persistence across sessions.
+- [ ] **Backfill POI photos (2026-06-15).** POI detail now shows a curated `imageUrl`
+      with a type-icon fallback when absent. Add an `imageUrl` per POI in the seeding
+      script `C:\Users\Paul\OneDrive\Desktop\Echo\seed_pois.py` (prefer free Wikimedia
+      Commons URLs — no hosting, clear licensing) and re-run it. Until then every POI
+      shows the type-icon fallback. Also wire up the Share button on the detail screen.
 - [ ] **Map performance & Firestore cost audit (2026-06-15).** Found during a map
       sanity check. The marker-tap jank (ripple animation recomposing every marker
       ~60fps) is **fixed**; these remain:

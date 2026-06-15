@@ -24,10 +24,11 @@ class PoiMapper @Inject constructor() {
             latitude = entity.location.latitude,
             longitude = entity.location.longitude,
             description = entity.description,
-            commentCount = entity.commentCount
+            commentCount = entity.commentCount,
+            imageUrl = entity.imageUrl.ifBlank { null }
         )
     }
-    
+
     /**
      * Convert a list of PoiEntities to domain Pois.
      * @param entities The list of Firestore entities.
@@ -49,7 +50,8 @@ class PoiMapper @Inject constructor() {
             type = poi.type,
             location = GeoPoint(poi.latitude, poi.longitude),
             description = poi.description,
-            commentCount = poi.commentCount
+            commentCount = poi.commentCount,
+            imageUrl = poi.imageUrl ?: ""
         )
     }
 }

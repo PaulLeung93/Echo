@@ -28,6 +28,7 @@ coroutines = "1.8.1"
 mockk = "1.13.12"
 turbine = "1.1.0"
 kotlinxSerializationJson = "1.7.1"
+coil = "2.7.0"
 
 [libraries]
 accompanist-swiperefresh = { module = "com.google.accompanist:accompanist-swiperefresh", version.ref = "accompanistSwiperefresh" }
@@ -78,6 +79,9 @@ turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine
 
 # Serialization (for type-safe navigation)
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+
+# Image loading (remote POI photos, with disk/memory caching)
+coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
