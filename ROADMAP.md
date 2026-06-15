@@ -465,11 +465,17 @@ Deferred until shipped; captured so they aren't lost.
 ### Technical
 - [ ] Offline cache / Room layer for feed resilience.
 - [ ] Search/filter persistence across sessions.
-- [ ] **Backfill POI photos (2026-06-15).** POI detail now shows a curated `imageUrl`
-      with a type-icon fallback when absent. Add an `imageUrl` per POI in the seeding
-      script `C:\Users\Paul\OneDrive\Desktop\Echo\seed_pois.py` (prefer free Wikimedia
-      Commons URLs — no hosting, clear licensing) and re-run it. Until then every POI
-      shows the type-icon fallback. Also wire up the Share button on the detail screen.
+- [x] **Backfill POI photos (2026-06-15).** POI detail shows a curated `imageUrl`
+      with a type-icon fallback when absent. The seeding script
+      (`C:\Users\Paul\OneDrive\Desktop\Echo\seed_pois.py`) now resolves a free
+      Wikimedia photo per POI at seed time via the MediaWiki `pageimages` API
+      (stable 800px `upload.wikimedia.org` thumbnails, follows redirects), with
+      hand-picked free **Commons** photos pinned for the 5 places whose lead image
+      is a non-free logo (Barnard, Fordham, Juilliard, Pratt, Chrysler). Re-ran it:
+      **all 38 POIs uploaded with photos, 0 fallback** (verified `imageUrl` persisted
+      in Firestore). The **Share button** on the detail screen is now wired to an
+      `ACTION_SEND` chooser (shares the place name + description), enabled once the
+      POI loads.
 - [ ] **Map performance & Firestore cost audit (2026-06-15).** Found during a map
       sanity check. The marker-tap jank (ripple animation recomposing every marker
       ~60fps) is **fixed**; these remain:

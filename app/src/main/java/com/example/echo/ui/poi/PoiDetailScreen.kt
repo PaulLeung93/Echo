@@ -1,5 +1,6 @@
 package com.example.echo.ui.poi
 
+import android.content.Intent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -59,6 +60,7 @@ fun PoiDetailScreen(
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var newComment by remember { mutableStateOf("") }
     var commentJustAdded by remember { mutableStateOf(false) }
@@ -88,7 +90,28 @@ fun PoiDetailScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            PlaceDetailTopBar(onBack = { navController.popBackStack() })
+            PlaceDetailTopBar(
+                onBack = { navController.popBackStack() },
+                // Enabled only once the POI has loaded.
+                onShare = uiState.poi?.let { poi ->
+                    {
+                        val shareText = context.getString(
+                            R.string.share_place_text, poi.name, poi.description
+                        )
+                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, poi.name)
+                            putExtra(Intent.EXTRA_TEXT, shareText)
+                        }
+                        context.startActivity(
+                            Intent.createChooser(
+                                sendIntent,
+                                context.getString(R.string.share_place)
+                            )
+                        )
+                    }
+                }
+            )
         },
         bottomBar = {
             if (uiState.poi != null) {
@@ -198,7 +221,7 @@ fun PoiDetailScreen(
 }
 
 @Composable
-private fun PlaceDetailTopBar(onBack: () -> Unit) {
+private fun PlaceDetailTopBar(onBack: () -> Unit, onShare: (() -> Unit)?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -219,7 +242,8 @@ private fun PlaceDetailTopBar(onBack: () -> Unit) {
             contentDescription = stringResource(R.string.share_place),
             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
             bordered = true,
-            onClick = { /* Share wiring is a separate task. */ }
+            enabled = onShare != null,
+            onClick = { onShare?.invoke() }
         )
     }
 }
@@ -230,6 +254,7 @@ private fun CircleIconButton(
     contentDescription: String,
     containerColor: androidx.compose.ui.graphics.Color,
     bordered: Boolean = false,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     Surface(
@@ -241,13 +266,13 @@ private fun CircleIconButton(
         } else null,
         modifier = Modifier
             .size(40.dp)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = MaterialTheme.colorScheme.onSurface,
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.4f),
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -264,23 +289,28 @@ private fun HeroImage(poi: Poi) {
             .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         contentAlignment = Alignment.Center
     ) {
+        // The type icon is the base layer, so it shows whenever there's no photo
+        // to cover it: blank URL, while loading, or on a failed load (e.g. a
+        // dead Wikimedia link). A successful photo draws on top and hides it.
+        Icon(
+            imageVector = typeIcon(poi.type),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+            modifier = Modifier.size(72.dp)
+        )
         if (!poi.imageUrl.isNullOrBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(poi.imageUrl)
+                    // POI photos are hotlinked from Wikimedia, which 403s the
+                    // default "okhttp/…" User-Agent; their policy requires a
+                    // descriptive one with contact info.
+                    .setHeader("User-Agent", Constants.IMAGE_USER_AGENT)
                     .crossfade(true)
                     .build(),
                 contentDescription = stringResource(R.string.poi_photo_desc, poi.name),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            // Type-based fallback (safety net) when a POI has no curated photo.
-            Icon(
-                imageVector = typeIcon(poi.type),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                modifier = Modifier.size(72.dp)
             )
         }
     }

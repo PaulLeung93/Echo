@@ -21,6 +21,7 @@
     <!-- Place detail redesign -->
     <string name="echoes_header">Echoes</string>
     <string name="share_place">Share place</string>
+    <string name="share_place_text">Check out %1$s on Echo — %2$s</string>
     <string name="proximity_in_range">You\'re %1$s — close enough to post here.</string>
     <string name="proximity_out_of_range">You\'re %1$s — get closer to join the conversation.</string>
     <string name="proximity_locating">Finding your location…</string>

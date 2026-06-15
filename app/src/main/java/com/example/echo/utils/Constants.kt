@@ -5,6 +5,13 @@ object Constants {
     /** Max distance (meters) a user may be from a POI/post to comment on it. */
     const val PROXIMITY_RADIUS_METERS = 5_000.0
 
+    /**
+     * User-Agent for hotlinking POI photos from Wikimedia. Their policy blocks
+     * generic library UAs (e.g. "okhttp/…" → 403); a descriptive one with
+     * contact info is required. See seed_pois.py for the matching seed-time UA.
+     */
+    const val IMAGE_USER_AGENT = "EchoApp/1.0 (Android; contact paul.leung@codepath.org)"
+
     // Firestore Collections
     const val COLLECTION_POSTS = "posts"
     const val COLLECTION_POIS = "pois"
