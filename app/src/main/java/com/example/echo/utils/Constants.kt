@@ -44,6 +44,7 @@ object Constants {
     const val FIELD_TIMESTAMP = "timestamp"
     const val FIELD_LIKES = "likes"
     const val FIELD_TAGS = "tags"
+    const val FIELD_GEOHASH = "geohash"
 
     // Navigation Routes
     const val ROUTE_FEED = "feed"

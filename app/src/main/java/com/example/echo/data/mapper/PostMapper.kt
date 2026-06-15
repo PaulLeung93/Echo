@@ -2,6 +2,8 @@ package com.example.echo.data.mapper
 
 import com.example.echo.data.entity.PostEntity
 import com.example.echo.domain.model.Post
+import com.firebase.geofire.GeoFireUtils
+import com.firebase.geofire.GeoLocation
 import javax.inject.Inject
 
 /**
@@ -75,6 +77,9 @@ class PostMapper @Inject constructor() {
             if (latitude != null && longitude != null) {
                 put("latitude", latitude)
                 put("longitude", longitude)
+                // Geohash lets the map fetch only posts within the visible viewport
+                // (server-side range query) instead of downloading the whole feed.
+                put("geohash", GeoFireUtils.getGeoHashForLocation(GeoLocation(latitude, longitude)))
             }
         }
     }

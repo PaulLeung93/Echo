@@ -89,7 +89,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
              'id', 'authorId', 'username', 'message', 'timestamp',
              'tags', 'likeCount', 'commentCount', 'likes',
-             'latitude', 'longitude'
+             'latitude', 'longitude', 'geohash'
            ]);
 
       // All post writes require a real (non-guest) account. Guests can read only.

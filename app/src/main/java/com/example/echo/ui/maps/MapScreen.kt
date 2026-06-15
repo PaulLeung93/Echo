@@ -139,7 +139,13 @@ fun MapScreen(
                     // native top-right one (which collides with the search bar).
                     myLocationButtonEnabled = false
                 ),
-                onMapClick = { mapViewModel.clearSelectedPost() }
+                onMapClick = { mapViewModel.clearSelectedPost() },
+                // Push the initial bounds as soon as the map is drawn, so posts load
+                // even if the camera never moves (projection is null before this).
+                onMapLoaded = {
+                    cameraPositionState.projection?.visibleRegion?.latLngBounds
+                        ?.let(mapViewModel::updateVisibleBounds)
+                }
             ) {
                 // Pulsing coral ripple at the user's location. Isolated in its own
                 // composable so its ~60fps animation recomposes only itself — not the

@@ -22,6 +22,13 @@ interface PostRepository {
      * @param limit Page size.
      */
     suspend fun getPostsPage(afterTimestamp: Long?, limit: Long): List<Post>
+
+    /**
+     * Fetch located posts within [radiusMeters] of a center via geohash range queries,
+     * so the map only reads documents near the current viewport instead of the whole
+     * collection. Returns posts already filtered to the true radius.
+     */
+    suspend fun getPostsNear(latitude: Double, longitude: Double, radiusMeters: Double): List<Post>
     
     /**
      * Get posts filtered by tag.

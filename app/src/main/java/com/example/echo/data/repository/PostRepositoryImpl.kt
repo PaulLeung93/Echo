@@ -9,6 +9,8 @@ import com.example.echo.domain.model.Post
 import com.example.echo.domain.repository.PostRepository
 import com.example.echo.domain.repository.UserRepository
 import com.example.echo.utils.Constants
+import com.firebase.geofire.GeoFireUtils
+import com.firebase.geofire.GeoLocation
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -90,6 +92,35 @@ class PostRepositoryImpl @Inject constructor(
             val entities = snapshot.documents.mapNotNull { it.toObject(PostEntity::class.java) }
             postMapper.toDomainList(entities, auth.currentUser?.uid)
         }
+
+    override suspend fun getPostsNear(
+        latitude: Double,
+        longitude: Double,
+        radiusMeters: Double
+    ): List<Post> = withContext(ioDispatcher) {
+        val center = GeoLocation(latitude, longitude)
+        // A circle maps to a set of geohash ranges; query each, then drop the false
+        // positives the rectangular ranges pull in just outside the true radius.
+        val entities = GeoFireUtils.getGeoHashQueryBounds(center, radiusMeters)
+            .map { bound ->
+                postsCollection
+                    .orderBy(Constants.FIELD_GEOHASH)
+                    .startAt(bound.startHash)
+                    .endAt(bound.endHash)
+                    .get()
+                    .await()
+            }
+            .flatMap { it.documents }
+            .mapNotNull { it.toObject(PostEntity::class.java) }
+            .distinctBy { it.id }
+            .filter { entity ->
+                val lat = entity.latitude
+                val lng = entity.longitude
+                lat != null && lng != null &&
+                    GeoFireUtils.getDistanceBetween(GeoLocation(lat, lng), center) <= radiusMeters
+            }
+        postMapper.toDomainList(entities, auth.currentUser?.uid)
+    }
 
     override fun getPostsByTag(tag: String): Flow<List<Post>> = callbackFlow {
         val listener = postsCollection

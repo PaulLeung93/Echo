@@ -14,6 +14,8 @@ data class PostEntity(
     val timestamp: Long = 0L,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    /** Standard base32 geohash of (latitude, longitude); enables viewport range queries on the map. */
+    val geohash: String? = null,
     val tags: List<String> = emptyList(),
     val likeCount: Int? = null,
     val commentCount: Int? = null,

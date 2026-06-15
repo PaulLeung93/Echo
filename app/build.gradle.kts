@@ -122,6 +122,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    // Geohash utilities (no Realtime DB) for viewport-bounded post queries on the map.
+    implementation(libs.geofire.android.common)
     // App Check — attests requests come from the genuine, unmodified app.
     // Play Integrity in release; a debug provider locally (token registered in console).
     implementation(libs.firebase.appcheck.playintegrity)

@@ -46,17 +46,51 @@ class MapViewModel @Inject constructor(
      */
     private val _visibleBounds = MutableStateFlow<LatLngBounds?>(null)
 
-    /** Posts that can be plotted: have a location and match the active tag/type filter. */
-    private val mappablePosts: Flow<List<Post>> = combine(
-        getPostsUseCase(),
-        _currentTag,
-        _activeFilters
-    ) { posts, tag, filters ->
-        if ("user posts" in filters) {
-            posts.filter { post ->
-                post.latitude != null && post.longitude != null &&
-                    (tag == null || post.tags.any { it.equals(tag, ignoreCase = true) })
+    /**
+     * Located posts near the current viewport, fetched via a geohash range query each
+     * time the camera settles (new bounds). This replaces the old newest-200 live
+     * listener, so the map only reads posts near what's on screen. Empty until the
+     * first bounds arrive.
+     */
+    private val nearbyPosts: Flow<List<Post>> = _visibleBounds.flatMapLatest { bounds ->
+        flow {
+            if (bounds == null) {
+                emit(emptyList())
+                return@flow
             }
+            val center = bounds.center
+            // Radius = center→corner, so the circle covers the (padded) viewport box.
+            val radius = distanceBetween(center, bounds.northeast).toDouble()
+            emit(
+                runCatching {
+                    getPostsUseCase.near(center.latitude, center.longitude, radius)
+                }.getOrDefault(emptyList())
+            )
+        }
+    }
+
+    /**
+     * The post source feeding the markers. With no tag we use the viewport-bounded
+     * [nearbyPosts]; with a tag we fall back to the recent-posts listener so a tag
+     * search can fly to a match *anywhere*, not just within the current view.
+     */
+    private val postSource: Flow<List<Post>> = _currentTag.flatMapLatest { tag ->
+        if (tag == null) {
+            nearbyPosts
+        } else {
+            getPostsUseCase().map { posts ->
+                posts.filter { it.tags.any { t -> t.equals(tag, ignoreCase = true) } }
+            }
+        }
+    }
+
+    /** Posts that can be plotted: have a location and pass the active type filter. */
+    private val mappablePosts: Flow<List<Post>> = combine(
+        postSource,
+        _activeFilters
+    ) { posts, filters ->
+        if ("user posts" in filters) {
+            posts.filter { it.latitude != null && it.longitude != null }
         } else {
             emptyList()
         }

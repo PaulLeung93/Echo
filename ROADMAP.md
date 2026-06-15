@@ -382,11 +382,9 @@ Deferred until shipped; captured so they aren't lost.
 - [ ] GeoFire interaction radius limit — restrict which posts/POIs a user can
       see or interact with based on a configurable distance from their current
       location (extend the existing 5km comment-proximity rule to broader
-      feed/map visibility). **Also covers geo-bounded *fetching*** (tabled
-      2026-06-15): add a geohash field to every post/POI and use geohash range
-      queries so the map only *downloads* documents in the current viewport,
-      instead of today's count-cap (posts) / whole-collection (POIs) reads. The
-      render-side viewport culling is already done (see *Map performance audit*).
+      feed/map visibility). *(Map post-fetching is now geohash-bounded — see
+      **Read-reduction staircase** below; this item remains for applying a radius
+      cap to POIs and to interaction/visibility policy.)*
 - [ ] Geofenced alerts ("something new posted near you") — would populate the
       existing **Alerts** screen (see *In-app Alerts* under Social & Engagement)
       rather than a new surface.
@@ -520,13 +518,53 @@ Deferred until shipped; captured so they aren't lost.
         targets the full post set; selection cards survive panning off-screen. Bounds
         start `null` (no cull) so first load is unchanged.
 
-      > **Tabled — geo-bounded *fetching* (not just drawing).** The culling above is
-      > **render-only**; it shrinks the on-screen marker count but not the Firestore
-      > download. At fetch level neither type is geo-bounded today: posts are capped by
-      > count (200), POIs are read whole. Bounding the *download* to the viewport needs
-      > geohash range queries (a geohash field on every post/POI + a rewrite of how
-      > they're saved and queried) — a real change, deferred. Tracked under *Map &
-      > Location → GeoFire interaction radius* below.
+      > **Geo-bounded *fetching* — now done.** The culling above was render-only; the
+      > **Read-reduction staircase** (below) takes the next step and bounds the actual
+      > Firestore *download*.
+
+#### Read-reduction staircase — fewer Firebase reads as the app grows (2026-06-15)
+
+Done as a four-stage staircase, cheapest-payoff first. Each stage shipped green
+(`compileDebugKotlin` + `testDebugUnitTest`).
+
+- [x] **Stage 1 — POIs cache-first.** POIs are admin-curated reference data, but the
+      repo held a live whole-collection snapshot listener that re-read every session.
+      Replaced with a cache-first fetch (`Source.CACHE` → 0 billed reads, survives
+      restarts; server only when the cache is empty or a 12h TTL elapsed, timestamp in
+      DataStore) plus a process-level in-memory cache shared by the map list + type
+      filter. POI-detail keeps its live single-doc listener for fresh comment counts.
+- [x] **Stage 2 — explicit unlimited persistent cache.** Pinned Firestore to the modern
+      `persistentCacheSettings { CACHE_SIZE_UNLIMITED }` so cache-first reads aren't
+      evicted under the old ~100MB default (less data over the network).
+- [x] **Stage 3 — feed pagination.** The default feed now loads in pages of
+      `FEED_PAGE_SIZE` (25) via one-time `getPostsPage()` reads (`orderBy(timestamp DESC)`
+      + `startAfter` cursor), not the shared newest-200 live listener — a session bills
+      reads only for posts scrolled into view. Likes update optimistically (no live
+      listener), pull-to-refresh re-primes page one, the tag view stays live. Removed
+      the orphaned `RefreshPostsUseCase`.
+- [x] **Stage 4 — geohash geo-bounded map fetch (code).** Added `geofire-android-common`,
+      a `geohash` field on `PostEntity` (written on create in `PostMapper`), and
+      `getPostsNear(lat, lng, radius)` (geohash range queries + true-distance filter).
+      `MapViewModel` now fetches posts within the viewport on each camera settle instead
+      of the newest-200 listener; tag search still falls back to the recent-posts
+      listener so it can fly to a match anywhere. `firestore.rules` post-create `hasOnly`
+      gains `geohash`.
+
+      > ⚠️ **Two production steps are PENDING (require the owner) for Stage 4 to work
+      > end-to-end:**
+      > 1. **Deploy the rules:** `firebase deploy --only firestore:rules` — until then,
+      >    creating a *located* post fails (the new `geohash` key is rejected). The
+      >    update is backward-compatible (`hasOnly` allows a subset, so the old
+      >    published app keeps working).
+      > 2. **Backfill existing posts:** run `backfill_post_geohashes.py` (in
+      >    `Desktop/Echo`, uses `firebase-key.json`, idempotent) so posts created before
+      >    this change carry a `geohash` and appear on the geo-bounded map. Without it,
+      >    only posts created after the rules deploy show up.
+
+      > **Known trade-off:** the map's geo-fetch reloads on each camera settle (one small
+      > range-query batch), and `getPosts()`'s shared newest-200 listener now serves only
+      > the map's *tag* path — removable if map tag-search is later moved to a
+      > `whereArrayContains` query.
 
 ---
 

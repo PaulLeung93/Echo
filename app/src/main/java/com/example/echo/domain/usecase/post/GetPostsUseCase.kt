@@ -25,6 +25,13 @@ class GetPostsUseCase @Inject constructor(
      */
     suspend fun page(afterTimestamp: Long?, limit: Long): List<Post> =
         postRepository.getPostsPage(afterTimestamp, limit)
+
+    /**
+     * Fetch located posts within [radiusMeters] of a center (geohash range query),
+     * for the viewport-bounded map.
+     */
+    suspend fun near(latitude: Double, longitude: Double, radiusMeters: Double): List<Post> =
+        postRepository.getPostsNear(latitude, longitude, radiusMeters)
     
     /**
      * Get posts filtered by a specific tag.
