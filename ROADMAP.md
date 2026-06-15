@@ -435,6 +435,19 @@ Deferred until shipped; captured so they aren't lost.
       deletes the `usernames/{handle}` reservation + `users/{uid}` doc + the Auth
       user — so a stale session or wrong password destroys nothing. Verified
       end-to-end on device against deployed rules.
+- [ ] **Audit the account-deletion flow for orphaned sessions** *(tabled
+      2026-06-15).* Found a device in an **authenticated-but-profileless** state:
+      a valid Firebase Auth session with no `users/{uid}` doc, which
+      `RootNavHost` routes to **Complete Profile**. That screen was a hard
+      dead-end (no back/sign-out; it's the start destination, so system-back
+      closed the app and relaunch returned there). **Fixed the trap** by adding a
+      **Sign out** action to the Complete Profile top bar
+      ([CompleteProfileScreen.kt](app/src/main/java/com/example/echo/ui/auth/CompleteProfileScreen.kt)) —
+      verified on-device (Sign out → Sign In). **Still to investigate:** how the
+      orphaned state is produced — if deletion can wipe the profile doc but leave
+      the Auth user alive (re-auth path, partial failure), it recreates this trap.
+      Confirm deletion is atomic/ordered so the Auth user goes last, and consider
+      a guard in routing for the profileless-session case.
 - [ ] **Google account deletion + Google Sign-In config.** Google Sign-In isn't
       actually wired up: `webClientId` is a hardcoded `"YOUR_WEB_CLIENT_ID"`
       placeholder and there's no `default_web_client_id` (the `google-services.json`

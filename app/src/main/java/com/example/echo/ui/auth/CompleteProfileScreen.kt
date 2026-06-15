@@ -52,7 +52,19 @@ fun CompleteProfileScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary
-                )
+                ),
+                actions = {
+                    // Escape hatch: this screen is the start destination for a
+                    // signed-in user without a profile, so without this there's no
+                    // way out (system-back just closes the app and relaunch returns
+                    // here). Signing out drops back to Sign In — see RootNavHost.
+                    TextButton(onClick = { authViewModel.signOut() }) {
+                        Text(
+                            "Sign out",
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
