@@ -382,7 +382,11 @@ Deferred until shipped; captured so they aren't lost.
 - [ ] GeoFire interaction radius limit — restrict which posts/POIs a user can
       see or interact with based on a configurable distance from their current
       location (extend the existing 5km comment-proximity rule to broader
-      feed/map visibility).
+      feed/map visibility). **Also covers geo-bounded *fetching*** (tabled
+      2026-06-15): add a geohash field to every post/POI and use geohash range
+      queries so the map only *downloads* documents in the current viewport,
+      instead of today's count-cap (posts) / whole-collection (POIs) reads. The
+      render-side viewport culling is already done (see *Map performance audit*).
 - [ ] Geofenced alerts ("something new posted near you") — would populate the
       existing **Alerts** screen (see *In-app Alerts* under Social & Engagement)
       rather than a new surface.
@@ -506,6 +510,23 @@ Deferred until shipped; captured so they aren't lost.
         `clusters` / `filteredPois` / `selection` / `filterState` flows removed the
         fragile `Array<Any?>` + unchecked casts. Marker icon bitmaps are now cached by
         `(resId, scale)` in `MapUtils`, so identical icons aren't re-rasterized.
+      - **[Med] Viewport culling of markers — fixed (2026-06-15).** Every fetched
+        post/POI was drawn immediately regardless of what was on screen (unbounded
+        native markers + O(n²) clustering over the full set). The map now pushes its
+        visible bounds to `MapViewModel` whenever the camera settles
+        (`LaunchedEffect(cameraPositionState.isMoving)` → `updateVisibleBounds`), and
+        new `visiblePosts` / `visiblePois` flows cull to those bounds (padded ~30% so
+        markers don't pop in while panning) before clustering/drawing. Tag search still
+        targets the full post set; selection cards survive panning off-screen. Bounds
+        start `null` (no cull) so first load is unchanged.
+
+      > **Tabled — geo-bounded *fetching* (not just drawing).** The culling above is
+      > **render-only**; it shrinks the on-screen marker count but not the Firestore
+      > download. At fetch level neither type is geo-bounded today: posts are capped by
+      > count (200), POIs are read whole. Bounding the *download* to the viewport needs
+      > geohash range queries (a geohash field on every post/POI + a rewrite of how
+      > they're saved and queried) — a real change, deferred. Tracked under *Map &
+      > Location → GeoFire interaction radius* below.
 
 ---
 

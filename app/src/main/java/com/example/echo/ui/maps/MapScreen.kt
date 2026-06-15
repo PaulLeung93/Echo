@@ -103,6 +103,17 @@ fun MapScreen(
         mapViewModel.updateZoom(cameraPositionState.position.zoom)
     }
 
+    // Cull markers to the viewport: whenever the camera comes to rest, hand its
+    // visible bounds to the ViewModel so only on-screen posts/POIs get clustered and
+    // drawn. `projection` is null until the first frame is laid out; until then the
+    // VM shows everything, so there's no regression on first load.
+    LaunchedEffect(cameraPositionState.isMoving) {
+        if (!cameraPositionState.isMoving) {
+            cameraPositionState.projection?.visibleRegion?.latLngBounds
+                ?.let(mapViewModel::updateVisibleBounds)
+        }
+    }
+
     // Notify user if no search results found
     LaunchedEffect(uiState.posts, filterAttempted) {
         if (filterAttempted && uiState.posts.isEmpty()) {
