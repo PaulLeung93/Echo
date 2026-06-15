@@ -430,11 +430,20 @@ Deferred until shipped; captured so they aren't lost.
       Sections: **Appearance** (dark-mode toggle — warm dark theme, persisted via
       Jetpack DataStore and applied app-wide through `EchoTheme(darkTheme=…)`);
       **Notifications** (a persisted preference toggle, stored for when FCM lands);
-      **Account** (Sign out; Delete account — confirm dialog → deletes the
-      `usernames/{handle}` reservation + `users/{uid}` doc + the Auth user, with a
-      re-auth prompt if the login is stale). ⚠️ Account deletion **requires the
-      firestore.rules deploy** (the new owner-only `delete` rules on `users` and
-      `usernames`).
+      **Account** (Sign out; Delete account). Deletion **re-authenticates first**
+      (a "Confirm it's you" password dialog for email accounts) and only then
+      deletes the `usernames/{handle}` reservation + `users/{uid}` doc + the Auth
+      user — so a stale session or wrong password destroys nothing. Verified
+      end-to-end on device against deployed rules.
+- [ ] **Google account deletion + Google Sign-In config.** Google Sign-In isn't
+      actually wired up: `webClientId` is a hardcoded `"YOUR_WEB_CLIENT_ID"`
+      placeholder and there's no `default_web_client_id` (the `google-services.json`
+      has no web/type-3 OAuth client). So "Continue with Google" can't return a
+      valid ID token, and account deletion for a Google-linked account can't
+      re-authenticate (it shows a "not available yet" message). Fix: add a Web
+      OAuth client in the Firebase Console, re-download `google-services.json`, and
+      read the client id from `R.string.default_web_client_id`. **Needed before
+      Play Store** (Google requires a working account-deletion path).
 
 ### Technical
 - [ ] Offline cache / Room layer for feed resilience.
