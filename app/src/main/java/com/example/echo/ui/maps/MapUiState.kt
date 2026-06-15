@@ -25,5 +25,7 @@ data class MapUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val currentTag: String? = null,
-    val activeFilters: Set<String> = setOf("user posts", "landmark", "park", "college")
+    val activeFilters: Set<String> = setOf("user posts", "landmark", "park", "college"),
+    /** True when zoomed out past [com.example.echo.utils.Constants.MIN_POSTS_ZOOM]; drives the "zoom in" hint. */
+    val postsZoomedOut: Boolean = false
 )

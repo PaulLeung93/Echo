@@ -30,6 +30,23 @@ object Constants {
      */
     const val POIS_CACHE_TTL_MS = 12 * 60 * 60 * 1000L
 
+    /**
+     * Minimum map zoom at which we load/show user posts. Posts are fetched by a
+     * viewport-radius geo query with no count cap, so zooming out far enough would
+     * read every located post in range (e.g. a whole country) — wasteful billed
+     * reads and meaningless at that scale. Below this zoom we skip the query and
+     * draw no post markers. ~12 ≈ city-district scale, matching the app's local feel.
+     */
+    const val MIN_POSTS_ZOOM = 12f
+
+    /**
+     * Minimum map zoom at which we draw POI markers. POIs are loaded from the local
+     * cache (0 billed reads) so this is purely a declutter threshold — zoomed out far
+     * enough, dozens of discs overlap into a blob. Set just below [MIN_POSTS_ZOOM] so
+     * landmarks appear slightly before posts as you zoom in (a tiered reveal).
+     */
+    const val MIN_POIS_ZOOM = 11f
+
     // Firestore Collections
     const val COLLECTION_POSTS = "posts"
     const val COLLECTION_POIS = "pois"

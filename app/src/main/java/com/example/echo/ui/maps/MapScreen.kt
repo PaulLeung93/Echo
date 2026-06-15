@@ -2,6 +2,9 @@ package com.example.echo.ui.maps
 
 import android.Manifest
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Comment
 import androidx.compose.material.icons.filled.Close
@@ -22,6 +26,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +50,7 @@ import com.google.android.gms.maps.model.*
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlin.math.roundToInt
 
 import androidx.hilt.navigation.compose.hiltViewModel
 
@@ -75,6 +81,13 @@ fun MapScreen(
 
     // Captured for use inside the GoogleMap content lambda (no MaterialTheme there).
     val rippleColor = MaterialTheme.colorScheme.primary
+
+    // Bucket the live zoom to whole levels so POI disc sizes track zoom without
+    // re-rasterizing every camera frame. derivedStateOf only notifies readers when
+    // the rounded level actually changes.
+    val zoomBucket by remember {
+        derivedStateOf { cameraPositionState.position.zoom.roundToInt() }
+    }
 
 
     // Get last known location on launch
@@ -180,8 +193,10 @@ fun MapScreen(
                             val post = cluster.posts.first()
                             val isSelected = uiState.selectedPost?.id == post.id
                             val icon = remember(isSelected) {
-                                BitmapDescriptorFactory.fromBitmap(
-                                    createPinIcon(PinCategory.POST, scale = if (isSelected) 1.5f else 1.0f)
+                                bitmapDescriptorFromVector(
+                                    context,
+                                    R.drawable.ic_default,
+                                    scale = if (isSelected) 1.5f else 1.0f
                                 )
                             }
                             Marker(
@@ -204,16 +219,17 @@ fun MapScreen(
                         val latLng = LatLng(poi.latitude, poi.longitude)
                         val isSelected = uiState.selectedPoi?.id == poi.id
                         val markerState = rememberUpdatedMarkerState(position = latLng)
-                        val icon = remember(poi.type, isSelected) {
-                            BitmapDescriptorFactory.fromBitmap(
-                                createPinIcon(
-                                    PinCategory.fromPoiType(poi.type),
-                                    scale = if (isSelected) 1.5f else 1.0f
-                                )
+                        val icon = remember(poi.type, isSelected, zoomBucket) {
+                            val zoomScale = markerScaleForZoom(zoomBucket)
+                            poiPinDescriptor(
+                                PinCategory.fromPoiType(poi.type),
+                                scale = if (isSelected) zoomScale * 1.5f else zoomScale
                             )
                         }
                         Marker(
                             state = markerState,
+                            // Round disc (no pointer) → anchor at its center, not bottom.
+                            anchor = Offset(0.5f, 0.5f),
                             title = poi.name,
                             snippet = "${poi.description} • ${poi.commentCount} comments",
                             onClick = {
@@ -253,6 +269,30 @@ fun MapScreen(
                 .statusBarsPadding()
                 .padding(16.dp)
         )
+
+        // --- "Zoom in to see posts" hint when zoomed out past the load threshold ---
+        AnimatedVisibility(
+            visible = uiState.postsZoomedOut,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 84.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shadowElevation = 3.dp
+            ) {
+                Text(
+                    text = "Zoom in to see posts",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+        }
 
         // --- Recenter button (bottom-right; lifts above a selection card) ---
         if (locationPermissionState.status.isGranted) {

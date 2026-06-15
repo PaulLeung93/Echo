@@ -6,29 +6,30 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
-import kotlin.math.cos
-import kotlin.math.sin
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 
 /**
- * WORKSHOP PROTOTYPE — circle + short pointer markers.
+ * Glyph-in-circle POI markers.
  *
- * Draws a rounded circle with a small downward pointer (so it still marks the
- * exact coordinate) filled in [color], with a white category glyph inside.
- * Everything is programmatic, like [createClusterIcon], so shape / color / tail
- * length / glyph are all tweakable here while we settle on a look. The Marker's
- * default anchor (0.5, 1.0) lines the pointer tip up with the post/POI position.
+ * Draws a solid colored disc in the POI's category color, ringed by a white
+ * outer border, with a white category glyph centered. Fully programmatic (like
+ * [createClusterIcon]) so shape / color / ring / glyph are all tweakable here.
  *
- * Tweak knobs: [BASE_RADIUS], [TAIL_HEIGHT], [GLYPH_FRACTION].
+ * These are round (no pointer), so the Marker should be anchored at its center
+ * — Offset(0.5f, 0.5f) — rather than the default bottom-center.
+ *
+ * Tweak knobs: [BASE_RADIUS], [RING_WIDTH], [GLYPH_FRACTION].
  */
-private const val BASE_RADIUS = 44f
-private const val TAIL_HEIGHT = 22f
-private const val GLYPH_FRACTION = 0.62f // glyph box side as a fraction of circle diameter
+private const val BASE_RADIUS = 50f
+private const val RING_WIDTH = 8f
+private const val GLYPH_FRACTION = 0.6f // glyph box side as a fraction of the colored disc diameter
 
-/** Per-category marker fills. Mid-tones chosen for white-glyph contrast. */
+/** Per-category disc fills. Mid-tones chosen for white ring + glyph contrast. */
 enum class PinCategory(val color: Int) {
-    POST(Color.rgb(0xFE, 0x6E, 0x4C)),     // coral (brand)
+    POST(Color.rgb(0xFE, 0x6E, 0x4C)),     // coral (brand) — fallback for unknown types
     PARK(Color.rgb(0x2D, 0x5A, 0x35)),     // sage green
-    COLLEGE(Color.rgb(0x1F, 0x3A, 0x93)),  // indigo
+    COLLEGE(Color.rgb(0x18, 0x2C, 0x78)),  // deep indigo (distinct from map's water/road blues)
     LANDMARK(Color.rgb(0xE0, 0x8A, 0x1E)); // amber
 
     companion object {
@@ -41,32 +42,55 @@ enum class PinCategory(val color: Int) {
     }
 }
 
+/**
+ * Base disc scale for a given (integer-bucketed) map zoom. POIs are admin-curated
+ * and can bunch up tightly at city scale, so discs shrink when zoomed out and grow
+ * as you zoom in. Bucketing by whole zoom levels keeps the number of distinct
+ * bitmaps tiny — only a handful per category — so [poiPinDescriptor]'s cache stays
+ * small and icons regenerate only when crossing a level, never per camera frame.
+ */
+fun markerScaleForZoom(zoom: Int): Float = when {
+    zoom <= 10 -> 0.55f
+    zoom <= 12 -> 0.8f
+    zoom <= 14 -> 1.0f
+    zoom <= 16 -> 1.2f
+    else -> 1.4f
+}
+
+/**
+ * Cached descriptor for a POI disc. Keyed by category + quantized scale so repeated
+ * POIs of the same type/zoom share one bitmap. Lives for the process — the key space
+ * is bounded (4 categories × a few zoom buckets × selected/not).
+ */
+private val pinCache = HashMap<Pair<PinCategory, Int>, BitmapDescriptor>()
+
+fun poiPinDescriptor(category: PinCategory, scale: Float): BitmapDescriptor {
+    val key = category to (scale * 100).toInt()
+    pinCache[key]?.let { return it }
+    return BitmapDescriptorFactory.fromBitmap(createPinIcon(category, scale))
+        .also { pinCache[key] = it }
+}
+
 fun createPinIcon(category: PinCategory, scale: Float = 1f): Bitmap {
     val radius = BASE_RADIUS * scale
-    val tail = TAIL_HEIGHT * scale
+    val ring = RING_WIDTH * scale
+    val size = (radius * 2).toInt()
     val cx = radius
     val cy = radius
-    val width = (radius * 2).toInt()
-    val height = (radius * 2 + tail).toInt()
 
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
-    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = category.color }
+    // White outer ring, then the colored disc inside it.
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    paint.color = Color.WHITE
+    canvas.drawCircle(cx, cy, radius, paint)
+    val discRadius = radius - ring
+    paint.color = category.color
+    canvas.drawCircle(cx, cy, discRadius, paint)
 
-    // Body: pointer triangle first, then the circle on top so the seam is hidden.
-    val spread = Math.toRadians(38.0)
-    Path().apply {
-        moveTo((cx - radius * sin(spread)).toFloat(), (cy + radius * cos(spread)).toFloat())
-        lineTo(cx, cy + radius + tail)
-        lineTo((cx + radius * sin(spread)).toFloat(), (cy + radius * cos(spread)).toFloat())
-        close()
-        canvas.drawPath(this, fill)
-    }
-    canvas.drawCircle(cx, cy, radius, fill)
-
-    // Glyph
-    val box = radius * 2 * GLYPH_FRACTION
+    // White glyph centered inside the disc.
+    val box = discRadius * 2 * GLYPH_FRACTION
     val glyph = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         strokeCap = Paint.Cap.ROUND

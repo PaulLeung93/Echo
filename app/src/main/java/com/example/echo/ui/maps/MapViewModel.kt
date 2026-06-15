@@ -8,6 +8,7 @@ import com.example.echo.domain.model.Post
 import com.example.echo.domain.usecase.poi.GetPoisUseCase
 import com.example.echo.domain.usecase.post.GetPostsUseCase
 import com.example.echo.domain.usecase.post.ToggleLikeUseCase
+import com.example.echo.utils.Constants
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
@@ -47,14 +48,35 @@ class MapViewModel @Inject constructor(
     private val _visibleBounds = MutableStateFlow<LatLngBounds?>(null)
 
     /**
+     * Whether the camera is zoomed in far enough to load posts (see
+     * [Constants.MIN_POSTS_ZOOM]). Posts are fetched by an uncapped viewport-radius
+     * query, so when zoomed out past this we skip the query entirely rather than read
+     * every post in a country-sized radius. Updated from [updateZoom].
+     */
+    private val _postsZoomEnabled = MutableStateFlow(false)
+
+    /**
+     * Whether the camera is zoomed in far enough to draw POI markers (see
+     * [Constants.MIN_POIS_ZOOM]). POIs cost no reads (cache-loaded), so this is purely
+     * to declutter the overlapping-disc "blob" at far zoom. Updated from [updateZoom].
+     */
+    private val _poisZoomEnabled = MutableStateFlow(false)
+
+    /**
      * Located posts near the current viewport, fetched via a geohash range query each
      * time the camera settles (new bounds). This replaces the old newest-200 live
      * listener, so the map only reads posts near what's on screen. Empty until the
      * first bounds arrive.
      */
-    private val nearbyPosts: Flow<List<Post>> = _visibleBounds.flatMapLatest { bounds ->
+    private val nearbyPosts: Flow<List<Post>> = combine(
+        _visibleBounds,
+        _postsZoomEnabled
+    ) { bounds, zoomEnabled -> bounds to zoomEnabled }
+        .distinctUntilChanged()
+        .flatMapLatest { (bounds, zoomEnabled) ->
         flow {
-            if (bounds == null) {
+            // No query when zoomed out past the threshold, or before the first settle.
+            if (bounds == null || !zoomEnabled) {
                 emit(emptyList())
                 return@flow
             }
@@ -132,10 +154,15 @@ class MapViewModel @Inject constructor(
     /** POIs culled to the viewport — only these get drawn as markers. */
     private val visiblePois: Flow<List<Poi>> = combine(
         filteredPois,
-        _visibleBounds
-    ) { pois, bounds ->
-        if (bounds == null) pois
-        else pois.filter { bounds.contains(LatLng(it.latitude, it.longitude)) }
+        _visibleBounds,
+        _poisZoomEnabled
+    ) { pois, bounds, zoomEnabled ->
+        when {
+            // Zoomed out past the declutter threshold → draw no POI markers.
+            !zoomEnabled -> emptyList()
+            bounds == null -> pois
+            else -> pois.filter { bounds.contains(LatLng(it.latitude, it.longitude)) }
+        }
     }
 
     /** Viewport-culled markers, grouped so they flow as one value into [uiState]. */
@@ -156,9 +183,10 @@ class MapViewModel @Inject constructor(
 
     private val filterState: Flow<FilterState> = combine(
         _currentTag,
-        _activeFilters
-    ) { tag, filters ->
-        FilterState(tag, filters)
+        _activeFilters,
+        _postsZoomEnabled
+    ) { tag, filters, postsEnabled ->
+        FilterState(tag, filters, postsZoomedOut = !postsEnabled)
     }
 
     val uiState: StateFlow<MapUiState> = combine(
@@ -179,6 +207,7 @@ class MapViewModel @Inject constructor(
             selectedPoi = allPois.find { it.id == sel.poiId },
             currentTag = filters.tag,
             activeFilters = filters.active,
+            postsZoomedOut = filters.postsZoomedOut,
             isLoading = false
         )
     }.stateIn(
@@ -197,7 +226,8 @@ class MapViewModel @Inject constructor(
     /** Tag + marker-type filters grouped so they flow as one value into [uiState]. */
     private data class FilterState(
         val tag: String?,
-        val active: Set<String>
+        val active: Set<String>,
+        val postsZoomedOut: Boolean
     )
 
     /** Viewport-culled markers (post clusters + POIs) for the current frame. */
@@ -245,6 +275,10 @@ class MapViewModel @Inject constructor(
         // Map to the discrete cluster radius so the StateFlow only emits (and only
         // re-clusters) when the zoom crosses a bucket boundary, not on every frame.
         _clusterRadius.value = clusterRadiusForZoom(zoom)
+        // Gate post loading: zoomed out past the threshold, don't query posts at all.
+        _postsZoomEnabled.value = zoom >= Constants.MIN_POSTS_ZOOM
+        // Gate POI drawing (cache-loaded, so this is declutter-only, not a read saving).
+        _poisZoomEnabled.value = zoom >= Constants.MIN_POIS_ZOOM
     }
 
     /**
