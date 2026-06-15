@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
@@ -38,6 +39,7 @@ class UserPreferencesRepository @Inject constructor(
     private object Keys {
         val DARK_MODE = booleanPreferencesKey("dark_mode")
         val NOTIFICATIONS = booleanPreferencesKey("notifications_enabled")
+        val POIS_LAST_SYNC = longPreferencesKey("pois_last_sync")
     }
 
     private val prefs: Flow<Preferences> = dataStore.data.catch { e ->
@@ -50,11 +52,22 @@ class UserPreferencesRepository @Inject constructor(
     /** Whether the user wants notifications (stored for when FCM lands). */
     val notificationsEnabled: Flow<Boolean> = prefs.map { it[Keys.NOTIFICATIONS] ?: true }
 
+    /**
+     * Epoch-millis of the last successful POI server sync (0 if never). Lets the POI
+     * repo serve the local Firestore cache for free and only re-read from the server
+     * once the TTL elapses — POIs are admin-curated reference data that rarely change.
+     */
+    val poisLastSync: Flow<Long> = prefs.map { it[Keys.POIS_LAST_SYNC] ?: 0L }
+
     suspend fun setDarkMode(enabled: Boolean) {
         dataStore.edit { it[Keys.DARK_MODE] = enabled }
     }
 
     suspend fun setNotificationsEnabled(enabled: Boolean) {
         dataStore.edit { it[Keys.NOTIFICATIONS] = enabled }
+    }
+
+    suspend fun setPoisLastSync(epochMillis: Long) {
+        dataStore.edit { it[Keys.POIS_LAST_SYNC] = epochMillis }
     }
 }

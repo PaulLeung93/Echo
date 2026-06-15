@@ -20,6 +20,16 @@ object Constants {
      */
     const val POSTS_QUERY_LIMIT = 200L
 
+    /** Page size for the paginated feed (one billed read per post, per page loaded). */
+    const val FEED_PAGE_SIZE = 25L
+
+    /**
+     * How long the cached POI list is trusted before a server re-sync. POIs are
+     * admin-curated reference data, so a long TTL means a device bills POI reads at
+     * most ~twice a day instead of once per session. (12 hours.)
+     */
+    const val POIS_CACHE_TTL_MS = 12 * 60 * 60 * 1000L
+
     // Firestore Collections
     const val COLLECTION_POSTS = "posts"
     const val COLLECTION_POIS = "pois"
