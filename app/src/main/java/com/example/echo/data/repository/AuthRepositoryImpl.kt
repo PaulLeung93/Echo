@@ -113,6 +113,17 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun signOut() {
         auth.signOut()
     }
+
+    override suspend fun deleteCurrentAuthAccount(): Result<Unit> = withContext(ioDispatcher) {
+        val user = auth.currentUser
+            ?: return@withContext Result.failure(IllegalStateException("No signed-in account to delete."))
+        try {
+            user.delete().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
     
     @Suppress("DEPRECATION")
     override suspend fun fetchSignInMethods(email: String): List<String> = 

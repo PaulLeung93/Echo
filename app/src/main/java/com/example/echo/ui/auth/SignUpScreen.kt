@@ -80,13 +80,6 @@ fun SignUpScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        IconButton(
-            onClick = { navController.popBackStack() },
-            modifier = Modifier.padding(8.dp)
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -227,5 +220,16 @@ fun SignUpScreen(
             }
         }
         TopSnackbarHost(snackbarHostState = snackbarHostState)
+
+        // Drawn last so it sits above the scrollable Column — otherwise the
+        // Column's verticalScroll intercepts the taps over the back button.
+        IconButton(
+            onClick = { navController.popBackStack() },
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(8.dp)
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
+        }
     }
 }

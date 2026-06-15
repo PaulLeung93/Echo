@@ -18,6 +18,7 @@ class AuthViewModel @Inject constructor(
     private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
     private val signInAsGuestUseCase: SignInAsGuestUseCase,
     private val fetchSignInMethodsUseCase: FetchSignInMethodsUseCase,
+    private val deleteProvisionalAccountUseCase: DeleteProvisionalAccountUseCase,
     private val signOutUseCase: SignOutUseCase,
     private val sendPasswordResetEmailUseCase: SendPasswordResetEmailUseCase,
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
@@ -42,29 +43,28 @@ class AuthViewModel @Inject constructor(
                 // (drives RootNavHost's cold-launch routing). Guests never do.
                 if (user != null && !user.isAnonymous) {
                     _uiState.update { it.copy(needsProfileSetup = null) }
-                    // Retry transient read errors so we never mistake a failed
-                    // read for "no profile" (which would wrongly force an existing
-                    // user through profile setup). After a few tries, fail open to
-                    // the app — new users are still routed to setup via sign-up.
-                    var attempts = 0
-                    while (true) {
-                        val result = getCurrentUserProfileUseCase()
-                        if (result.isSuccess) {
-                            _uiState.update { it.copy(needsProfileSetup = result.getOrNull() == null) }
-                            break
-                        }
-                        attempts++
-                        if (attempts >= 3) {
-                            _uiState.update { it.copy(needsProfileSetup = false) }
-                            break
-                        }
-                        delay(800)
-                    }
+                    _uiState.update { it.copy(needsProfileSetup = resolveNeedsProfileSetup()) }
                 } else {
                     _uiState.update { it.copy(needsProfileSetup = false) }
                 }
             }
         }
+    }
+
+    /**
+     * Whether the current non-anonymous user still needs to set up a profile.
+     * Retries transient read errors so a failed read is never mistaken for
+     * "no profile" (which would wrongly force an existing user through setup).
+     * After a few tries, fails open to false — new accounts are still routed to
+     * setup because their profile genuinely reads back as null.
+     */
+    private suspend fun resolveNeedsProfileSetup(): Boolean {
+        repeat(3) { attempt ->
+            val result = getCurrentUserProfileUseCase()
+            if (result.isSuccess) return result.getOrNull() == null
+            if (attempt < 2) delay(800)
+        }
+        return false
     }
 
     /** Called after the profile is created so routing reflects it immediately. */
@@ -82,9 +82,16 @@ class AuthViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             signInWithEmailUseCase(email, password)
                 .onSuccess { user ->
-                    _uiState.update { it.copy(isLoading = false, currentUser = user) }
-                    _uiEvent.send(AuthUiEvent.SignInSuccess)
-                    _uiEvent.send(AuthUiEvent.NavigateToHome)
+                    // A signed-up user who abandoned profile setup must still
+                    // finish it on sign-in — don't drop them straight into the app.
+                    val needsSetup = resolveNeedsProfileSetup()
+                    _uiState.update { it.copy(isLoading = false, currentUser = user, needsProfileSetup = needsSetup) }
+                    if (needsSetup) {
+                        _uiEvent.send(AuthUiEvent.NavigateToCompleteProfile)
+                    } else {
+                        _uiEvent.send(AuthUiEvent.SignInSuccess)
+                        _uiEvent.send(AuthUiEvent.NavigateToHome)
+                    }
                 }
                 .onFailure { error ->
                     _uiState.update { it.copy(isLoading = false, error = error.message) }
@@ -124,13 +131,33 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Abandon profile setup for a provisional account (the Complete Profile
+     * "Cancel" escape hatch). Deletes the orphan account when possible, otherwise
+     * signs out — either way the user ends up back at Sign In.
+     */
+    fun cancelProfileSetup() {
+        viewModelScope.launch {
+            deleteProvisionalAccountUseCase()
+            _uiState.update { it.copy(currentUser = null, needsProfileSetup = false) }
+            _uiEvent.send(AuthUiEvent.NavigateToSignIn)
+        }
+    }
+
     fun signInWithGoogle(idToken: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isGoogleLoading = true, error = null) }
             signInWithGoogleUseCase(idToken)
                 .onSuccess { user ->
-                    _uiState.update { it.copy(isGoogleLoading = false, currentUser = user) }
-                    _uiEvent.send(AuthUiEvent.NavigateToHome)
+                    // First-time Google users have no profile yet — route them to
+                    // setup rather than straight into the app.
+                    val needsSetup = resolveNeedsProfileSetup()
+                    _uiState.update { it.copy(isGoogleLoading = false, currentUser = user, needsProfileSetup = needsSetup) }
+                    if (needsSetup) {
+                        _uiEvent.send(AuthUiEvent.NavigateToCompleteProfile)
+                    } else {
+                        _uiEvent.send(AuthUiEvent.NavigateToHome)
+                    }
                 }
                 .onFailure { error ->
                     _uiState.update { it.copy(isGoogleLoading = false, error = error.message) }

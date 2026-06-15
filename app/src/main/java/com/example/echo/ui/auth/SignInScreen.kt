@@ -63,6 +63,13 @@ fun SignInScreen(
                         popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                     }
                 }
+                is AuthUiEvent.NavigateToCompleteProfile -> {
+                    // Signed in but profile never finished → resume setup. Clear the
+                    // auth back stack so Back can't return to sign-in.
+                    navController.navigate(Destinations.COMPLETE_PROFILE) {
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                    }
+                }
                 is AuthUiEvent.ShowError -> snackbarHostState.showSnackbar(event.message)
                 is AuthUiEvent.SignInSuccess -> snackbarHostState.showSnackbar("Welcome back!")
                 else -> {}

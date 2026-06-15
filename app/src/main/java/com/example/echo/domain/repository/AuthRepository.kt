@@ -71,6 +71,17 @@ interface AuthRepository {
      * Sign out the current user.
      */
     suspend fun signOut()
+
+    /**
+     * Delete the current Firebase Auth account directly, without re-authentication.
+     * Intended for discarding a *freshly created* account that never completed
+     * profile setup (the recent sign-in satisfies Firebase's recency check). May
+     * fail with a recent-login-required error for an older session — callers
+     * should fall back to [signOut] in that case. Account-deletion that releases
+     * a username + profile and re-auths first lives in
+     * [com.example.echo.domain.repository.UserRepository.deleteAccount].
+     */
+    suspend fun deleteCurrentAuthAccount(): Result<Unit>
     
     /**
      * Fetch available sign-in methods for an email.
