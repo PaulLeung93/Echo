@@ -16,4 +16,5 @@
     <string name="comment_guest_prompt">Sign in to join the conversation.</string>
     <string name="comment_location_unknown">Enable location to comment here.</string>
     <string name="comment_out_of_range">You must be within %1$d km of this place to comment.</string>
+    <string name="location_chip_desc">Current neighborhood location</string>
 </resources>

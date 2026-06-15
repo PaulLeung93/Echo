@@ -29,9 +29,16 @@ class FeedViewModel @Inject constructor(
     private val _userCoordinates = MutableStateFlow<Coordinates?>(null)
     val userCoordinates: StateFlow<Coordinates?> = _userCoordinates.asStateFlow()
 
+    private val _neighborhoodName = MutableStateFlow<String?>(null)
+    val neighborhoodName: StateFlow<String?> = _neighborhoodName.asStateFlow()
+
     init {
         viewModelScope.launch {
-            _userCoordinates.value = runCatching { locationProvider.getCurrentCoordinates() }.getOrNull()
+            val coords = runCatching { locationProvider.getCurrentCoordinates() }.getOrNull()
+            _userCoordinates.value = coords
+            if (coords != null) {
+                _neighborhoodName.value = runCatching { locationProvider.getNeighborhoodName(coords) }.getOrNull()
+            }
         }
     }
     

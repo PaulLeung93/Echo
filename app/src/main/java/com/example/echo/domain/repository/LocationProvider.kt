@@ -14,4 +14,11 @@ interface LocationProvider {
      *         (e.g. permission not granted or no fix obtainable).
      */
     suspend fun getCurrentCoordinates(): Coordinates?
+
+    /**
+     * Get the neighborhood or locality name for the given coordinates.
+     * @return the name of the neighborhood/locality, or null if unavailable.
+     */
+    suspend fun getNeighborhoodName(coordinates: Coordinates): String?
 }
+
