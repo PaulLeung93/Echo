@@ -122,6 +122,7 @@ fun MapScreen(
                     mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style)
                 ),
                 uiSettings = MapUiSettings(
+                    compassEnabled = false,
                     zoomControlsEnabled = false,
                     // Use our own bottom-right recenter button instead of the
                     // native top-right one (which collides with the search bar).
