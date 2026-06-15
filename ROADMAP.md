@@ -465,6 +465,31 @@ Deferred until shipped; captured so they aren't lost.
 ### Technical
 - [ ] Offline cache / Room layer for feed resilience.
 - [ ] Search/filter persistence across sessions.
+- [ ] **Map performance & Firestore cost audit (2026-06-15).** Found during a map
+      sanity check. The marker-tap jank (ripple animation recomposing every marker
+      ~60fps) is **fixed**; these remain:
+      - **[High] Unbounded posts read.** `PostRepositoryImpl.getPosts()` attaches a
+        live snapshot listener to the whole `posts` collection — no `.limit()`, no
+        geo bound. Every map/feed open bills a read for every post and re-reads on
+        every change. On the Spark plan (50K reads/day) this caps sessions and grows
+        with the collection forever. Stopgap: `.limit(N)` newest posts. Proper fix:
+        geohash-based geo queries (bigger change).
+      - **[High] Duplicate full-collection listeners.** MapViewModel and FeedViewModel
+        each open their own `getPosts()` listener (one `callbackFlow` per collector);
+        with `WhileSubscribed(5000)` they overlap on tab switches → ~2× reads. Share a
+        single upstream in the repo (e.g. `shareIn`).
+      - **[High] Over-fetch then discard.** Map downloads all posts then filters out
+        location-less ones client-side — paying to download posts it never plots.
+      - **[Med] O(n²) clustering re-runs on unrelated changes.** `clusterPosts` sits
+        inside the 8-way `combine`, so tapping a marker re-clusters every post even
+        though data didn't change. Split clustering (data→clusters) from selection.
+      - **[Med] Continuous zoom spam.** `LaunchedEffect(zoom)` pushes every fractional
+        zoom delta into `_currentZoom` → full combine + O(n²) re-cluster, but the
+        cluster radius only changes at zoom buckets 13/15/17. Bucket zoom +
+        `distinctUntilChanged`.
+      - **[Low]** Splitting the combine also removes the fragile `Array<Any?>` +
+        unchecked casts. Cache marker icon bitmaps by `(resId, scale)` to avoid
+        re-rasterizing identical icons per marker.
 
 ---
 

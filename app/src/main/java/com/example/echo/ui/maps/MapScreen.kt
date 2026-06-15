@@ -22,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -74,15 +75,6 @@ fun MapScreen(
 
     // Captured for use inside the GoogleMap content lambda (no MaterialTheme there).
     val rippleColor = MaterialTheme.colorScheme.primary
-
-    // Pulsing "echo" ripple around the user's location (2s loop, fades out).
-    val rippleTransition = rememberInfiniteTransition(label = "mapRipple")
-    val ripple by rippleTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(durationMillis = 2000, easing = LinearEasing)),
-        label = "ripple"
-    )
 
 
     // Get last known location on launch
@@ -137,75 +129,84 @@ fun MapScreen(
                 ),
                 onMapClick = { mapViewModel.clearSelectedPost() }
             ) {
-                // Pulsing coral ripple at the user's location (expands + fades).
+                // Pulsing coral ripple at the user's location. Isolated in its own
+                // composable so its ~60fps animation recomposes only itself — not the
+                // markers below. That churn was rebuilding marker state/icons every
+                // frame and making taps miss.
                 userLocation?.let { loc ->
-                    Circle(
-                        center = loc,
-                        radius = 60.0 + 440.0 * ripple,
-                        strokeWidth = 0f,
-                        fillColor = rippleColor.copy(alpha = 0.5f * (1f - ripple))
-                    )
+                    UserLocationRipple(center = loc, color = rippleColor)
                 }
 
                 // Cluster markers for user posts
                 uiState.clusters.forEach { cluster ->
-                    val count = cluster.posts.size
-                    if (count > 1) {
-                        val isSelected = uiState.selectedCluster?.position == cluster.position
-                        Marker(
-                            state = MarkerState(cluster.position),
-                            title = "$count posts",
-                            icon = BitmapDescriptorFactory.fromBitmap(
-                                createClusterIcon(
+                    key(cluster.position.latitude, cluster.position.longitude) {
+                        val count = cluster.posts.size
+                        val markerState = rememberUpdatedMarkerState(position = cluster.position)
+                        if (count > 1) {
+                            val isSelected = uiState.selectedCluster?.position == cluster.position
+                            val icon = remember(count, isSelected) {
+                                BitmapDescriptorFactory.fromBitmap(
+                                    createClusterIcon(context, count, scale = if (isSelected) 1.5f else 1.0f)
+                                )
+                            }
+                            Marker(
+                                state = markerState,
+                                title = "$count posts",
+                                icon = icon,
+                                onClick = {
+                                    mapViewModel.onClusterClick(cluster, cameraPositionState)
+                                    true
+                                }
+                            )
+                        } else {
+                            val post = cluster.posts.first()
+                            val isSelected = uiState.selectedPost?.id == post.id
+                            val icon = remember(isSelected) {
+                                bitmapDescriptorFromVector(
                                     context,
-                                    count,
+                                    R.drawable.ic_default,
                                     scale = if (isSelected) 1.5f else 1.0f
                                 )
-                            ),
-                            onClick = {
-                                mapViewModel.onClusterClick(cluster, cameraPositionState)
-                                true
                             }
-                        )
-                    } else {
-                        val post = cluster.posts.first()
-                        val isSelected = uiState.selectedPost?.id == post.id
-                        Marker(
-                            state = MarkerState(cluster.position),
-                            title = post.username,
-                            snippet = post.message,
-                            onClick = {
-                                mapViewModel.setSelectedPost(post, cameraPositionState)
-                                true
-                            },
-                            icon = bitmapDescriptorFromVector(
-                                context,
-                                R.drawable.ic_default,
-                                scale = if (isSelected) 1.5f else 1.0f
+                            Marker(
+                                state = markerState,
+                                title = post.username,
+                                snippet = post.message,
+                                onClick = {
+                                    mapViewModel.setSelectedPost(post, cameraPositionState)
+                                    true
+                                },
+                                icon = icon
                             )
-                        )
+                        }
                     }
                 }
 
                 // POI markers
                 uiState.pois.forEach { poi ->
-                    val latLng = LatLng(poi.latitude, poi.longitude)
-                    val isSelected = uiState.selectedPoi?.id == poi.id
-                    Marker(
-                        state = MarkerState(position = latLng),
-                        title = poi.name,
-                        snippet = "${poi.description} • ${poi.commentCount} comments",
-                        onClick = {
-                            mapViewModel.setSelectedPoi(poi, cameraPositionState)
-                            true
-                        },
-                        icon = when (poi.type.lowercase()) {
-                            "college" -> bitmapDescriptorFromVector(context, R.drawable.ic_college, scale = if (isSelected) 1.5f else 1.0f)
-                            "park" -> bitmapDescriptorFromVector(context, R.drawable.ic_park, scale = if (isSelected) 1.5f else 1.0f)
-                            "landmark" -> bitmapDescriptorFromVector(context, R.drawable.ic_landmark, scale = if (isSelected) 1.5f else 1.0f)
-                            else -> BitmapDescriptorFactory.defaultMarker()
+                    key(poi.id) {
+                        val latLng = LatLng(poi.latitude, poi.longitude)
+                        val isSelected = uiState.selectedPoi?.id == poi.id
+                        val markerState = rememberUpdatedMarkerState(position = latLng)
+                        val icon = remember(poi.type, isSelected) {
+                            when (poi.type.lowercase()) {
+                                "college" -> bitmapDescriptorFromVector(context, R.drawable.ic_college, scale = if (isSelected) 1.5f else 1.0f)
+                                "park" -> bitmapDescriptorFromVector(context, R.drawable.ic_park, scale = if (isSelected) 1.5f else 1.0f)
+                                "landmark" -> bitmapDescriptorFromVector(context, R.drawable.ic_landmark, scale = if (isSelected) 1.5f else 1.0f)
+                                else -> BitmapDescriptorFactory.defaultMarker()
+                            }
                         }
-                    )
+                        Marker(
+                            state = markerState,
+                            title = poi.name,
+                            snippet = "${poi.description} • ${poi.commentCount} comments",
+                            onClick = {
+                                mapViewModel.setSelectedPoi(poi, cameraPositionState)
+                                true
+                            },
+                            icon = icon
+                        )
+                    }
                 }
             }
         } else {
@@ -396,6 +397,30 @@ fun MapScreen(
             }
         )
     }
+}
+
+/**
+ * Expanding, fading ripple drawn at [center]. Hosts its own infinite animation so
+ * the per-frame recomposition stays scoped to this composable and never invalidates
+ * the marker composables sitting alongside it in the map content (which would
+ * otherwise rebuild marker state + icons every frame and make taps unreliable).
+ */
+@Composable
+@GoogleMapComposable
+private fun UserLocationRipple(center: LatLng, color: Color) {
+    val transition = rememberInfiniteTransition(label = "mapRipple")
+    val ripple by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 2000, easing = LinearEasing)),
+        label = "ripple"
+    )
+    Circle(
+        center = center,
+        radius = 60.0 + 440.0 * ripple,
+        strokeWidth = 0f,
+        fillColor = color.copy(alpha = 0.5f * (1f - ripple))
+    )
 }
 
 /** Floating search pill + circular filter button over the map (wireframe style). */
