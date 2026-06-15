@@ -1,5 +1,6 @@
 package com.example.echo.ui.auth
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,6 +16,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -80,6 +83,28 @@ fun SignUpScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        // Signature Echo ripple watermark bleeding off the top-right corner, to
+        // match the Stitch wireframe. Drawn in code (not an image asset): two big,
+        // faint coral rings. The Canvas clips to its bounds so they fade off-screen,
+        // and it's pointer-transparent so it never intercepts taps.
+        val rippleColor = MaterialTheme.colorScheme.primaryContainer
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(
+                color = rippleColor,
+                radius = size.width * 0.85f,
+                center = Offset(size.width, size.height * 0.08f),
+                alpha = 0.06f,
+                style = Stroke(width = 40.dp.toPx())
+            )
+            drawCircle(
+                color = rippleColor,
+                radius = size.width * 0.6f,
+                center = Offset(size.width * 1.06f, size.height * 0.02f),
+                alpha = 0.10f,
+                style = Stroke(width = 26.dp.toPx())
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
