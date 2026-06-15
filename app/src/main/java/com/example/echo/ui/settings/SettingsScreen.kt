@@ -15,10 +15,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import com.example.echo.domain.repository.AuthProvider
 import com.example.echo.ui.auth.AuthViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +35,8 @@ fun SettingsScreen(
     val isDeleting by viewModel.isDeleting.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showPasswordDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         viewModel.uiEvent.collect { snackbarHostState.showSnackbar(it) }
@@ -125,14 +130,63 @@ fun SettingsScreen(
                     enabled = !isDeleting,
                     onClick = {
                         showDeleteDialog = false
-                        viewModel.deleteAccount()
+                        when (viewModel.authProvider) {
+                            AuthProvider.PASSWORD -> showPasswordDialog = true
+                            else -> scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    "Deleting a Google-linked account isn't available yet. Please contact support."
+                                )
+                            }
+                        }
+                    }
+                ) {
+                    Text("Continue", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(enabled = !isDeleting, onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showPasswordDialog) {
+        var password by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { if (!isDeleting) showPasswordDialog = false },
+            title = { Text("Confirm it's you") },
+            text = {
+                Column {
+                    Text(
+                        "Enter your password to permanently delete your account.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        enabled = !isDeleting,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isDeleting && password.isNotBlank(),
+                    onClick = {
+                        showPasswordDialog = false
+                        viewModel.deleteAccountWithPassword(password)
                     }
                 ) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(enabled = !isDeleting, onClick = { showDeleteDialog = false }) {
+                TextButton(enabled = !isDeleting, onClick = { showPasswordDialog = false }) {
                     Text("Cancel")
                 }
             }

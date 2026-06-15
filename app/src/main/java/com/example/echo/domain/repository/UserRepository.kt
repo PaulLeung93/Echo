@@ -4,6 +4,20 @@ import com.example.echo.domain.model.UserProfile
 import kotlinx.coroutines.flow.Flow
 
 /**
+ * A fresh credential used to re-authenticate the user immediately before a
+ * sensitive action (account deletion). Firebase requires a recent login, and
+ * re-auth must succeed *before* any data is destroyed so a stale session can't
+ * leave a half-deleted account.
+ */
+sealed interface ReauthCredential {
+    /** Email/password accounts: the user re-enters their password. */
+    data class Password(val password: String) : ReauthCredential
+
+    /** Google accounts: a freshly obtained Google ID token. */
+    data class Google(val idToken: String) : ReauthCredential
+}
+
+/**
  * Repository for user profiles (`users/{uid}`) and the username reservation
  * index (`usernames/{handle}`) that enforces case-insensitive uniqueness.
  */
@@ -34,10 +48,17 @@ interface UserRepository {
     /** Observe the current user's profile (null when signed out or no profile yet). */
     fun observeCurrentUserProfile(): Flow<UserProfile?>
 
+    /** The sign-in provider of the current user (for choosing the re-auth flow). */
+    fun currentAuthProvider(): AuthProvider
+
     /**
-     * Permanently delete the current user: releases their username, deletes the
-     * profile doc, then deletes the Firebase Auth account. May fail with a
-     * recent-login-required error if the session is old.
+     * Permanently delete the current user. Re-authenticates with [reauth] first;
+     * only if that succeeds does it release the username, delete the profile doc,
+     * and delete the Firebase Auth account — so a failed/stale re-auth never
+     * leaves a half-deleted account.
      */
-    suspend fun deleteAccount(): Result<Unit>
+    suspend fun deleteAccount(reauth: ReauthCredential): Result<Unit>
 }
+
+/** Which sign-in method the current account uses. */
+enum class AuthProvider { PASSWORD, GOOGLE, OTHER, NONE }

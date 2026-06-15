@@ -3,9 +3,13 @@ package com.example.echo.data.repository
 import com.example.echo.data.entity.UserProfileEntity
 import com.example.echo.di.IoDispatcher
 import com.example.echo.domain.model.UserProfile
+import com.example.echo.domain.repository.AuthProvider
+import com.example.echo.domain.repository.ReauthCredential
 import com.example.echo.domain.repository.UserRepository
 import com.example.echo.utils.Constants
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -155,10 +159,35 @@ class UserRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }.flowOn(ioDispatcher)
 
-    override suspend fun deleteAccount(): Result<Unit> = withContext(ioDispatcher) {
+    override fun currentAuthProvider(): AuthProvider {
+        val user = auth.currentUser ?: return AuthProvider.NONE
+        val providers = user.providerData.map { it.providerId }
+        return when {
+            providers.contains(GoogleAuthProvider.PROVIDER_ID) -> AuthProvider.GOOGLE
+            providers.contains(EmailAuthProvider.PROVIDER_ID) -> AuthProvider.PASSWORD
+            else -> AuthProvider.OTHER
+        }
+    }
+
+    override suspend fun deleteAccount(reauth: ReauthCredential): Result<Unit> = withContext(ioDispatcher) {
         val user = auth.currentUser
             ?: return@withContext Result.failure(IllegalStateException("You must be signed in."))
         try {
+            // Re-authenticate FIRST. This satisfies Firebase's recent-login
+            // requirement and validates the credential (wrong password, cancelled
+            // Google flow, etc. throw here) — so nothing below runs unless we're
+            // certain the auth deletion will be allowed. Destroying the profile
+            // before a successful re-auth would orphan a half-deleted account.
+            val credential = when (reauth) {
+                is ReauthCredential.Password -> {
+                    val email = user.email
+                        ?: return@withContext Result.failure(IllegalStateException("Your account has no email to re-authenticate with."))
+                    EmailAuthProvider.getCredential(email, reauth.password)
+                }
+                is ReauthCredential.Google -> GoogleAuthProvider.getCredential(reauth.idToken, null)
+            }
+            user.reauthenticate(credential).await()
+
             val uid = user.uid
             // Release the username reservation and delete the profile (best-effort
             // so a missing doc doesn't block the auth deletion).
@@ -169,7 +198,7 @@ class UserRepositoryImpl @Inject constructor(
                 runCatching { usernamesCollection.document(handle).delete().await() }
             }
             runCatching { usersCollection.document(uid).delete().await() }
-            // Delete the Firebase Auth account (may require a recent login).
+            // Delete the Firebase Auth account (now permitted — we just re-authed).
             user.delete().await()
             Result.success(Unit)
         } catch (e: Exception) {
