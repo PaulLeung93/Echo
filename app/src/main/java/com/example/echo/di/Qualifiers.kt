@@ -22,3 +22,13 @@ annotation class DefaultDispatcher
 @Retention(AnnotationRetention.BINARY)
 @Qualifier
 annotation class MainDispatcher
+
+/**
+ * Qualifier for an application-lifetime CoroutineScope. Used to host shared,
+ * long-lived flows (e.g. the single posts snapshot listener) that should outlive
+ * any one ViewModel so collectors can share one upstream instead of each opening
+ * its own.
+ */
+@Retention(AnnotationRetention.BINARY)
+@Qualifier
+annotation class ApplicationScope

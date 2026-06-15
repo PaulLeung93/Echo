@@ -5,7 +5,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import javax.inject.Singleton
 
 /**
@@ -30,4 +32,16 @@ object DispatcherModule {
     @Provides
     @Singleton
     fun providesMainDispatcher(): CoroutineDispatcher = Dispatchers.Main
+
+    /**
+     * Application-lifetime scope for shared hot flows. A [SupervisorJob] keeps one
+     * failed child from cancelling the others; it's never cancelled (lives as long
+     * as the process), which is intentional for app-wide shared streams.
+     */
+    @ApplicationScope
+    @Provides
+    @Singleton
+    fun providesApplicationScope(
+        @IoDispatcher dispatcher: CoroutineDispatcher
+    ): CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
 }

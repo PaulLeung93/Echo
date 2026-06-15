@@ -28,55 +28,100 @@ class MapViewModel @Inject constructor(
     private val _selectedPost = MutableStateFlow<Post?>(null)
     private val _selectedCluster = MutableStateFlow<ClusterGroup?>(null)
     private val _selectedPoiId = MutableStateFlow<String?>(null)
-    private val _currentZoom = MutableStateFlow(12f)
 
-    @Suppress("UNCHECKED_CAST")
-    val uiState: StateFlow<MapUiState> = combine(
+    /**
+     * Cluster radius (meters) derived from the camera zoom *bucket*, not the raw
+     * zoom. The radius only steps at zoom 13/15/17, so collapsing the continuous
+     * zoom to its bucket here lets the StateFlow de-dupe identical values — every
+     * fractional zoom delta no longer re-runs the O(n²) clustering.
+     */
+    private val _clusterRadius = MutableStateFlow(clusterRadiusForZoom(12f))
+
+    /** Posts that can be plotted: have a location and match the active tag/type filter. */
+    private val mappablePosts: Flow<List<Post>> = combine(
         getPostsUseCase(),
-        getPoisUseCase(),
         _currentTag,
-        _activeFilters,
-        _selectedPost,
-        _selectedCluster,
-        _selectedPoiId,
-        _currentZoom
-    ) { args: Array<Any?> ->
-        val posts = args[0] as List<Post>
-        val pois = args[1] as List<Poi>
-        val tag = args[2] as String?
-        val filters = args[3] as Set<String>
-        val selected = args[4] as Post?
-        val selectedCluster = args[5] as ClusterGroup?
-        val selectedPoiId = args[6] as String?
-        val zoom = args[7] as Float
-
-        val filteredPosts = if ("user posts" in filters) {
+        _activeFilters
+    ) { posts, tag, filters ->
+        if ("user posts" in filters) {
             posts.filter { post ->
                 post.latitude != null && post.longitude != null &&
-                (tag == null || post.tags.any { it.equals(tag, ignoreCase = true) })
+                    (tag == null || post.tags.any { it.equals(tag, ignoreCase = true) })
             }
         } else {
             emptyList()
         }
+    }
 
-        val filteredPois = pois.filter { it.type.lowercase() in filters }
-        val selectedPoi = filteredPois.find { it.id == selectedPoiId }
-        
+    /**
+     * Clusters live on their own upstream so they recompute only when the plottable
+     * posts or the zoom bucket change — selecting a marker (which only touches the
+     * selection flows below) no longer re-clusters every post.
+     */
+    private val clusters: Flow<List<ClusterGroup>> = combine(
+        mappablePosts,
+        _clusterRadius
+    ) { posts, radius ->
+        clusterPosts(posts, radius)
+    }
+
+    private val filteredPois: Flow<List<Poi>> = combine(
+        getPoisUseCase(),
+        _activeFilters
+    ) { pois, filters ->
+        pois.filter { it.type.lowercase() in filters }
+    }
+
+    private val selection: Flow<Selection> = combine(
+        _selectedPost,
+        _selectedCluster,
+        _selectedPoiId
+    ) { post, cluster, poiId ->
+        Selection(post, cluster, poiId)
+    }
+
+    private val filterState: Flow<FilterState> = combine(
+        _currentTag,
+        _activeFilters
+    ) { tag, filters ->
+        FilterState(tag, filters)
+    }
+
+    val uiState: StateFlow<MapUiState> = combine(
+        mappablePosts,
+        clusters,
+        filteredPois,
+        selection,
+        filterState
+    ) { posts, clusterGroups, pois, sel, filters ->
         MapUiState(
-            posts = filteredPosts,
-            pois = filteredPois,
-            clusters = clusterPosts(filteredPosts, zoom),
-            selectedPost = selected,
-            selectedCluster = selectedCluster,
-            selectedPoi = selectedPoi,
-            currentTag = tag,
-            activeFilters = filters,
+            posts = posts,
+            pois = pois,
+            clusters = clusterGroups,
+            selectedPost = sel.post,
+            selectedCluster = sel.cluster,
+            selectedPoi = pois.find { it.id == sel.poiId },
+            currentTag = filters.tag,
+            activeFilters = filters.active,
             isLoading = false
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = MapUiState(isLoading = true)
+    )
+
+    /** Selection state grouped so it flows as one value into the [uiState] combine. */
+    private data class Selection(
+        val post: Post?,
+        val cluster: ClusterGroup?,
+        val poiId: String?
+    )
+
+    /** Tag + marker-type filters grouped so they flow as one value into [uiState]. */
+    private data class FilterState(
+        val tag: String?,
+        val active: Set<String>
     )
 
     fun setTagFilter(tag: String, camera: CameraPositionState?) {
@@ -115,7 +160,9 @@ class MapViewModel @Inject constructor(
     }
 
     fun updateZoom(zoom: Float) {
-        _currentZoom.value = zoom
+        // Map to the discrete cluster radius so the StateFlow only emits (and only
+        // re-clusters) when the zoom crosses a bucket boundary, not on every frame.
+        _clusterRadius.value = clusterRadiusForZoom(zoom)
     }
 
     fun setSelectedPost(post: Post, camera: CameraPositionState) {
@@ -167,14 +214,15 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private fun clusterPosts(posts: List<Post>, zoom: Float): List<ClusterGroup> {
-        val radius = when {
-            zoom >= 17 -> 0f
-            zoom >= 15 -> 60f
-            zoom >= 13 -> 120f
-            else -> 200f
-        }
+    /** The cluster radius (meters) for a given zoom. Bucketed so it only steps at 13/15/17. */
+    private fun clusterRadiusForZoom(zoom: Float): Float = when {
+        zoom >= 17 -> 0f
+        zoom >= 15 -> 60f
+        zoom >= 13 -> 120f
+        else -> 200f
+    }
 
+    private fun clusterPosts(posts: List<Post>, radius: Float): List<ClusterGroup> {
         if (radius == 0f) {
             return posts.map {
                 ClusterGroup(LatLng(it.latitude!!, it.longitude!!), listOf(it))

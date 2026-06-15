@@ -12,6 +12,14 @@ object Constants {
      */
     const val IMAGE_USER_AGENT = "EchoApp/1.0 (Android; contact paul.leung@codepath.org)"
 
+    /**
+     * Max posts fetched by the live feed/map snapshot listener. The listener is
+     * unbounded by nature (a `.limit()` newest-first cap), so without this every
+     * session bills a read per post in the collection and grows forever. Caps the
+     * Spark-plan read budget; the proper fix is geohash-based geo queries.
+     */
+    const val POSTS_QUERY_LIMIT = 200L
+
     // Firestore Collections
     const val COLLECTION_POSTS = "posts"
     const val COLLECTION_POIS = "pois"

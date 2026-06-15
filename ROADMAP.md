@@ -476,31 +476,36 @@ Deferred until shipped; captured so they aren't lost.
       in Firestore). The **Share button** on the detail screen is now wired to an
       `ACTION_SEND` chooser (shares the place name + description), enabled once the
       POI loads.
-- [ ] **Map performance & Firestore cost audit (2026-06-15).** Found during a map
+- [x] **Map performance & Firestore cost audit (2026-06-15).** Found during a map
       sanity check. The marker-tap jank (ripple animation recomposing every marker
-      ~60fps) is **fixed**; these remain:
-      - **[High] Unbounded posts read.** `PostRepositoryImpl.getPosts()` attaches a
-        live snapshot listener to the whole `posts` collection — no `.limit()`, no
-        geo bound. Every map/feed open bills a read for every post and re-reads on
-        every change. On the Spark plan (50K reads/day) this caps sessions and grows
-        with the collection forever. Stopgap: `.limit(N)` newest posts. Proper fix:
-        geohash-based geo queries (bigger change).
-      - **[High] Duplicate full-collection listeners.** MapViewModel and FeedViewModel
-        each open their own `getPosts()` listener (one `callbackFlow` per collector);
-        with `WhileSubscribed(5000)` they overlap on tab switches → ~2× reads. Share a
-        single upstream in the repo (e.g. `shareIn`).
-      - **[High] Over-fetch then discard.** Map downloads all posts then filters out
-        location-less ones client-side — paying to download posts it never plots.
-      - **[Med] O(n²) clustering re-runs on unrelated changes.** `clusterPosts` sits
-        inside the 8-way `combine`, so tapping a marker re-clusters every post even
-        though data didn't change. Split clustering (data→clusters) from selection.
-      - **[Med] Continuous zoom spam.** `LaunchedEffect(zoom)` pushes every fractional
-        zoom delta into `_currentZoom` → full combine + O(n²) re-cluster, but the
-        cluster radius only changes at zoom buckets 13/15/17. Bucket zoom +
-        `distinctUntilChanged`.
-      - **[Low]** Splitting the combine also removes the fragile `Array<Any?>` +
-        unchecked casts. Cache marker icon bitmaps by `(resId, scale)` to avoid
-        re-rasterizing identical icons per marker.
+      ~60fps) was fixed earlier; the rest are now addressed (green
+      `compileDebugKotlin` + `testDebugUnitTest`):
+      - **[High] Unbounded posts read — fixed.** `getPosts()` now caps at the newest
+        `Constants.POSTS_QUERY_LIMIT` (200) via `.orderBy(timestamp DESC).limit()`,
+        so a session no longer bills a read per post in the whole collection. Proper
+        fix (geohash geo queries) remains the long-term path; tracked under *Map &
+        Location → GeoFire*.
+      - **[High] Duplicate full-collection listeners — fixed.** The repo now exposes
+        **one** shared listener: the `getPosts()` `callbackFlow` is `shareIn`'d on a
+        new `@ApplicationScope` `CoroutineScope` (`WhileSubscribed(5000)`,
+        `replay = 1`). Feed and Map collect the same upstream, so a Feed↔Map tab
+        switch reuses the warm listener instead of opening a second one (~2× → 1×).
+      - **[High] Over-fetch then discard — addressed by the share.** Map still filters
+        location-less posts client-side, but it now shares Feed's already-needed
+        download rather than opening its own listener, so it pays **nothing extra**.
+        (A dedicated geo query would *add* a second listener, working against the
+        single-upstream fix; deferred to the geohash work.)
+      - **[Med] O(n²) clustering re-runs — fixed.** Clustering moved to its own
+        `clusters` flow (`combine(mappablePosts, clusterRadius)`), so selecting a
+        marker (separate `selection` flow) no longer re-clusters every post.
+      - **[Med] Continuous zoom spam — fixed.** `updateZoom` now maps the raw zoom to
+        its discrete cluster **radius** bucket and stores that in a `StateFlow`, which
+        de-dupes identical values — fractional zoom deltas between buckets 13/15/17 no
+        longer trigger a re-cluster.
+      - **[Low] — fixed.** Splitting the 8-way `combine` into typed `mappablePosts` /
+        `clusters` / `filteredPois` / `selection` / `filterState` flows removed the
+        fragile `Array<Any?>` + unchecked casts. Marker icon bitmaps are now cached by
+        `(resId, scale)` in `MapUtils`, so identical icons aren't re-rasterized.
 
 ---
 

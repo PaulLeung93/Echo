@@ -3,6 +3,7 @@ package com.example.echo.data.repository
 import com.example.echo.data.entity.PostEntity
 import com.example.echo.data.mapper.PostMapper
 import com.example.echo.data.withWriteTimeout
+import com.example.echo.di.ApplicationScope
 import com.example.echo.di.IoDispatcher
 import com.example.echo.domain.model.Post
 import com.example.echo.domain.repository.PostRepository
@@ -12,10 +13,13 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -30,32 +34,50 @@ class PostRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val postMapper: PostMapper,
     private val userRepository: UserRepository,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    @ApplicationScope private val appScope: CoroutineScope
 ) : PostRepository {
-    
+
     private val postsCollection = firestore.collection(Constants.COLLECTION_POSTS)
-    
-    override fun getPosts(): Flow<List<Post>> = callbackFlow {
+
+    /**
+     * A single live listener over the newest [Constants.POSTS_QUERY_LIMIT] posts,
+     * shared across all collectors (Feed + Map). Without `shareIn`, each
+     * `getPosts()` collector opened its own snapshot listener, so overlapping
+     * subscriptions (e.g. a Feed↔Map tab switch) doubled the Firestore reads.
+     * `WhileSubscribed(5000)` keeps the listener warm for 5s after the last
+     * collector leaves (so a quick tab switch reuses it), and `replay = 1` hands a
+     * new collector the latest snapshot immediately rather than re-fetching.
+     */
+    private val sharedPosts: Flow<List<Post>> = callbackFlow {
         val listener = postsCollection
             .orderBy(Constants.FIELD_TIMESTAMP, Query.Direction.DESCENDING)
+            .limit(Constants.POSTS_QUERY_LIMIT)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     close(error)
                     return@addSnapshotListener
                 }
-                
+
                 val entities = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(PostEntity::class.java)
                 } ?: emptyList()
-                
+
                 val currentUserId = auth.currentUser?.uid
                 val posts = postMapper.toDomainList(entities, currentUserId)
                 trySend(posts)
             }
-        
+
         awaitClose { listener.remove() }
     }.flowOn(ioDispatcher)
-    
+        .shareIn(
+            scope = appScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            replay = 1
+        )
+
+    override fun getPosts(): Flow<List<Post>> = sharedPosts
+
     override fun getPostsByTag(tag: String): Flow<List<Post>> = callbackFlow {
         val listener = postsCollection
             .orderBy(Constants.FIELD_TIMESTAMP, Query.Direction.DESCENDING)
