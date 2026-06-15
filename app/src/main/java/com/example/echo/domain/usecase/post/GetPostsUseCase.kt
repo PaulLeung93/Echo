@@ -17,6 +17,14 @@ class GetPostsUseCase @Inject constructor(
      * @return Flow of posts for reactive updates.
      */
     operator fun invoke(): Flow<List<Post>> = postRepository.getPosts()
+
+    /**
+     * Fetch one newest-first page via a one-time read (for the paginated feed).
+     * @param afterTimestamp Cursor; null for the first page.
+     * @param limit Page size.
+     */
+    suspend fun page(afterTimestamp: Long?, limit: Long): List<Post> =
+        postRepository.getPostsPage(afterTimestamp, limit)
     
     /**
      * Get posts filtered by a specific tag.

@@ -3,11 +3,12 @@ package com.example.echo.ui.feed
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.echo.domain.model.Coordinates
+import com.example.echo.domain.model.Post
 import com.example.echo.domain.repository.LocationProvider
 import com.example.echo.domain.usecase.post.GetPostsUseCase
 import com.example.echo.domain.usecase.post.GetPostsByTagUseCase
 import com.example.echo.domain.usecase.post.ToggleLikeUseCase
-import com.example.echo.domain.usecase.post.RefreshPostsUseCase
+import com.example.echo.utils.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -19,7 +20,6 @@ class FeedViewModel @Inject constructor(
     private val getPostsUseCase: GetPostsUseCase,
     private val getPostsByTagUseCase: GetPostsByTagUseCase,
     private val toggleLikeUseCase: ToggleLikeUseCase,
-    private val refreshPostsUseCase: RefreshPostsUseCase,
     private val locationProvider: LocationProvider
 ) : ViewModel() {
 
@@ -32,6 +32,17 @@ class FeedViewModel @Inject constructor(
     private val _neighborhoodName = MutableStateFlow<String?>(null)
     val neighborhoodName: StateFlow<String?> = _neighborhoodName.asStateFlow()
 
+    // --- Paginated (untagged) feed state ---
+    // The default feed pages in via one-time reads instead of a live 200-post
+    // listener, so a session only bills reads for what's actually scrolled to.
+    private val _pagedPosts = MutableStateFlow<List<Post>>(emptyList())
+    private val _isLoadingFirstPage = MutableStateFlow(true)
+    private val _endReached = MutableStateFlow(false)
+    private var oldestTimestamp: Long? = null
+
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
     init {
         viewModelScope.launch {
             val coords = runCatching { locationProvider.getCurrentCoordinates() }.getOrNull()
@@ -40,19 +51,25 @@ class FeedViewModel @Inject constructor(
                 _neighborhoodName.value = runCatching { locationProvider.getNeighborhoodName(coords) }.getOrNull()
             }
         }
+        viewModelScope.launch { loadPage(reset = true) }
     }
-    
-    val uiState: StateFlow<FeedUiState> = combine(
-        _currentTag.flatMapLatest { tag ->
-            if (tag == null) getPostsUseCase() else getPostsByTagUseCase(tag)
-        }.catch { e -> emit(emptyList()) },
-        _currentTag
-    ) { posts, tag ->
-        FeedUiState(
-            posts = posts,
-            currentTag = tag,
-            isLoading = false // Flow-based real-time updates don't strictly have a "loading" start here
-        )
+
+    val uiState: StateFlow<FeedUiState> = _currentTag.flatMapLatest { tag ->
+        if (tag != null) {
+            // The tag view stays live (rare and short-lived); it reflects likes via
+            // its own listener, so optimistic updates aren't needed there.
+            getPostsByTagUseCase(tag)
+                .catch { emit(emptyList()) }
+                .map { posts -> FeedUiState(posts = posts, currentTag = tag, isLoading = false) }
+        } else {
+            combine(_pagedPosts, _isLoadingFirstPage) { posts, loadingFirst ->
+                FeedUiState(
+                    posts = posts,
+                    currentTag = null,
+                    isLoading = loadingFirst && posts.isEmpty()
+                )
+            }
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -66,11 +83,42 @@ class FeedViewModel @Inject constructor(
     private val _uiEvent = Channel<String>()
     val uiEvent = _uiEvent.receiveAsFlow()
 
+    /** Load the next page when the user nears the end of the list (untagged feed only). */
+    fun loadMore() {
+        if (_currentTag.value != null) return
+        if (_isLoadingMore.value || _isLoadingFirstPage.value || _endReached.value) return
+        viewModelScope.launch { loadPage(reset = false) }
+    }
+
+    private suspend fun loadPage(reset: Boolean) {
+        if (reset) {
+            _isLoadingFirstPage.value = true
+            _endReached.value = false
+            oldestTimestamp = null
+        } else {
+            _isLoadingMore.value = true
+        }
+        try {
+            val page = getPostsUseCase.page(
+                afterTimestamp = if (reset) null else oldestTimestamp,
+                limit = Constants.FEED_PAGE_SIZE
+            )
+            _endReached.value = page.size < Constants.FEED_PAGE_SIZE
+            page.lastOrNull()?.let { oldestTimestamp = it.timestamp }
+            _pagedPosts.value = if (reset) page else _pagedPosts.value + page
+        } catch (e: Exception) {
+            _uiEvent.send(e.message ?: "Couldn't load posts. Please try again.")
+        } finally {
+            _isLoadingFirstPage.value = false
+            _isLoadingMore.value = false
+        }
+    }
+
     fun refreshPosts() {
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
-                refreshPostsUseCase()
+                loadPage(reset = true)
             } finally {
                 _isRefreshing.value = false
             }
@@ -82,14 +130,31 @@ class FeedViewModel @Inject constructor(
     }
 
     fun clearTagFilter() {
+        // Return to the already-loaded paginated feed (no extra reads); pull-to-refresh
+        // re-primes it if the user wants the latest.
         _currentTag.value = null
     }
 
     fun toggleLike(postId: String) {
         viewModelScope.launch {
-            toggleLikeUseCase(postId).onFailure { e ->
-                _uiEvent.send(e.message ?: "Couldn't update your like. Please try again.")
-            }
+            toggleLikeUseCase(postId)
+                .onSuccess { nowLiked ->
+                    // No live listener backs the paginated feed, so reflect the like
+                    // locally instead of re-reading the post.
+                    _pagedPosts.update { posts ->
+                        posts.map {
+                            if (it.id == postId) {
+                                it.copy(
+                                    likedByCurrentUser = nowLiked,
+                                    likeCount = (it.likeCount + if (nowLiked) 1 else -1).coerceAtLeast(0)
+                                )
+                            } else it
+                        }
+                    }
+                }
+                .onFailure { e ->
+                    _uiEvent.send(e.message ?: "Couldn't update your like. Please try again.")
+                }
         }
     }
 }

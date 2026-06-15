@@ -78,6 +78,19 @@ class PostRepositoryImpl @Inject constructor(
 
     override fun getPosts(): Flow<List<Post>> = sharedPosts
 
+    override suspend fun getPostsPage(afterTimestamp: Long?, limit: Long): List<Post> =
+        withContext(ioDispatcher) {
+            var query = postsCollection
+                .orderBy(Constants.FIELD_TIMESTAMP, Query.Direction.DESCENDING)
+                .limit(limit)
+            if (afterTimestamp != null) {
+                query = query.startAfter(afterTimestamp)
+            }
+            val snapshot = query.get().await()
+            val entities = snapshot.documents.mapNotNull { it.toObject(PostEntity::class.java) }
+            postMapper.toDomainList(entities, auth.currentUser?.uid)
+        }
+
     override fun getPostsByTag(tag: String): Flow<List<Post>> = callbackFlow {
         val listener = postsCollection
             .orderBy(Constants.FIELD_TIMESTAMP, Query.Direction.DESCENDING)

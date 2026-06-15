@@ -174,10 +174,8 @@ fun MapScreen(
                             val post = cluster.posts.first()
                             val isSelected = uiState.selectedPost?.id == post.id
                             val icon = remember(isSelected) {
-                                bitmapDescriptorFromVector(
-                                    context,
-                                    R.drawable.ic_default,
-                                    scale = if (isSelected) 1.5f else 1.0f
+                                BitmapDescriptorFactory.fromBitmap(
+                                    createPinIcon(PinCategory.POST, scale = if (isSelected) 1.5f else 1.0f)
                                 )
                             }
                             Marker(
@@ -201,12 +199,12 @@ fun MapScreen(
                         val isSelected = uiState.selectedPoi?.id == poi.id
                         val markerState = rememberUpdatedMarkerState(position = latLng)
                         val icon = remember(poi.type, isSelected) {
-                            when (poi.type.lowercase()) {
-                                "college" -> bitmapDescriptorFromVector(context, R.drawable.ic_college, scale = if (isSelected) 1.5f else 1.0f)
-                                "park" -> bitmapDescriptorFromVector(context, R.drawable.ic_park, scale = if (isSelected) 1.5f else 1.0f)
-                                "landmark" -> bitmapDescriptorFromVector(context, R.drawable.ic_landmark, scale = if (isSelected) 1.5f else 1.0f)
-                                else -> BitmapDescriptorFactory.defaultMarker()
-                            }
+                            BitmapDescriptorFactory.fromBitmap(
+                                createPinIcon(
+                                    PinCategory.fromPoiType(poi.type),
+                                    scale = if (isSelected) 1.5f else 1.0f
+                                )
+                            )
                         }
                         Marker(
                             state = markerState,

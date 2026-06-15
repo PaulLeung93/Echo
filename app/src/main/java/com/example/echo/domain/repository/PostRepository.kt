@@ -13,6 +13,15 @@ interface PostRepository {
      * Get all posts as a Flow for reactive updates.
      */
     fun getPosts(): Flow<List<Post>>
+
+    /**
+     * Fetch one page of newest-first posts via a one-time read (not a live listener),
+     * so the feed only bills reads for the posts actually scrolled into view.
+     * @param afterTimestamp Cursor: return posts strictly older than this timestamp,
+     *   or the newest page when null.
+     * @param limit Page size.
+     */
+    suspend fun getPostsPage(afterTimestamp: Long?, limit: Long): List<Post>
     
     /**
      * Get posts filtered by tag.

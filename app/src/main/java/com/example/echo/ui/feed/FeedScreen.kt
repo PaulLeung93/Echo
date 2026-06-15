@@ -3,6 +3,7 @@ package com.example.echo.ui.feed
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -46,8 +47,23 @@ fun FeedScreen(
 ) {
     val uiState by feedViewModel.uiState.collectAsState()
     val isRefreshing by feedViewModel.isRefreshing.collectAsState()
+    val isLoadingMore by feedViewModel.isLoadingMore.collectAsState()
     val userCoords by feedViewModel.userCoordinates.collectAsState()
     val neighborhoodName by feedViewModel.neighborhoodName.collectAsState()
+
+    // Drive feed pagination: ask for the next page once the user scrolls within a few
+    // items of the end. Only the untagged feed pages (the VM ignores it otherwise).
+    val listState = rememberLazyListState()
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val total = listState.layoutInfo.totalItemsCount
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            total > 0 && lastVisible >= total - 3
+        }
+    }
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) feedViewModel.loadMore()
+    }
     
     val authState by authViewModel.uiState.collectAsState()
     val isUserAuthenticated = authState.currentUser != null
@@ -186,6 +202,7 @@ fun FeedScreen(
                         onRefresh = { feedViewModel.refreshPosts() }
                     ) {
                         LazyColumn(
+                            state = listState,
                             contentPadding = PaddingValues(16.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
@@ -234,6 +251,18 @@ fun FeedScreen(
                                         }
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
+                                }
+                                if (isLoadingMore) {
+                                    item {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                                        }
+                                    }
                                 }
                             }
                         }

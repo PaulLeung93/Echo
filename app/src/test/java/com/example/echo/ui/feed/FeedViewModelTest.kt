@@ -4,7 +4,6 @@ import com.example.echo.domain.model.Coordinates
 import com.example.echo.domain.repository.LocationProvider
 import com.example.echo.domain.usecase.post.GetPostsUseCase
 import com.example.echo.domain.usecase.post.GetPostsByTagUseCase
-import com.example.echo.domain.usecase.post.RefreshPostsUseCase
 import com.example.echo.domain.usecase.post.ToggleLikeUseCase
 import io.mockk.coEvery
 import io.mockk.every
@@ -27,7 +26,6 @@ class FeedViewModelTest {
     private val getPostsUseCase: GetPostsUseCase = mockk()
     private val getPostsByTagUseCase: GetPostsByTagUseCase = mockk()
     private val toggleLikeUseCase: ToggleLikeUseCase = mockk()
-    private val refreshPostsUseCase: RefreshPostsUseCase = mockk()
     private val locationProvider: LocationProvider = mockk()
 
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -38,6 +36,7 @@ class FeedViewModelTest {
         
         // Default mocks
         every { getPostsUseCase() } returns flowOf(emptyList())
+        coEvery { getPostsUseCase.page(any(), any()) } returns emptyList()
         every { getPostsByTagUseCase(any()) } returns flowOf(emptyList())
     }
 
@@ -56,7 +55,6 @@ class FeedViewModelTest {
             getPostsUseCase,
             getPostsByTagUseCase,
             toggleLikeUseCase,
-            refreshPostsUseCase,
             locationProvider
         )
 
@@ -72,7 +70,6 @@ class FeedViewModelTest {
             getPostsUseCase,
             getPostsByTagUseCase,
             toggleLikeUseCase,
-            refreshPostsUseCase,
             locationProvider
         )
 
