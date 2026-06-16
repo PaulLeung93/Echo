@@ -5,12 +5,14 @@ import com.example.echo.data.repository.AuthRepositoryImpl
 import com.example.echo.data.repository.CommentRepositoryImpl
 import com.example.echo.data.repository.PoiRepositoryImpl
 import com.example.echo.data.repository.PostRepositoryImpl
+import com.example.echo.data.repository.ReportRepositoryImpl
 import com.example.echo.data.repository.UserRepositoryImpl
 import com.example.echo.domain.repository.AuthRepository
 import com.example.echo.domain.repository.CommentRepository
 import com.example.echo.domain.repository.LocationProvider
 import com.example.echo.domain.repository.PoiRepository
 import com.example.echo.domain.repository.PostRepository
+import com.example.echo.domain.repository.ReportRepository
 import com.example.echo.domain.repository.UserRepository
 import dagger.Binds
 import dagger.Module
@@ -48,4 +50,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindUserRepository(impl: UserRepositoryImpl): UserRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindReportRepository(impl: ReportRepositoryImpl): ReportRepository
 }

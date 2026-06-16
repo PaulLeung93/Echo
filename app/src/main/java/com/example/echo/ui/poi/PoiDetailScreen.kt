@@ -44,7 +44,10 @@ import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.echo.R
+import com.example.echo.components.BlockUserDialog
 import com.example.echo.components.CommentCard
+import com.example.echo.components.ReportDialog
+import com.example.echo.domain.model.Comment
 import com.example.echo.domain.model.Poi
 import com.example.echo.utils.Constants
 import com.example.echo.utils.formatDistance
@@ -64,6 +67,8 @@ fun PoiDetailScreen(
 
     var newComment by remember { mutableStateOf("") }
     var commentJustAdded by remember { mutableStateOf(false) }
+    var reportingComment by remember { mutableStateOf<Comment?>(null) }
+    var blockTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     // Lightweight client-side rate limiting (real enforcement is server-side).
     val commentTimestamps = remember { mutableStateListOf<Long>() }
@@ -209,6 +214,16 @@ fun PoiDetailScreen(
                                     onDelete = if (isOwnComment) {
                                         { viewModel.deleteComment(comment.id) }
                                     } else null,
+                                    onReport = if (!uiState.isGuest && !isOwnComment &&
+                                        comment.authorId.isNotEmpty()
+                                    ) {
+                                        { reportingComment = comment }
+                                    } else null,
+                                    onBlock = if (!uiState.isGuest && !isOwnComment &&
+                                        comment.authorId.isNotEmpty()
+                                    ) {
+                                        { blockTarget = comment.authorId to comment.username }
+                                    } else null,
                                 )
                                 Spacer(Modifier.height(12.dp))
                             }
@@ -217,6 +232,27 @@ fun PoiDetailScreen(
                 }
             }
         }
+    }
+
+    reportingComment?.let { comment ->
+        ReportDialog(
+            onDismiss = { reportingComment = null },
+            onSubmit = { reason ->
+                viewModel.reportComment(comment, reason)
+                reportingComment = null
+            }
+        )
+    }
+
+    blockTarget?.let { (uid, username) ->
+        BlockUserDialog(
+            username = username,
+            onDismiss = { blockTarget = null },
+            onConfirm = {
+                viewModel.blockUser(uid)
+                blockTarget = null
+            }
+        )
     }
 }
 

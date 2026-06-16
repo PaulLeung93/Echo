@@ -33,6 +33,7 @@ fun SettingsScreen(
     val darkMode by viewModel.darkMode.collectAsState()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
     val isDeleting by viewModel.isDeleting.collectAsState()
+    val blockedUsers by viewModel.blockedUsers.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }
@@ -92,6 +93,43 @@ fun SettingsScreen(
                 checked = notificationsEnabled,
                 onCheckedChange = viewModel::setNotificationsEnabled
             )
+
+            SectionHeader("Blocked accounts")
+            if (blockedUsers.isEmpty()) {
+                Text(
+                    "You haven't blocked anyone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                )
+            } else {
+                blockedUsers.forEach { profile ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "@${profile.username}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (profile.fullName.isNotBlank()) {
+                                Text(
+                                    profile.fullName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        TextButton(onClick = { viewModel.unblockUser(profile.uid) }) {
+                            Text("Unblock")
+                        }
+                    }
+                }
+            }
 
             SectionHeader("Account")
             ActionRow(

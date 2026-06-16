@@ -53,6 +53,7 @@ object Constants {
     const val COLLECTION_COMMENTS = "comments"
     const val COLLECTION_USERS = "users"
     const val COLLECTION_USERNAMES = "usernames"
+    const val COLLECTION_REPORTS = "reports"
 
 
     // Firestore Fields

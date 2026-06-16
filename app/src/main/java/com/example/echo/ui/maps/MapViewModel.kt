@@ -8,6 +8,7 @@ import com.example.echo.domain.model.Post
 import com.example.echo.domain.usecase.poi.GetPoisUseCase
 import com.example.echo.domain.usecase.post.GetPostsUseCase
 import com.example.echo.domain.usecase.post.ToggleLikeUseCase
+import com.example.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
 import com.example.echo.utils.Constants
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
@@ -22,8 +23,11 @@ import javax.inject.Inject
 class MapViewModel @Inject constructor(
     private val getPostsUseCase: GetPostsUseCase,
     private val getPoisUseCase: GetPoisUseCase,
-    private val toggleLikeUseCase: ToggleLikeUseCase
+    private val toggleLikeUseCase: ToggleLikeUseCase,
+    observeHiddenAuthorIdsUseCase: ObserveHiddenAuthorIdsUseCase
 ) : ViewModel() {
+
+    private val blockedIds: Flow<Set<String>> = observeHiddenAuthorIdsUseCase()
 
     private val _currentTag = MutableStateFlow<String?>(null)
     private val _activeFilters = MutableStateFlow(setOf("user posts", "landmark", "park", "college"))
@@ -106,13 +110,14 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    /** Posts that can be plotted: have a location and pass the active type filter. */
+    /** Posts that can be plotted: located, pass the type filter, and not from a blocked user. */
     private val mappablePosts: Flow<List<Post>> = combine(
         postSource,
-        _activeFilters
-    ) { posts, filters ->
+        _activeFilters,
+        blockedIds
+    ) { posts, filters, blocked ->
         if ("user posts" in filters) {
-            posts.filter { it.latitude != null && it.longitude != null }
+            posts.filter { it.latitude != null && it.longitude != null && it.authorId !in blocked }
         } else {
             emptyList()
         }

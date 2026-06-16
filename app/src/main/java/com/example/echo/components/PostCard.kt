@@ -41,8 +41,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import com.example.echo.R
 import com.example.echo.domain.model.Post
 import com.example.echo.ui.theme.EchoTheme
 import com.example.echo.ui.theme.WarmAmberBadge
@@ -66,6 +68,8 @@ fun PostCard(
     onTagClick: ((String) -> Unit)? = null,
     onEdit: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
+    onReport: (() -> Unit)? = null,
+    onBlock: (() -> Unit)? = null,
     distanceLabel: String? = null,
     modifier: Modifier = Modifier
 ) {
@@ -116,8 +120,13 @@ fun PostCard(
                         )
                     }
                 }
-                if (onEdit != null || onDelete != null) {
-                    PostOverflowMenu(onEdit = onEdit, onDelete = onDelete)
+                if (onEdit != null || onDelete != null || onReport != null || onBlock != null) {
+                    PostOverflowMenu(
+                        onEdit = onEdit,
+                        onDelete = onDelete,
+                        onReport = onReport,
+                        onBlock = onBlock
+                    )
                 }
             }
 
@@ -200,9 +209,17 @@ fun PostCard(
     }
 }
 
-/** Owner-only "⋮" menu offering Edit / Delete for a post. */
+/**
+ * "⋮" menu for a post. Owner-only actions (Edit / Delete) and viewer actions
+ * (Report / Block) are each shown only when their callback is provided.
+ */
 @Composable
-private fun PostOverflowMenu(onEdit: (() -> Unit)?, onDelete: (() -> Unit)?) {
+private fun PostOverflowMenu(
+    onEdit: (() -> Unit)?,
+    onDelete: (() -> Unit)?,
+    onReport: (() -> Unit)?,
+    onBlock: (() -> Unit)?
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
@@ -223,6 +240,18 @@ private fun PostOverflowMenu(onEdit: (() -> Unit)?, onDelete: (() -> Unit)?) {
                 DropdownMenuItem(
                     text = { Text("Delete") },
                     onClick = { expanded = false; onDelete() }
+                )
+            }
+            if (onReport != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.report)) },
+                    onClick = { expanded = false; onReport() }
+                )
+            }
+            if (onBlock != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.block_user)) },
+                    onClick = { expanded = false; onBlock() }
                 )
             }
         }

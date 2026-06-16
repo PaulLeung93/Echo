@@ -17,7 +17,10 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -101,6 +104,47 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun blockUser(blockedUid: String): Result<Unit> = withContext(ioDispatcher) {
+        val user = auth.currentUser
+            ?: return@withContext Result.failure(IllegalStateException("You must be signed in."))
+        if (blockedUid.isBlank() || blockedUid == user.uid) {
+            return@withContext Result.failure(IllegalArgumentException("Can't block this user."))
+        }
+        try {
+            usersCollection.document(user.uid)
+                .update("blockedUserIds", FieldValue.arrayUnion(blockedUid)).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun unblockUser(blockedUid: String): Result<Unit> = withContext(ioDispatcher) {
+        val user = auth.currentUser
+            ?: return@withContext Result.failure(IllegalStateException("You must be signed in."))
+        try {
+            usersCollection.document(user.uid)
+                .update("blockedUserIds", FieldValue.arrayRemove(blockedUid)).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getProfilesByIds(uids: List<String>): Result<List<UserProfile>> =
+        withContext(ioDispatcher) {
+            if (uids.isEmpty()) return@withContext Result.success(emptyList())
+            try {
+                val profiles = uids.mapNotNull { uid ->
+                    usersCollection.document(uid).get().await()
+                        .toObject(UserProfileEntity::class.java)?.toDomain()
+                }
+                Result.success(profiles)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     override suspend fun getCurrentUserProfile(): Result<UserProfile?> = withContext(ioDispatcher) {
         val uid = auth.currentUser?.uid ?: return@withContext Result.success(null)
         try {
@@ -159,6 +203,31 @@ class UserRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }.flowOn(ioDispatcher)
 
+    override fun observeHiddenUserIds(): Flow<Set<String>> {
+        val uid = auth.currentUser?.uid ?: return flowOf(emptySet())
+
+        // People I blocked (from my own profile doc).
+        val blockedByMe: Flow<Set<String>> =
+            observeCurrentUserProfile().map { it?.blockedUserIds?.toSet() ?: emptySet() }
+
+        // People who blocked me (their profile lists my uid). Makes the block mutual:
+        // once they block me, their content and mine disappear from each other.
+        val blockedMe: Flow<Set<String>> = callbackFlow {
+            val registration = usersCollection
+                .whereArrayContains("blockedUserIds", uid)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        trySend(emptySet())
+                        return@addSnapshotListener
+                    }
+                    trySend(snapshot?.documents?.map { it.id }?.toSet() ?: emptySet())
+                }
+            awaitClose { registration.remove() }
+        }.flowOn(ioDispatcher)
+
+        return combine(blockedByMe, blockedMe) { mine, theirs -> mine + theirs }
+    }
+
     override fun currentAuthProvider(): AuthProvider {
         val user = auth.currentUser ?: return AuthProvider.NONE
         val providers = user.providerData.map { it.providerId }
@@ -214,7 +283,8 @@ class UserRepositoryImpl @Inject constructor(
             firstName = firstName,
             lastName = lastName,
             email = email,
-            bio = bio
+            bio = bio,
+            blockedUserIds = blockedUserIds
         )
     }
 }

@@ -19,9 +19,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.example.echo.components.BlockUserDialog
 import com.example.echo.components.PostCard
 import com.example.echo.components.CommentCard
 import com.example.echo.components.EmptyState
+import com.example.echo.components.ReportDialog
 import com.example.echo.navigation.Destinations
 import com.example.echo.domain.model.Comment
 import com.example.echo.domain.model.Post
@@ -47,6 +49,12 @@ fun PostDetailScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    // Moderation dialog state.
+    var reportingPost by remember { mutableStateOf(false) }
+    var reportingComment by remember { mutableStateOf<Comment?>(null) }
+    // The user being blocked (uid to username) — set from a post or a comment.
+    var blockTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.uiEvent.collect { message -> snackbarHostState.showSnackbar(message) }
@@ -96,6 +104,8 @@ fun PostDetailScreen(
                 )
             } else if (uiState.post != null) {
                 val post = uiState.post!!
+                val canModeratePost = !viewModel.isGuest && post.authorId.isNotBlank() &&
+                    post.authorId != uiState.currentUserId
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -111,6 +121,12 @@ fun PostDetailScreen(
                             onLikeClick = { viewModel.toggleLike() },
                             onClick = {},
                             onTagClick = {},
+                            onReport = if (canModeratePost) {
+                                { reportingPost = true }
+                            } else null,
+                            onBlock = if (canModeratePost) {
+                                { blockTarget = post.authorId to post.username }
+                            } else null,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
@@ -143,7 +159,17 @@ fun PostDetailScreen(
                                     { viewModel.deleteComment(comment.id) }
                                 } else {
                                     null
-                                }
+                                },
+                                onReport = if (!viewModel.isGuest && !isOwnComment &&
+                                    comment.authorId.isNotEmpty()
+                                ) {
+                                    { reportingComment = comment }
+                                } else null,
+                                onBlock = if (!viewModel.isGuest && !isOwnComment &&
+                                    comment.authorId.isNotEmpty()
+                                ) {
+                                    { blockTarget = comment.authorId to comment.username }
+                                } else null
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                         }
@@ -203,6 +229,37 @@ fun PostDetailScreen(
                             )
                         }
                     }
+                }
+
+                if (reportingPost) {
+                    ReportDialog(
+                        onDismiss = { reportingPost = false },
+                        onSubmit = { reason ->
+                            viewModel.reportPost(reason)
+                            reportingPost = false
+                        }
+                    )
+                }
+
+                reportingComment?.let { comment ->
+                    ReportDialog(
+                        onDismiss = { reportingComment = null },
+                        onSubmit = { reason ->
+                            viewModel.reportComment(comment, reason)
+                            reportingComment = null
+                        }
+                    )
+                }
+
+                blockTarget?.let { (uid, username) ->
+                    BlockUserDialog(
+                        username = username,
+                        onDismiss = { blockTarget = null },
+                        onConfirm = {
+                            viewModel.blockUser(uid)
+                            blockTarget = null
+                        }
+                    )
                 }
             }
         }

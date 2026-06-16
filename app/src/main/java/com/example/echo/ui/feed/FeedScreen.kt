@@ -30,9 +30,12 @@ import com.example.echo.ui.auth.AuthViewModel
 import com.example.echo.utils.Constants
 import com.example.echo.utils.distanceMeters
 import com.example.echo.utils.formatDistance
+import com.example.echo.components.BlockUserDialog
 import com.example.echo.components.EmptyState
 import com.example.echo.components.PostCard
 import com.example.echo.components.PostCardSkeleton
+import com.example.echo.components.ReportDialog
+import com.example.echo.domain.model.Post
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
@@ -74,6 +77,9 @@ fun FeedScreen(
 
     var showFilterDialog by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
+    // Posts pending a report / block confirmation (others' posts only).
+    var reportTarget by remember { mutableStateOf<Post?>(null) }
+    var blockTarget by remember { mutableStateOf<Post?>(null) }
 
     LaunchedEffect(Unit) {
         feedViewModel.uiEvent.collect { message -> snackbarHostState.showSnackbar(message) }
@@ -248,7 +254,17 @@ fun FeedScreen(
                                         onTagClick = { tag ->
                                             tagInput = tag
                                             feedViewModel.setTagFilter(tag)
-                                        }
+                                        },
+                                        onReport = if (!isGuest && post.authorId.isNotBlank() &&
+                                            post.authorId != feedViewModel.currentUserId
+                                        ) {
+                                            { reportTarget = post }
+                                        } else null,
+                                        onBlock = if (!isGuest && post.authorId.isNotBlank() &&
+                                            post.authorId != feedViewModel.currentUserId
+                                        ) {
+                                            { blockTarget = post }
+                                        } else null
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
                                 }
@@ -307,6 +323,27 @@ fun FeedScreen(
                 }) {
                     Text("Clear")
                 }
+            }
+        )
+    }
+
+    reportTarget?.let { post ->
+        ReportDialog(
+            onDismiss = { reportTarget = null },
+            onSubmit = { reason ->
+                feedViewModel.reportPost(post, reason)
+                reportTarget = null
+            }
+        )
+    }
+
+    blockTarget?.let { post ->
+        BlockUserDialog(
+            username = post.username,
+            onDismiss = { blockTarget = null },
+            onConfirm = {
+                feedViewModel.blockUser(post)
+                blockTarget = null
             }
         )
     }

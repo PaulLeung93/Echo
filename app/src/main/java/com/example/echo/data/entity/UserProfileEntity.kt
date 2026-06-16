@@ -11,5 +11,6 @@ data class UserProfileEntity(
     val firstName: String = "",
     val lastName: String = "",
     val email: String = "",
-    val bio: String = ""
+    val bio: String = "",
+    val blockedUserIds: List<String> = emptyList()
 )

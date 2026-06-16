@@ -10,7 +10,9 @@ data class UserProfile(
     val firstName: String,
     val lastName: String,
     val email: String,
-    val bio: String = ""
+    val bio: String = "",
+    /** Uids this user has blocked; their posts/comments are hidden from this user. */
+    val blockedUserIds: List<String> = emptyList()
 ) {
     /** "First Last", trimmed (handles a missing last name gracefully). */
     val fullName: String get() = listOf(firstName, lastName).filter { it.isNotBlank() }.joinToString(" ")

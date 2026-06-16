@@ -11,6 +11,27 @@
     <string name="delete_comment">Delete comment</string>
     <string name="unknown_error">Something went wrong.</string>
 
+    <!-- Report / block (moderation) -->
+    <string name="report">Report</string>
+    <string name="report_post">Report post</string>
+    <string name="report_comment">Report comment</string>
+    <string name="block_user">Block user</string>
+    <string name="report_dialog_title">Report this content</string>
+    <string name="report_dialog_message">Tell us what\'s wrong. Our team will review it.</string>
+    <string name="report_submit">Submit report</string>
+    <string name="report_submitted">Thanks — your report was submitted.</string>
+    <string name="report_failed">Couldn\'t submit your report. Please try again.</string>
+    <string name="block_dialog_title">Block @%1$s?</string>
+    <string name="block_dialog_message">You won\'t see posts or comments from this person anymore. You can unblock them in Settings.</string>
+    <string name="block_confirm">Block</string>
+    <string name="cancel">Cancel</string>
+    <string name="user_blocked">User blocked.</string>
+    <string name="block_failed">Couldn\'t block this user. Please try again.</string>
+    <string name="blocked_accounts">Blocked accounts</string>
+    <string name="blocked_accounts_empty">You haven\'t blocked anyone.</string>
+    <string name="unblock">Unblock</string>
+    <string name="unblock_failed">Couldn\'t unblock. Please try again.</string>
+
     <!-- Commenting eligibility -->
     <string name="comment_rate_limited">You\'re commenting too fast. Please wait a bit.</string>
     <string name="comment_guest_prompt">Sign in to join the conversation.</string>

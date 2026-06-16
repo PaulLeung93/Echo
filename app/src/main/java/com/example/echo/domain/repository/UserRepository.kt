@@ -36,6 +36,22 @@ interface UserRepository {
     /** Update the current user's editable profile fields (name + bio). */
     suspend fun updateProfile(firstName: String, lastName: String, bio: String): Result<Unit>
 
+    /** Add [blockedUid] to the current user's blocked list (idempotent). */
+    suspend fun blockUser(blockedUid: String): Result<Unit>
+
+    /** Remove [blockedUid] from the current user's blocked list (idempotent). */
+    suspend fun unblockUser(blockedUid: String): Result<Unit>
+
+    /** Resolve profiles for [uids] (e.g. to show usernames in the blocked list). */
+    suspend fun getProfilesByIds(uids: List<String>): Result<List<UserProfile>>
+
+    /**
+     * Author uids whose content the current user should NOT see — the union of
+     * people they blocked *and* people who blocked them (block is mutual). Empty
+     * for guests / signed-out users. Used to filter feed/map/comments.
+     */
+    fun observeHiddenUserIds(): Flow<Set<String>>
+
     /**
      * One-shot read of the current user's profile.
      * - `success(profile)` — the profile exists.

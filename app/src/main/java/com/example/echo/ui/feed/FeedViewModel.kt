@@ -4,11 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.echo.domain.model.Coordinates
 import com.example.echo.domain.model.Post
+import com.example.echo.domain.model.Report
+import com.example.echo.domain.model.ReportReason
+import com.example.echo.domain.model.ReportType
 import com.example.echo.domain.repository.LocationProvider
 import com.example.echo.domain.usecase.post.GetPostsUseCase
 import com.example.echo.domain.usecase.post.GetPostsByTagUseCase
 import com.example.echo.domain.usecase.post.ToggleLikeUseCase
+import com.example.echo.domain.usecase.report.SubmitReportUseCase
+import com.example.echo.domain.usecase.user.BlockUserUseCase
+import com.example.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
 import com.example.echo.utils.Constants
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -20,8 +27,17 @@ class FeedViewModel @Inject constructor(
     private val getPostsUseCase: GetPostsUseCase,
     private val getPostsByTagUseCase: GetPostsByTagUseCase,
     private val toggleLikeUseCase: ToggleLikeUseCase,
-    private val locationProvider: LocationProvider
+    private val submitReportUseCase: SubmitReportUseCase,
+    private val blockUserUseCase: BlockUserUseCase,
+    observeHiddenAuthorIdsUseCase: ObserveHiddenAuthorIdsUseCase,
+    private val locationProvider: LocationProvider,
+    auth: FirebaseAuth
 ) : ViewModel() {
+
+    /** Current user's uid, to distinguish own posts (no report/block) from others'. */
+    val currentUserId: String? = auth.currentUser?.uid
+
+    private val blockedIds: Flow<Set<String>> = observeHiddenAuthorIdsUseCase()
 
     private val _currentTag = MutableStateFlow<String?>(null)
 
@@ -58,13 +74,20 @@ class FeedViewModel @Inject constructor(
         if (tag != null) {
             // The tag view stays live (rare and short-lived); it reflects likes via
             // its own listener, so optimistic updates aren't needed there.
-            getPostsByTagUseCase(tag)
-                .catch { emit(emptyList()) }
-                .map { posts -> FeedUiState(posts = posts, currentTag = tag, isLoading = false) }
-        } else {
-            combine(_pagedPosts, _isLoadingFirstPage) { posts, loadingFirst ->
+            combine(
+                getPostsByTagUseCase(tag).catch { emit(emptyList()) },
+                blockedIds
+            ) { posts, blocked ->
                 FeedUiState(
-                    posts = posts,
+                    posts = posts.filterNot { it.authorId in blocked },
+                    currentTag = tag,
+                    isLoading = false
+                )
+            }
+        } else {
+            combine(_pagedPosts, _isLoadingFirstPage, blockedIds) { posts, loadingFirst, blocked ->
+                FeedUiState(
+                    posts = posts.filterNot { it.authorId in blocked },
                     currentTag = null,
                     isLoading = loadingFirst && posts.isEmpty()
                 )
@@ -133,6 +156,33 @@ class FeedViewModel @Inject constructor(
         // Return to the already-loaded paginated feed (no extra reads); pull-to-refresh
         // re-primes it if the user wants the latest.
         _currentTag.value = null
+    }
+
+    /** Report another user's post for moderation review. */
+    fun reportPost(post: Post, reason: ReportReason) {
+        viewModelScope.launch {
+            submitReportUseCase(
+                Report(
+                    type = ReportType.POST,
+                    targetId = post.id,
+                    targetAuthorId = post.authorId,
+                    reason = reason
+                )
+            ).onSuccess {
+                _uiEvent.send("Thanks — your report was submitted.")
+            }.onFailure {
+                _uiEvent.send("Couldn't submit your report. Please try again.")
+            }
+        }
+    }
+
+    /** Block a post's author; their content disappears from the feed/map. */
+    fun blockUser(post: Post) {
+        viewModelScope.launch {
+            blockUserUseCase(post.authorId)
+                .onSuccess { _uiEvent.send("User blocked.") }
+                .onFailure { _uiEvent.send("Couldn't block this user. Please try again.") }
+        }
     }
 
     fun toggleLike(postId: String) {

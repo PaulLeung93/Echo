@@ -164,14 +164,20 @@ service cloud.firestore {
              ['uid', 'username', 'firstName', 'lastName', 'email', 'bio', 'createdAt']
            );
 
-      // Owner may edit their name + bio later; username/uid/email are immutable.
+      // Owner-only updates: either (a) edit name + bio, or (b) change the blocked
+      // list. username/uid/email are immutable. Split so a block/unblock write
+      // (which doesn't carry name/bio) isn't rejected, and vice versa.
       allow update: if isNotAnonymous()
         && uid == request.auth.uid
-        && changedKeys().hasOnly(['firstName', 'lastName', 'bio'])
-        && request.resource.data.firstName is string
-        && request.resource.data.firstName.size() > 0
-        && request.resource.data.bio is string
-        && request.resource.data.bio.size() <= 160;
+        && (
+          (changedKeys().hasOnly(['firstName', 'lastName', 'bio'])
+            && request.resource.data.firstName is string
+            && request.resource.data.firstName.size() > 0
+            && request.resource.data.bio is string
+            && request.resource.data.bio.size() <= 160)
+          || (changedKeys().hasOnly(['blockedUserIds'])
+            && request.resource.data.blockedUserIds is list)
+        );
 
       // Owner may delete their own profile (account deletion).
       allow delete: if isNotAnonymous() && uid == request.auth.uid;
@@ -190,6 +196,24 @@ service cloud.firestore {
       allow update: if false;
       // Owner may release their handle (account deletion).
       allow delete: if isNotAnonymous() && resource.data.uid == request.auth.uid;
+    }
+
+    // ----- Content reports (user-submitted; triaged out-of-band) -----
+    // Write-only for clients: any signed-in real user may file a report, but no
+    // client can read/modify/delete them. Moderation happens in the console.
+    match /reports/{reportId} {
+      allow read, update, delete: if false;
+      allow create: if isNotAnonymous()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.type in ['post', 'comment']
+        && request.resource.data.targetId is string
+        && request.resource.data.targetId.size() > 0
+        && request.resource.data.targetAuthorId is string
+        && request.resource.data.reason is string
+        && request.resource.data.keys().hasOnly(
+             ['reporterId', 'type', 'targetId', 'targetAuthorId',
+              'contextId', 'reason', 'timestamp']
+           );
     }
 
     // Deny everything not explicitly matched above.
