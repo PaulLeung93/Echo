@@ -418,9 +418,9 @@ Deferred until shipped; captured so they aren't lost.
       name + bio with a live character counter; `@username` is shown read-only
       (handles are permanent). Rules: `users create` now requires `bio`, and a
       new owner-only `users update` permits changing only `firstName/lastName/bio`.
-      ⚠️ **Requires the firestore.rules deploy** — the create rule now lists `bio`
-      in `hasOnly`, so the app update and `firebase deploy --only firestore:rules`
-      must ship together or new sign-ups break.
+      **Rules deployed** — ✅ confirmed live in the Firebase Console Rules tab
+      (2026-06-16): the `users create` rule lists `bio` in `hasOnly` and the
+      owner-only `users update` rule is present, so new sign-ups and bio edits work.
 - [~] Avatar upload — *blocked on the free (Spark) plan:* image uploads need
       Firebase **Storage**, which requires Blaze. The Edit profile screen keeps
       the initials avatar with a "Photo uploads coming soon" caption as the
@@ -550,16 +550,15 @@ Done as a four-stage staircase, cheapest-payoff first. Each stage shipped green
       listener so it can fly to a match anywhere. `firestore.rules` post-create `hasOnly`
       gains `geohash`.
 
-      > ⚠️ **Two production steps are PENDING (require the owner) for Stage 4 to work
-      > end-to-end:**
-      > 1. **Deploy the rules:** `firebase deploy --only firestore:rules` — until then,
-      >    creating a *located* post fails (the new `geohash` key is rejected). The
-      >    update is backward-compatible (`hasOnly` allows a subset, so the old
-      >    published app keeps working).
-      > 2. **Backfill existing posts:** run `backfill_post_geohashes.py` (in
-      >    `Desktop/Echo`, uses `firebase-key.json`, idempotent) so posts created before
-      >    this change carry a `geohash` and appear on the geo-bounded map. Without it,
-      >    only posts created after the rules deploy show up.
+      > **Production steps for Stage 4 to work end-to-end:**
+      > 1. **Deploy the rules** — ✅ **DONE** (confirmed in the Firebase Console Rules
+      >    tab 2026-06-16: the live rules include `geohash` in the post-create
+      >    `hasOnly`). Located-post creation is no longer rejected.
+      > 2. **Backfill existing posts:** ⚠ **still to do** — run
+      >    `backfill_post_geohashes.py` (in `Desktop/Echo`, uses `firebase-key.json`,
+      >    idempotent) so posts created *before* this change carry a `geohash` and
+      >    appear on the geo-bounded map. This is a one-time data fix (not a rules
+      >    deploy); without it, only posts created after 2026-06-15 show on the map.
 
       > **Known trade-off:** the map's geo-fetch reloads on each camera settle (one small
       > range-query batch), and `getPosts()`'s shared newest-200 listener now serves only

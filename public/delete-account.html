@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Echo — Delete Your Account</title>
+  <style>
+    :root { --coral: #E76F51; --ink: #2b2724; --muted: #6b635c; --cream: #FFF8F0; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--cream); color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+    }
+    .wrap { max-width: 680px; margin: 0 auto; padding: 32px 20px 80px; }
+    h1 { color: var(--coral); font-size: 1.8rem; margin-bottom: 4px; }
+    h2 { margin-top: 1.8rem; font-size: 1.2rem; }
+    a { color: var(--coral); }
+    .card {
+      background: #fff; border: 1px solid #00000012; border-radius: 14px;
+      padding: 18px 20px; margin-top: 20px;
+    }
+    .btn {
+      display: inline-block; margin-top: 8px; background: var(--coral); color: #fff;
+      text-decoration: none; padding: 12px 20px; border-radius: 10px; font-weight: 600;
+    }
+    footer { margin-top: 48px; color: var(--muted); font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Delete Your Echo Account</h1>
+    <p>This page explains how to delete your Echo account and the data associated
+    with it. Echo is operated by Paul Leung.</p>
+
+    <h2>Option 1 — Delete in the app (fastest)</h2>
+    <div class="card">
+      <p>Open Echo and go to <strong>Settings &rarr; Account &rarr; Delete
+      account</strong>. You'll be asked to confirm your identity, and then your
+      account is deleted immediately.</p>
+    </div>
+
+    <h2>Option 2 — Request deletion by email</h2>
+    <div class="card">
+      <p>If you can't access the app, email us from the address on your account and
+      we'll delete it for you:</p>
+      <a class="btn" href="mailto:PaulLeung93@gmail.com?subject=Echo%20account%20deletion%20request&body=Please%20delete%20my%20Echo%20account.%20My%20account%20email%2Fusername%20is%3A%20">
+        Email a deletion request
+      </a>
+      <p style="margin-top:14px">Please send it from your account email (or include
+      your <strong>@username</strong>) so we can verify the request. We will confirm
+      once your account is deleted.</p>
+    </div>
+
+    <h2>What gets deleted</h2>
+    <p>When your account is deleted, we remove:</p>
+    <ul>
+      <li>Your profile (name, username, bio) and your username reservation.</li>
+      <li>Your Firebase authentication account (email and sign-in credentials).</li>
+    </ul>
+    <p>Posts and comments you created may be removed or disassociated from your
+    account. Diagnostic/crash data follows Google Firebase's standard retention
+    periods. Requests are typically completed within 30 days.</p>
+
+    <p style="margin-top:24px">See our
+    <a href="https://echo-2b5ba.web.app/privacy.html">Privacy Policy</a> for more
+    detail on the data we collect.</p>
+
+    <footer>&copy; 2026 Echo &middot; Paul Leung &middot;
+    <a href="mailto:PaulLeung93@gmail.com">PaulLeung93@gmail.com</a></footer>
+  </div>
+</body>
+</html>
