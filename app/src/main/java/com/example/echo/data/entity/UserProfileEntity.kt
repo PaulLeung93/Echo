@@ -10,7 +10,6 @@ data class UserProfileEntity(
     val username: String = "",
     val firstName: String = "",
     val lastName: String = "",
-    val email: String = "",
     val bio: String = "",
     val blockedUserIds: List<String> = emptyList()
 )

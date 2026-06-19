@@ -54,7 +54,6 @@ class UserRepositoryImpl @Inject constructor(
         val user = auth.currentUser
             ?: return@withContext Result.failure(IllegalStateException("You must be signed in."))
         val uid = user.uid
-        val email = user.email ?: ""
         val handle = username.lowercase()
 
         try {
@@ -73,7 +72,6 @@ class UserRepositoryImpl @Inject constructor(
                         "username" to handle,
                         "firstName" to firstName.trim(),
                         "lastName" to lastName.trim(),
-                        "email" to email,
                         "bio" to "",
                         "createdAt" to FieldValue.serverTimestamp()
                     )
@@ -95,8 +93,7 @@ class UserRepositoryImpl @Inject constructor(
                     uid = uid,
                     username = handle,
                     firstName = firstName.trim(),
-                    lastName = lastName.trim(),
-                    email = email
+                    lastName = lastName.trim()
                 )
             )
         } catch (e: Exception) {
@@ -282,7 +279,6 @@ class UserRepositoryImpl @Inject constructor(
             username = username,
             firstName = firstName,
             lastName = lastName,
-            email = email,
             bio = bio,
             blockedUserIds = blockedUserIds
         )

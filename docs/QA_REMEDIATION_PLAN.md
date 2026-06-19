@@ -29,11 +29,12 @@ Permanent once published, so it must be right before first upload.
 - Move the source package `com.example.echo` → new package (large mechanical refactor; its own commit).
 - **Dependency:** decide the identifier first. Do this *before* A3 to avoid re-doing Google Sign-In config twice.
 
-### A2. Remove email from the publicly-readable profile *(fully in-code — best first blocker)*
-- **Rules:** in `firestore.rules:149-184`, drop `email` from the `users/{uid}` create `hasOnly` set and the `request.auth.token.email` check. Add a private subcollection rule: `users/{uid}/private/{doc}` with `allow read, write: if isNotAnonymous() && uid == request.auth.uid`. (Decision: private subdoc vs. a public `publicProfiles/{uid}` model — subdoc is the smaller change.)
-- **Data layer:** remove `email` from `UserProfileEntity` and the `UserProfile` domain model; write email to the private subdoc at signup.
-- **Migration:** existing `users/*` docs still contain `email`. One-time backfill (reuse the `scripts/` admin setup) to move it into the private subdoc and strip the field. versionCode is 1 / nothing published, so low risk now.
-- **Consider:** tightening profile reads to `isNotAnonymous()` if guests don't need profiles — verify guest flows first.
+### A2. Remove email from the publicly-readable profile — ✅ DONE
+**Decision:** dropped the `email` field entirely instead of moving it to a private subdoc. Verified that nothing in the app ever reads `UserProfile.email`; every place that needs the user's own email reads `FirebaseAuth.currentUser.email` (e.g. `ProfileScreen.kt:45`, `PoiDetailViewModel.kt:53`). If no one reads it, there's no reason to store it — this fully removes the exposure with less surface area than a subdoc.
+- **Rules:** removed the `request.resource.data.email == request.auth.token.email` check and dropped `email` from the create `hasOnly` set (`firestore.rules`).
+- **Data layer:** removed `email` from `UserProfileEntity`, the `UserProfile` domain model, the profile write map, and both `UserProfile` constructions in `UserRepositoryImpl`.
+- **Migration:** `scripts/strip_profile_emails.py` deletes the `email` field from existing `users/*` docs (idempotent). **Must be run once against the live project** to clean already-stored emails.
+- **Not done (optional):** tightening profile reads from `isSignedIn()` to `isNotAnonymous()` — left as-is; revisit if guests don't need to read profiles.
 
 ### A3. Wire Google-account deletion *(blocked: Google Sign-In not configured)*
 - `SettingsScreen.kt:171-178`: replace the "isn't available yet" snackbar in the `else` branch with a Credential Manager re-auth flow that obtains a Google ID token, then calls `viewModel.deleteAccountWithGoogle(idToken)` (`SettingsViewModel.kt:90`).

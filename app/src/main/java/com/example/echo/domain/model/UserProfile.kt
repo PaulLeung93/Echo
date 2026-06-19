@@ -9,7 +9,6 @@ data class UserProfile(
     val username: String,
     val firstName: String,
     val lastName: String,
-    val email: String,
     val bio: String = "",
     /** Uids this user has blocked; their posts/comments are hidden from this user. */
     val blockedUserIds: List<String> = emptyList()

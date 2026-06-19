@@ -154,7 +154,6 @@ service cloud.firestore {
       allow create: if isNotAnonymous()
         && uid == request.auth.uid
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.email == request.auth.token.email
         && isValidUsername(request.resource.data.username)
         && request.resource.data.firstName is string
         && request.resource.data.firstName.size() > 0
@@ -162,7 +161,7 @@ service cloud.firestore {
         && request.resource.data.bio is string
         && request.resource.data.bio.size() <= 160
         && request.resource.data.keys().hasOnly(
-             ['uid', 'username', 'firstName', 'lastName', 'email', 'bio', 'createdAt']
+             ['uid', 'username', 'firstName', 'lastName', 'bio', 'createdAt']
            );
 
       // Owner-only updates: either (a) edit name + bio, or (b) change the blocked
