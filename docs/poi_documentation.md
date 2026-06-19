@@ -3,10 +3,10 @@
 This document explains how the Points of Interest (POI) system is implemented in the Echo app, covering the data source, processing pipeline, and UI integration.
 
 ## 1. Data Source & Origin
-The POI data originates from a Python seeding script located on the local machine and is stored in Firebase Firestore.
+The POI data originates from a Python seeding script in the repo and is stored in Firebase Firestore.
 
-- **Primary Source File**: `C:\Users\Paul\OneDrive\Desktop\Echo\seed_pois.py`
-- **Authentication**: Uses a service account key at `C:\Users\Paul\OneDrive\Desktop\Echo\firebase-key.json`.
+- **Primary Source File**: `scripts/seed_pois.py`
+- **Authentication**: Uses a service account key at `scripts/firebase-key.json` (gitignored — never committed; place it there manually before running).
 - **Database**: Cloud Firestore (Project: `echo-2b5ba`)
 - **Collection Name**: `pois`
 
@@ -36,9 +36,9 @@ The ViewModel manages how POIs are prepared for the map:
 
 ## 3. How to Update POIs
 To add or modify POIs:
-1. Open the local script: `C:\Users\Paul\OneDrive\Desktop\Echo\seed_pois.py`.
+1. Open the script: `scripts/seed_pois.py`.
 2. Update the `pois` list in the Python dictionary.
-3. Run the script: `python seed_pois.py`.
+3. Run from the `scripts/` folder (so it finds `firebase-key.json`): `cd scripts && python seed_pois.py`.
 4. The changes will propagate to all active app instances via Firestore's real-time sync.
 
 ---

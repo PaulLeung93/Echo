@@ -1,5 +1,6 @@
 *.iml
 .gradle
+.kotlin/
 /local.properties
 /.idea/caches
 /.idea/libraries
@@ -23,6 +24,10 @@ keystore.properties
 
 # Stitch design exploration screenshots (not part of the app)
 .stitch_shots/
+
+# Firebase Admin service-account key used by scripts/ — NEVER commit (full backend access)
+firebase-key.json
+*-serviceaccount.json
 
 # Firebase emulator / CLI artifacts (rules and config are tracked; these are not)
 .firebase/
