@@ -79,7 +79,7 @@ Not urgent: `scripts/firebase-key.json` is gitignored and not cloud-synced. If d
 - ✅ Sign-up enumeration — removed the proactive `fetchSignInMethods` "account already exists" probe from `SignUpScreen` (debounced disclosure of registered emails). Duplicate emails are still caught at submit via `signUpWithEmail`. Removed the now-dead `fetchSignInMethods` chain (VM method, `FetchSignInMethodsUseCase`, interface + impl).
 
 **Remaining:**
-- ⏳ Error-handling convention (`Result` everywhere) — broader audit of repos that still throw.
+- ✅ Error-handling convention (`Result` at the use-case boundary). Audit found it was already 5/7 consistent — repos throw, and the use cases adapt to `Result` (a valid translation boundary). Normalized the two outliers (`DeleteCommentUseCase`, `DeletePoiCommentUseCase`) to return `Result<Unit>` via `runCatching`; converted the two VM `try/catch` blocks to `.onFailure`. Deliberately did **not** push `Result` into the repo interfaces — that would just relocate the `try/catch` a layer down with no behavioral payoff.
 - ⏳ Seeding-script idempotency.
 - ⏳ Test coverage in the audit's Section-4 order: pure helpers → repo guards → `FeedViewModel` → extracted clustering.
 

@@ -98,9 +98,7 @@ class PostDetailViewModel @Inject constructor(
 
     fun deleteComment(commentId: String) {
         viewModelScope.launch {
-            try {
-                deleteCommentUseCase(postId, commentId)
-            } catch (e: Exception) {
+            deleteCommentUseCase(postId, commentId).onFailure { e ->
                 _uiEvent.send(e.message ?: "Couldn't delete the comment. Please try again.")
             }
         }

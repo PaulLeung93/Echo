@@ -11,7 +11,6 @@ import javax.inject.Inject
 class DeleteCommentUseCase @Inject constructor(
     private val commentRepository: CommentRepository
 ) {
-    suspend operator fun invoke(postId: String, commentId: String) {
-        commentRepository.deleteComment(postId, commentId)
-    }
+    suspend operator fun invoke(postId: String, commentId: String): Result<Unit> =
+        runCatching { commentRepository.deleteComment(postId, commentId) }
 }
