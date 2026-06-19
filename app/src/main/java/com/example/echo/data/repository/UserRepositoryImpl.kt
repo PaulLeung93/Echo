@@ -1,6 +1,7 @@
 package com.example.echo.data.repository
 
 import com.example.echo.data.entity.UserProfileEntity
+import com.example.echo.di.ApplicationScope
 import com.example.echo.di.IoDispatcher
 import com.example.echo.domain.model.UserProfile
 import com.example.echo.domain.repository.AuthProvider
@@ -14,13 +15,17 @@ import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -30,7 +35,8 @@ import javax.inject.Singleton
 class UserRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    @ApplicationScope private val appScope: CoroutineScope
 ) : UserRepository {
 
     private val usersCollection = firestore.collection(Constants.COLLECTION_USERS)
@@ -200,8 +206,20 @@ class UserRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }.flowOn(ioDispatcher)
 
-    override fun observeHiddenUserIds(): Flow<Set<String>> {
-        val uid = auth.currentUser?.uid ?: return flowOf(emptySet())
+    /**
+     * People hidden from the current user (those they blocked + those who blocked them),
+     * shared across all collectors (map, feed, post-detail, POI-detail). Without sharing,
+     * each of those view models opened its own pair of snapshot listeners on identical
+     * data — one of them a collection query. `WhileSubscribed(5000)` keeps the listeners
+     * warm across a quick screen switch; the upstream re-reads `auth.currentUser` when it
+     * restarts after the timeout, so it picks up a new uid after a re-login.
+     */
+    private val sharedHiddenUserIds: Flow<Set<String>> = flow {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            emit(emptySet())
+            return@flow
+        }
 
         // People I blocked (from my own profile doc).
         val blockedByMe: Flow<Set<String>> =
@@ -222,8 +240,14 @@ class UserRepositoryImpl @Inject constructor(
             awaitClose { registration.remove() }
         }.flowOn(ioDispatcher)
 
-        return combine(blockedByMe, blockedMe) { mine, theirs -> mine + theirs }
-    }
+        emitAll(combine(blockedByMe, blockedMe) { mine, theirs -> mine + theirs })
+    }.shareIn(
+        scope = appScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        replay = 1
+    )
+
+    override fun observeHiddenUserIds(): Flow<Set<String>> = sharedHiddenUserIds
 
     override fun currentAuthProvider(): AuthProvider {
         val user = auth.currentUser ?: return AuthProvider.NONE

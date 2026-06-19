@@ -20,6 +20,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.tasks.await
@@ -122,27 +123,23 @@ class PostRepositoryImpl @Inject constructor(
         postMapper.toDomainList(entities, auth.currentUser?.uid)
     }
 
-    override fun getPostsByTag(tag: String): Flow<List<Post>> = callbackFlow {
-        val listener = postsCollection
-            .orderBy(Constants.FIELD_TIMESTAMP, Query.Direction.DESCENDING)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                
-                val entities = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(PostEntity::class.java)
-                }?.filter { entity ->
-                    entity.tags.any { it.equals(tag, ignoreCase = true) }
-                } ?: emptyList()
-                
-                val currentUserId = auth.currentUser?.uid
-                val posts = postMapper.toDomainList(entities, currentUserId)
-                trySend(posts)
-            }
-        
-        awaitClose { listener.remove() }
+    override fun getPostsByTag(tag: String): Flow<List<Post>> = flow {
+        // Server-side filter so we only download (and pay for) posts that actually carry
+        // the tag, instead of streaming the whole collection and filtering in Kotlin.
+        // Tags are stored lowercased (see PostMapper.toFirestoreMap and the create screen),
+        // so a normalized exact match is correct. A one-shot read (not a live listener)
+        // suits the short-lived tag view; results are capped and sorted newest-first in
+        // memory to avoid needing a composite (array-contains + timestamp) index.
+        val normalized = tag.trim().lowercase()
+        val snapshot = postsCollection
+            .whereArrayContains(Constants.FIELD_TAGS, normalized)
+            .limit(Constants.POSTS_QUERY_LIMIT)
+            .get()
+            .await()
+        val entities = snapshot.documents
+            .mapNotNull { it.toObject(PostEntity::class.java) }
+            .sortedByDescending { it.timestamp }
+        emit(postMapper.toDomainList(entities, auth.currentUser?.uid))
     }.flowOn(ioDispatcher)
     
     override fun getPostsByAuthorId(authorId: String): Flow<List<Post>> = callbackFlow {
@@ -257,23 +254,27 @@ class PostRepositoryImpl @Inject constructor(
         val docRef = postsCollection.document(postId)
 
         withWriteTimeout {
-            val doc = docRef.get().await()
-            val entity = doc.toObject(PostEntity::class.java)
-                ?: throw IllegalStateException("Post not found")
+            // Read and write in one transaction so two simultaneous likes can't both read
+            // the same "before" state and clobber each other (which would drop a like and
+            // leave likeCount wrong). likeCount is kept == likes.size for the rules.
+            // Note: FieldValue.arrayUnion/increment can't be used here — the rules validate
+            // the concrete resulting array against likeCount, which opaque operators defeat.
+            firestore.runTransaction { txn ->
+                val entity = txn.get(docRef).toObject(PostEntity::class.java)
+                    ?: throw IllegalStateException("Post not found")
 
-            val isCurrentlyLiked = entity.likes.contains(userId)
-
-            // Update likes and the denormalized likeCount atomically (single write) so they
-            // can never drift and so security rules can require likeCount == likes.size().
-            val newLikes = if (isCurrentlyLiked) entity.likes - userId else entity.likes + userId
-            docRef.update(
-                mapOf(
-                    Constants.FIELD_LIKES to newLikes,
-                    "likeCount" to newLikes.size
+                val isCurrentlyLiked = entity.likes.contains(userId)
+                val newLikes =
+                    if (isCurrentlyLiked) entity.likes - userId else entity.likes + userId
+                txn.update(
+                    docRef,
+                    mapOf(
+                        Constants.FIELD_LIKES to newLikes,
+                        "likeCount" to newLikes.size
+                    )
                 )
-            ).await()
-
-            !isCurrentlyLiked
+                !isCurrentlyLiked
+            }.await()
         }
     }
 }

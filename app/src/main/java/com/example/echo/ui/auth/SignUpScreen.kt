@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
@@ -53,7 +54,7 @@ fun SignUpScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var emailCheckJob by remember { mutableStateOf<Job?>(null) }
 
-    val uiState by authViewModel.uiState.collectAsState()
+    val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         authViewModel.uiEvent.collect { event ->

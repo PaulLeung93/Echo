@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -77,7 +78,7 @@ fun MapScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val uiState by mapViewModel.uiState.collectAsState()
+    val uiState by mapViewModel.uiState.collectAsStateWithLifecycle()
 
     // Captured for use inside the GoogleMap content lambda (no MaterialTheme there).
     val rippleColor = MaterialTheme.colorScheme.primary

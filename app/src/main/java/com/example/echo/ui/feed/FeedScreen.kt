@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,11 +49,11 @@ fun FeedScreen(
     authViewModel: AuthViewModel,
     feedViewModel: FeedViewModel = hiltViewModel()
 ) {
-    val uiState by feedViewModel.uiState.collectAsState()
-    val isRefreshing by feedViewModel.isRefreshing.collectAsState()
-    val isLoadingMore by feedViewModel.isLoadingMore.collectAsState()
-    val userCoords by feedViewModel.userCoordinates.collectAsState()
-    val neighborhoodName by feedViewModel.neighborhoodName.collectAsState()
+    val uiState by feedViewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by feedViewModel.isRefreshing.collectAsStateWithLifecycle()
+    val isLoadingMore by feedViewModel.isLoadingMore.collectAsStateWithLifecycle()
+    val userCoords by feedViewModel.userCoordinates.collectAsStateWithLifecycle()
+    val neighborhoodName by feedViewModel.neighborhoodName.collectAsStateWithLifecycle()
 
     // Drive feed pagination: ask for the next page once the user scrolls within a few
     // items of the end. Only the untagged feed pages (the VM ignores it otherwise).
@@ -68,7 +69,7 @@ fun FeedScreen(
         if (shouldLoadMore) feedViewModel.loadMore()
     }
     
-    val authState by authViewModel.uiState.collectAsState()
+    val authState by authViewModel.uiState.collectAsStateWithLifecycle()
     val isUserAuthenticated = authState.currentUser != null
     val isGuest = authState.currentUser?.isAnonymous == true
 

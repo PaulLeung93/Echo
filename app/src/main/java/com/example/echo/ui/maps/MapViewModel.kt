@@ -292,6 +292,17 @@ class MapViewModel @Inject constructor(
      * edges are kept loaded and don't pop in while panning.
      */
     fun updateVisibleBounds(bounds: LatLngBounds) {
+        // Skip the update when the previous (padded) box still fully contains the new
+        // viewport: the posts we already fetched cover it, so a small pan/zoom that
+        // revealed nothing new shouldn't re-run the (billed) geohash query batch. Only
+        // a move that exposes area outside the padded box triggers a fresh fetch.
+        val current = _visibleBounds.value
+        if (current != null &&
+            current.contains(bounds.northeast) &&
+            current.contains(bounds.southwest)
+        ) {
+            return
+        }
         _visibleBounds.value = bounds.padded()
     }
 

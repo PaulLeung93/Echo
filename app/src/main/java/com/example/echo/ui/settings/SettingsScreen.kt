@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -30,10 +31,10 @@ fun SettingsScreen(
     authViewModel: AuthViewModel,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
-    val darkMode by viewModel.darkMode.collectAsState()
-    val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
-    val isDeleting by viewModel.isDeleting.collectAsState()
-    val blockedUsers by viewModel.blockedUsers.collectAsState()
+    val darkMode by viewModel.darkMode.collectAsStateWithLifecycle()
+    val notificationsEnabled by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
+    val isDeleting by viewModel.isDeleting.collectAsStateWithLifecycle()
+    val blockedUsers by viewModel.blockedUsers.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }

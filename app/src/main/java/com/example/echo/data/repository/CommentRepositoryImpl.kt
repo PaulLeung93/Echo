@@ -9,6 +9,7 @@ import com.example.echo.domain.repository.CommentRepository
 import com.example.echo.domain.repository.UserRepository
 import com.example.echo.utils.Constants
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.CoroutineDispatcher
@@ -82,32 +83,37 @@ class CommentRepositoryImpl @Inject constructor(
                 message = message
             )
 
-            val docRef = withWriteTimeout { getCommentsCollection(postId).add(commentMap).await() }
+            val commentRef = getCommentsCollection(postId).document()
+            val postRef = firestore.collection(Constants.COLLECTION_POSTS).document(postId)
 
-            // Update comment count on post
-            firestore.collection(Constants.COLLECTION_POSTS)
-                .document(postId)
-                .update("commentCount", com.google.firebase.firestore.FieldValue.increment(1))
-                .await()
+            // Write the comment and bump the denormalized count in one batch so they can't
+            // drift if the process dies between the two writes. Same number of billed writes.
+            withWriteTimeout {
+                firestore.batch().apply {
+                    set(commentRef, commentMap)
+                    update(postRef, "commentCount", FieldValue.increment(1))
+                }.commit().await()
+            }
 
             Comment(
-                id = docRef.id,
+                id = commentRef.id,
                 authorId = currentUser.uid,
                 username = username,
                 message = message,
                 timestamp = System.currentTimeMillis()
             )
         }
-    
-    override suspend fun deleteComment(postId: String, commentId: String): Unit = 
+
+    override suspend fun deleteComment(postId: String, commentId: String): Unit =
         withContext(ioDispatcher) {
-            withWriteTimeout { getCommentsCollection(postId).document(commentId).delete().await() }
-            
-            // Update comment count on post
-            firestore.collection(Constants.COLLECTION_POSTS)
-                .document(postId)
-                .update("commentCount", com.google.firebase.firestore.FieldValue.increment(-1))
-                .await()
+            val commentRef = getCommentsCollection(postId).document(commentId)
+            val postRef = firestore.collection(Constants.COLLECTION_POSTS).document(postId)
+            withWriteTimeout {
+                firestore.batch().apply {
+                    delete(commentRef)
+                    update(postRef, "commentCount", FieldValue.increment(-1))
+                }.commit().await()
+            }
             Unit
         }
 
@@ -152,16 +158,18 @@ class CommentRepositoryImpl @Inject constructor(
                 message = message
             )
 
-            val docRef = withWriteTimeout { getPoiCommentsCollection(poiId).add(commentMap).await() }
+            val commentRef = getPoiCommentsCollection(poiId).document()
+            val poiRef = firestore.collection(Constants.COLLECTION_POIS).document(poiId)
 
-            // Update comment count on POI
-            firestore.collection(Constants.COLLECTION_POIS)
-                .document(poiId)
-                .update("commentCount", com.google.firebase.firestore.FieldValue.increment(1))
-                .await()
+            withWriteTimeout {
+                firestore.batch().apply {
+                    set(commentRef, commentMap)
+                    update(poiRef, "commentCount", FieldValue.increment(1))
+                }.commit().await()
+            }
 
             Comment(
-                id = docRef.id,
+                id = commentRef.id,
                 authorId = currentUser.uid,
                 username = username,
                 message = message,
@@ -169,15 +177,16 @@ class CommentRepositoryImpl @Inject constructor(
             )
         }
 
-    override suspend fun deleteCommentFromPoi(poiId: String, commentId: String): Unit = 
+    override suspend fun deleteCommentFromPoi(poiId: String, commentId: String): Unit =
         withContext(ioDispatcher) {
-            withWriteTimeout { getPoiCommentsCollection(poiId).document(commentId).delete().await() }
-            
-            // Update comment count on POI
-            firestore.collection(Constants.COLLECTION_POIS)
-                .document(poiId)
-                .update("commentCount", com.google.firebase.firestore.FieldValue.increment(-1))
-                .await()
+            val commentRef = getPoiCommentsCollection(poiId).document(commentId)
+            val poiRef = firestore.collection(Constants.COLLECTION_POIS).document(poiId)
+            withWriteTimeout {
+                firestore.batch().apply {
+                    delete(commentRef)
+                    update(poiRef, "commentCount", FieldValue.increment(-1))
+                }.commit().await()
+            }
             Unit
         }
 }

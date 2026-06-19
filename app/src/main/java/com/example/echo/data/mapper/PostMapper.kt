@@ -70,7 +70,9 @@ class PostMapper @Inject constructor() {
             put("username", username)
             put("message", message)
             put("timestamp", System.currentTimeMillis())
-            put("tags", tags)
+            // Store tags normalized (lowercased, de-duped) so the server-side
+            // whereArrayContains tag query in getPostsByTag matches reliably.
+            put("tags", tags.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.distinct())
             put("likeCount", 0)
             put("commentCount", 0)
             put("likes", emptyList<String>())
