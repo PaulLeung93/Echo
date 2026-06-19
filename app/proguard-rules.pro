@@ -32,7 +32,6 @@
 # Firestore deserializes documents into these entities via reflection
 # (DocumentSnapshot.toObject). R8 must NOT rename/strip their no-arg
 # constructor, fields, or accessors, or deserialization returns empty objects.
+# (-keep class { *; } already retains all members, so a separate
+# -keepclassmembers rule would be redundant.)
 -keep class com.example.echo.data.entity.** { *; }
--keepclassmembers class com.example.echo.data.entity.** {
-    *;
-}

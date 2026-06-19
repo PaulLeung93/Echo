@@ -2,7 +2,7 @@
 
 **Goal:** Get Echo to a production-ready, publishable state on the Google Play Store.
 **Created:** 2026-06-10
-**Companion docs:** [README.md](README.md) · [architecture.md](architecture.md) (source of truth)
+**Companion docs:** [README.md](../README.md) · [architecture.md](architecture.md) (source of truth)
 
 This roadmap is phased: stabilize first, finish what's in-flight, clean the
 structure, then harden for release. Phases are ordered by dependency — each one
@@ -73,7 +73,7 @@ of the screen is pending a real-device run.)
 
 Decision: **keep the documented `ui/` + `domain/usecase/` layout** (architecture.md
 is the source of truth). Remove the competing half-migration and dead code.
-*(Agent scaffolding — `GEMINI.md`, `.agent/` — is intentionally kept.)*
+*(Agent scaffolding — `.agent/` — is intentionally kept. `GEMINI.md` was later removed in favor of the Android CLI.)*
 
 - [x] **Collapse the `feature/` experiment.** Moved
       `feature/map/presentation/{PoiDetailScreen,PoiDetailViewModel,PoiDetailUiState}.kt`
