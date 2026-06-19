@@ -10,6 +10,8 @@ import com.example.echo.domain.repository.UserRepository
 import com.example.echo.utils.Constants
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FieldValue
@@ -291,6 +293,10 @@ class UserRepositoryImpl @Inject constructor(
             // Delete the Firebase Auth account (now permitted — we just re-authed).
             user.delete().await()
             Result.success(Unit)
+        } catch (e: FirebaseAuthInvalidCredentialsException) {
+            Result.failure(IllegalStateException("Incorrect password. Please try again.", e))
+        } catch (e: FirebaseAuthRecentLoginRequiredException) {
+            Result.failure(IllegalStateException("Please sign out and sign back in, then try again.", e))
         } catch (e: Exception) {
             Result.failure(e)
         }

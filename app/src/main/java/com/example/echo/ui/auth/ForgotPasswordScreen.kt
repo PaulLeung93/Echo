@@ -24,9 +24,7 @@ import com.example.echo.R
 import com.example.echo.navigation.Destinations
 import com.example.echo.ui.common.TopSnackbarHost
 import com.example.echo.utils.isValidEmail
-import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 import androidx.hilt.navigation.compose.hiltViewModel
 

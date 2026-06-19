@@ -6,6 +6,7 @@ import com.example.echo.domain.model.User
 import com.example.echo.domain.repository.AuthRepository
 import com.example.echo.utils.mapFirebaseErrorMessage
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.awaitClose
@@ -51,11 +52,11 @@ class AuthRepositoryImpl @Inject constructor(
                     Result.failure(Exception("Authentication failed"))
                 }
             } catch (e: Exception) {
-                Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage)))
+                Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage), e))
             }
         }
-    
-    override suspend fun signUpWithEmail(email: String, password: String): Result<User> = 
+
+    override suspend fun signUpWithEmail(email: String, password: String): Result<User> =
         withContext(ioDispatcher) {
             try {
                 val result = auth.createUserWithEmailAndPassword(email, password).await()
@@ -66,7 +67,7 @@ class AuthRepositoryImpl @Inject constructor(
                     Result.failure(Exception("Registration failed"))
                 }
             } catch (e: Exception) {
-                Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage)))
+                Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage), e))
             }
         }
     
@@ -80,7 +81,7 @@ class AuthRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Anonymous sign-in failed"))
             }
         } catch (e: Exception) {
-            Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage)))
+            Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage), e))
         }
     }
     
@@ -96,17 +97,22 @@ class AuthRepositoryImpl @Inject constructor(
                     Result.failure(Exception("Google sign-in failed"))
                 }
             } catch (e: Exception) {
-                Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage)))
+                Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage), e))
             }
         }
     
-    override suspend fun sendPasswordResetEmail(email: String): Result<Unit> = 
+    override suspend fun sendPasswordResetEmail(email: String): Result<Unit> =
         withContext(ioDispatcher) {
             try {
                 auth.sendPasswordResetEmail(email).await()
                 Result.success(Unit)
+            } catch (e: FirebaseAuthInvalidUserException) {
+                // No account for this email. Report success anyway so the response
+                // is identical whether or not the address is registered — otherwise
+                // the screen leaks which emails have accounts (enumeration).
+                Result.success(Unit)
             } catch (e: Exception) {
-                Result.failure(Exception(e.localizedMessage))
+                Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage), e))
             }
         }
     
@@ -124,15 +130,4 @@ class AuthRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
-    
-    @Suppress("DEPRECATION")
-    override suspend fun fetchSignInMethods(email: String): List<String> = 
-        withContext(ioDispatcher) {
-            try {
-                val result = auth.fetchSignInMethodsForEmail(email).await()
-                result.signInMethods ?: emptyList()
-            } catch (e: Exception) {
-                emptyList()
-            }
-        }
 }

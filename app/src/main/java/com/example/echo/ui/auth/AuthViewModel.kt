@@ -17,7 +17,6 @@ class AuthViewModel @Inject constructor(
     private val signUpWithEmailUseCase: SignUpWithEmailUseCase,
     private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
     private val signInAsGuestUseCase: SignInAsGuestUseCase,
-    private val fetchSignInMethodsUseCase: FetchSignInMethodsUseCase,
     private val deleteProvisionalAccountUseCase: DeleteProvisionalAccountUseCase,
     private val signOutUseCase: SignOutUseCase,
     private val sendPasswordResetEmailUseCase: SendPasswordResetEmailUseCase,
@@ -172,10 +171,6 @@ class AuthViewModel @Inject constructor(
             _uiState.update { it.copy(currentUser = null) }
             _uiEvent.send(AuthUiEvent.NavigateToSignIn)
         }
-    }
-
-    suspend fun fetchSignInMethods(email: String): List<String> {
-        return fetchSignInMethodsUseCase(email)
     }
 
     fun sendPasswordResetEmail(email: String, onSuccess: () -> Unit) {

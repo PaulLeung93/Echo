@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-18
 **Source:** Derived from [QA_AUDIT.md](QA_AUDIT.md), after independently verifying each finding against the actual code, Google Play policy (via Google Developer Knowledge), and [architecture.md](architecture.md).
-**Status:** Plan only — no code changed yet.
+**Status:** Batches B, C, and A2 complete. A1, A3, A4, and Batch D remain.
 
 ## Verification summary
 
@@ -21,7 +21,7 @@ Confirmed valid:
 
 ## Batch A — Launch blockers
 
-### A1. Rename applicationId *(blocked: needs a real owned identifier — deferred)*
+### A1. Rename applicationId *(blocked: needs a real owned identifier — deferred)* ⏳
 Permanent once published, so it must be right before first upload.
 - `app/build.gradle.kts:28` `namespace`, `:37` `applicationId`.
 - Regenerate `google-services.json` from a re-registered app in the Firebase Console (package name is baked in).
@@ -36,41 +36,52 @@ Permanent once published, so it must be right before first upload.
 - **Migration:** `scripts/strip_profile_emails.py` deletes the `email` field from existing `users/*` docs (idempotent). **Must be run once against the live project** to clean already-stored emails.
 - **Not done (optional):** tightening profile reads from `isSignedIn()` to `isNotAnonymous()` — left as-is; revisit if guests don't need to read profiles.
 
-### A3. Wire Google-account deletion *(blocked: Google Sign-In not configured)*
+### A3. Wire Google-account deletion *(blocked: Google Sign-In not configured)* ⏳
 - `SettingsScreen.kt:171-178`: replace the "isn't available yet" snackbar in the `else` branch with a Credential Manager re-auth flow that obtains a Google ID token, then calls `viewModel.deleteAccountWithGoogle(idToken)` (`SettingsViewModel.kt:90`).
 - **Dependency:** real `default_web_client_id` / configured Google Sign-In. Can't be tested end-to-end until that's done. Use the Credential Manager / `verified-email` skill as reference.
 
-### A4. Rotate the admin key *(downgraded — optional hygiene)*
+### A4. Rotate the admin key *(downgraded — optional hygiene)* ⏳
 Not urgent: `scripts/firebase-key.json` is gitignored and not cloud-synced. If desired: regenerate in Console, replace the local file (same path, no code change). Skip unless exposure is suspected.
 
 ---
 
-## Batch B — Quick wins (no external setup; one PR)
-1. Feed list key: add `key = { it.id }` at `FeedScreen.kt:227`.
-2. Alerts list key: add `key = { it.postId }` at `AlertsScreen.kt:84`.
-3. commentCount floor: require result `>= 0` in `firestore.rules:67-71` (interim; real fix is a Cloud Function).
-4. Comment-delete gate: `firestore.rules:118` & `:138` → `isNotAnonymous()` to match create.
-5. Nav test libs: move `build.gradle.kts:110-111` to `androidTestImplementation`.
-6. Nav version alignment: set all nav refs in `libs.versions.toml:17-20` to one stable version (drop `2.9.0-rc01`).
-7. Backup rules: fill `data_extraction_rules.xml` / `backup_rules.xml` to exclude auth/datastore, or set `allowBackup="false"` (`AndroidManifest.xml:11`).
-8. Dead code: delete `getPostsWithLocation`, `getPostsByUsername`, `refreshPosts` + use-case wrappers (`PoiMapper.toEntity`, `GetPostByIdUseCase`) — verify zero callers first.
-9. Architecture doc: update `architecture.md` `data/model`+`Dto` → `data/entity`+`Entity`.
-10. Commit `local.defaults.properties` with the placeholder so clean builds don't get a blank map.
+## Batch B — Quick wins ✅ DONE
+1. ✅ Feed list key: add `key = { it.id }` at `FeedScreen.kt:227`.
+2. ✅ Alerts list key: add `key = { it.postId }` at `AlertsScreen.kt:84`.
+3. ✅ commentCount floor: require result `>= 0` in `firestore.rules:67-71` (interim; real fix is a Cloud Function).
+4. ✅ Comment-delete gate: `firestore.rules:118` & `:138` → `isNotAnonymous()` to match create.
+5. ✅ Nav test libs: moved to `androidTestImplementation`; dropped non-existent `-android` suffixed artifacts entirely.
+6. ✅ Nav version alignment: all nav refs pinned to stable `2.8.9`; RC dropped.
+7. ✅ Backup rules: set `allowBackup="false"` (`AndroidManifest.xml:11`).
+8. ✅ Dead code: deleted `getPostsWithLocation`, `getPostsByUsername`, `refreshPosts` + `PoiMapper.toEntity`, `GetPostByIdUseCase`.
+9. ✅ Architecture doc: updated `architecture.md` `data/model`+`Dto` → `data/entity`+`Entity`.
+10. ✅ Committed `local.defaults.properties` with the placeholder so clean builds don't get a blank map.
 
 ---
 
-## Batch C — Robustness (each independently testable)
-- `toggleLike` → wrap read+write in `runTransaction` (`PostRepositoryImpl.kt:301`); fix the misleading "single write" comment. (Can't use `arrayUnion`/`increment` — rules check concrete array == likeCount.)
-- Share `observeHiddenUserIds` via `shareIn` on app scope (`UserRepositoryImpl.kt:206`).
-- `getPostsByTag` → server-side `whereArrayContains` + `limit`, one-shot fetch, normalize tag case on write (`PostRepositoryImpl.kt:125`).
-- Map: add debounce + viewport-overlap check in `MapViewModel`.
-- Batch comment write + counter (`CommentRepositoryImpl`).
-- Migrate screens `collectAsState()` → `collectAsStateWithLifecycle()`.
+## Batch C — Robustness ✅ DONE
+- ✅ `toggleLike` → wrapped in `runTransaction` (`PostRepositoryImpl.kt`). (Can't use `arrayUnion`/`increment` — rules check concrete array == likeCount.)
+- ✅ `observeHiddenUserIds` shared via `shareIn(appScope, WhileSubscribed(5000), replay=1)` (`UserRepositoryImpl.kt`).
+- ✅ `getPostsByTag` → server-side `whereArrayContains` + `limit(200)` one-shot fetch; tags normalized (trim/lowercase/distinct) on write in `PostMapper`.
+- ✅ Map: viewport-overlap guard in `MapViewModel.updateVisibleBounds` — skips re-fetch when new bounds are fully inside the current padded box.
+- ✅ All 4 comment add/delete paths use `WriteBatch` so comment doc + counter are atomic (`CommentRepositoryImpl`).
+- ✅ All 13 UI screens migrated from `collectAsState()` → `collectAsStateWithLifecycle()`; `lifecycle-runtime-compose` dependency added.
 
 ---
 
-## Batch D — Consistency & tests (later)
-Error-handling convention (`Result` everywhere); preserve exception causes in `AuthRepositoryImpl`; password-reset generic message; layering leaks (`DeleteAccountUseCase` Firebase import; VMs injecting `FirebaseAuth`); seeding-script idempotency. Then test coverage in the audit's Section-4 order: pure helpers → repo guards → `FeedViewModel` → extracted clustering.
+## Batch D — Consistency & tests 🔶 IN PROGRESS
+
+**Done (layering + auth hardening):**
+- ✅ Layering leak — `DeleteAccountUseCase` no longer imports Firebase types; the Firebase-exception → friendly-message mapping moved into `UserRepositoryImpl.deleteAccount` (data layer). Use case is now a clean pass-through.
+- ✅ Layering leak — `FeedViewModel`, `PostDetailViewModel`, `PoiDetailViewModel` no longer inject `FirebaseAuth`; they read the current user via `AuthRepository.getCurrentUser()` (returns the `User` domain model with `id`/`email`/`isAnonymous`). Also removed dead Firebase imports from `ForgotPasswordScreen`.
+- ✅ Preserve exception causes — `AuthRepositoryImpl` sign-in/up/guest/Google now wrap with `Exception(msg, e)` so the original cause survives.
+- ✅ Password-reset generic message — `sendPasswordResetEmail` swallows `FirebaseAuthInvalidUserException` and reports success regardless, so the screen can't be used to tell which emails have accounts (enumeration).
+- ✅ Sign-up enumeration — removed the proactive `fetchSignInMethods` "account already exists" probe from `SignUpScreen` (debounced disclosure of registered emails). Duplicate emails are still caught at submit via `signUpWithEmail`. Removed the now-dead `fetchSignInMethods` chain (VM method, `FetchSignInMethodsUseCase`, interface + impl).
+
+**Remaining:**
+- ⏳ Error-handling convention (`Result` everywhere) — broader audit of repos that still throw.
+- ⏳ Seeding-script idempotency.
+- ⏳ Test coverage in the audit's Section-4 order: pure helpers → repo guards → `FeedViewModel` → extracted clustering.
 
 ---
 

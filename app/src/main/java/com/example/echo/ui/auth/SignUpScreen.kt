@@ -30,8 +30,6 @@ import com.example.echo.navigation.Destinations
 import com.example.echo.ui.common.TopSnackbarHost
 import com.example.echo.utils.isStrongPassword
 import com.example.echo.utils.isValidEmail
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -45,14 +43,12 @@ fun SignUpScreen(
     val coroutineScope = rememberCoroutineScope()
 
     var email by remember { mutableStateOf("") }
-    var emailError by remember { mutableStateOf<String?>(null) }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
-    var emailCheckJob by remember { mutableStateOf<Job?>(null) }
 
     val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
 
@@ -132,36 +128,13 @@ fun SignUpScreen(
                 Column(modifier = Modifier.padding(20.dp)) {
                     OutlinedTextField(
                         value = email,
-                        onValueChange = {
-                            email = it
-                            emailError = null
-                            emailCheckJob?.cancel()
-                            emailCheckJob = coroutineScope.launch {
-                                delay(500)
-                                val trimmedEmail = email.trim()
-                                if (isValidEmail(trimmedEmail)) {
-                                    val methods = authViewModel.fetchSignInMethods(trimmedEmail)
-                                    if (methods.isNotEmpty()) emailError = "An account with this email already exists."
-                                }
-                            }
-                        },
+                        onValueChange = { email = it },
                         label = { Text("Email address") },
                         singleLine = true,
-                        isError = emailError != null,
                         shape = MaterialTheme.shapes.medium,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    emailError?.let { error ->
-                        Text(
-                            text = error,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier
-                                .align(Alignment.Start)
-                                .padding(top = 4.dp)
-                        )
-                    }
 
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
@@ -204,10 +177,6 @@ fun SignUpScreen(
 
                             if (!isValidEmail(trimmedEmail)) {
                                 coroutineScope.launch { snackbarHostState.showSnackbar("Please enter a valid email address.") }
-                                return@Button
-                            }
-                            if (emailError != null) {
-                                coroutineScope.launch { snackbarHostState.showSnackbar(emailError!!) }
                                 return@Button
                             }
                             if (trimmedPassword.isBlank() || trimmedConfirmPassword.isBlank()) {

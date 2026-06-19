@@ -9,6 +9,7 @@ import com.example.echo.domain.model.Poi
 import com.example.echo.domain.model.Report
 import com.example.echo.domain.model.ReportReason
 import com.example.echo.domain.model.ReportType
+import com.example.echo.domain.repository.AuthRepository
 import com.example.echo.domain.repository.LocationProvider
 import com.example.echo.domain.repository.PoiRepository
 import com.example.echo.domain.usecase.comment.AddPoiCommentUseCase
@@ -19,7 +20,6 @@ import com.example.echo.domain.usecase.user.BlockUserUseCase
 import com.example.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
 import com.example.echo.utils.distanceMeters
 import kotlinx.coroutines.flow.combine
-import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,7 +35,7 @@ import javax.inject.Inject
 class PoiDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val poiRepository: PoiRepository,
-    private val auth: FirebaseAuth,
+    authRepository: AuthRepository,
     private val locationProvider: LocationProvider,
     private val getPoiCommentsUseCase: GetPoiCommentsUseCase,
     private val addPoiCommentUseCase: AddPoiCommentUseCase,
@@ -48,11 +48,13 @@ class PoiDetailViewModel @Inject constructor(
     private val blockedIds = observeHiddenAuthorIdsUseCase()
 
     private val _uiState = MutableStateFlow(
-        PoiDetailUiState(
-            currentUserId = auth.currentUser?.uid,
-            currentUserEmail = auth.currentUser?.email,
-            isGuest = auth.currentUser?.isAnonymous != false
-        )
+        authRepository.getCurrentUser().let { user ->
+            PoiDetailUiState(
+                currentUserId = user?.id,
+                currentUserEmail = user?.email,
+                isGuest = user?.isAnonymous != false
+            )
+        }
     )
     val uiState: StateFlow<PoiDetailUiState> = _uiState.asStateFlow()
 

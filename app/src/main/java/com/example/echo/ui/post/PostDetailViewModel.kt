@@ -7,6 +7,7 @@ import com.example.echo.domain.model.Comment
 import com.example.echo.domain.model.Report
 import com.example.echo.domain.model.ReportReason
 import com.example.echo.domain.model.ReportType
+import com.example.echo.domain.repository.AuthRepository
 import com.example.echo.domain.usecase.comment.AddCommentUseCase
 import com.example.echo.domain.usecase.comment.DeleteCommentUseCase
 import com.example.echo.domain.usecase.comment.GetCommentsUseCase
@@ -15,7 +16,6 @@ import com.example.echo.domain.usecase.post.ToggleLikeUseCase
 import com.example.echo.domain.usecase.report.SubmitReportUseCase
 import com.example.echo.domain.usecase.user.BlockUserUseCase
 import com.example.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
-import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -32,15 +32,16 @@ class PostDetailViewModel @Inject constructor(
     private val submitReportUseCase: SubmitReportUseCase,
     private val blockUserUseCase: BlockUserUseCase,
     observeHiddenAuthorIdsUseCase: ObserveHiddenAuthorIdsUseCase,
-    auth: FirebaseAuth,
+    authRepository: AuthRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val postId: String = checkNotNull(savedStateHandle["postId"])
-    private val currentUserId: String? = auth.currentUser?.uid
+    private val currentUser = authRepository.getCurrentUser()
+    private val currentUserId: String? = currentUser?.id
 
     /** Guests (anonymous) and signed-out users can't report/block (rules reject it). */
-    val isGuest: Boolean = auth.currentUser?.isAnonymous != false
+    val isGuest: Boolean = currentUser?.isAnonymous != false
 
     private val blockedIds = observeHiddenAuthorIdsUseCase()
 

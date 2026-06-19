@@ -7,6 +7,7 @@ import com.example.echo.domain.model.Post
 import com.example.echo.domain.model.Report
 import com.example.echo.domain.model.ReportReason
 import com.example.echo.domain.model.ReportType
+import com.example.echo.domain.repository.AuthRepository
 import com.example.echo.domain.repository.LocationProvider
 import com.example.echo.domain.usecase.post.GetPostsUseCase
 import com.example.echo.domain.usecase.post.GetPostsByTagUseCase
@@ -15,7 +16,6 @@ import com.example.echo.domain.usecase.report.SubmitReportUseCase
 import com.example.echo.domain.usecase.user.BlockUserUseCase
 import com.example.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
 import com.example.echo.utils.Constants
-import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -31,11 +31,11 @@ class FeedViewModel @Inject constructor(
     private val blockUserUseCase: BlockUserUseCase,
     observeHiddenAuthorIdsUseCase: ObserveHiddenAuthorIdsUseCase,
     private val locationProvider: LocationProvider,
-    auth: FirebaseAuth
+    authRepository: AuthRepository
 ) : ViewModel() {
 
     /** Current user's uid, to distinguish own posts (no report/block) from others'. */
-    val currentUserId: String? = auth.currentUser?.uid
+    val currentUserId: String? = authRepository.getCurrentUser()?.id
 
     private val blockedIds: Flow<Set<String>> = observeHiddenAuthorIdsUseCase()
 

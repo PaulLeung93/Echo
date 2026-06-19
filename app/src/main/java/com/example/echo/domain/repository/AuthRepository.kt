@@ -82,11 +82,4 @@ interface AuthRepository {
      * [com.example.echo.domain.repository.UserRepository.deleteAccount].
      */
     suspend fun deleteCurrentAuthAccount(): Result<Unit>
-    
-    /**
-     * Fetch available sign-in methods for an email.
-     * @param email The email to check.
-     * @return List of sign-in method identifiers.
-     */
-    suspend fun fetchSignInMethods(email: String): List<String>
 }
