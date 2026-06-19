@@ -39,17 +39,4 @@ class GetPostsUseCase @Inject constructor(
      * @return Flow of filtered posts.
      */
     fun byTag(tag: String): Flow<List<Post>> = postRepository.getPostsByTag(tag)
-    
-    /**
-     * Get posts that have location data for map display.
-     * @return Flow of posts with location.
-     */
-    fun withLocation(): Flow<List<Post>> = postRepository.getPostsWithLocation()
-    
-    /**
-     * Get posts by a specific user.
-     * @param userEmail The user's email.
-     * @return Flow of user's posts.
-     */
-    fun byUser(userEmail: String): Flow<List<Post>> = postRepository.getPostsByUsername(userEmail)
 }

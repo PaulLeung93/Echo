@@ -224,7 +224,7 @@ fun FeedScreen(
                                     )
                                 }
                             } else {
-                                items(uiState.posts) { post ->
+                                items(uiState.posts, key = { it.id }) { post ->
                                     val distanceLabel = remember(post.id, userCoords) {
                                         val u = userCoords
                                         val lat = post.latitude

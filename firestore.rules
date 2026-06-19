@@ -66,8 +66,9 @@ service cloud.firestore {
     // commentCount moved by exactly +/-1 (a single comment added or removed).
     function commentCountMovedByOne() {
       let before = resource.data.get('commentCount', 0);
-      return request.resource.data.commentCount == before + 1
-          || request.resource.data.commentCount == before - 1;
+      let after = request.resource.data.commentCount;
+      // Move by exactly +/-1, and never let the counter go negative.
+      return (after == before + 1 || after == before - 1) && after >= 0;
     }
 
     // ----- Posts -----
@@ -115,7 +116,7 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow create: if isNotAnonymous() && isValidNewComment();
         allow update: if false; // comments are immutable
-        allow delete: if isSignedIn() && request.auth.uid == resource.data.authorId;
+        allow delete: if isNotAnonymous() && request.auth.uid == resource.data.authorId;
       }
     }
 
@@ -135,7 +136,7 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow create: if isNotAnonymous() && isValidNewComment();
         allow update: if false; // comments are immutable
-        allow delete: if isSignedIn() && request.auth.uid == resource.data.authorId;
+        allow delete: if isNotAnonymous() && request.auth.uid == resource.data.authorId;
       }
     }
 

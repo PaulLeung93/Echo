@@ -2,7 +2,6 @@ package com.example.echo.data.mapper
 
 import com.example.echo.data.entity.PoiEntity
 import com.example.echo.domain.model.Poi
-import com.google.firebase.firestore.GeoPoint
 import javax.inject.Inject
 
 /**
@@ -36,22 +35,5 @@ class PoiMapper @Inject constructor() {
      */
     fun toDomainList(entities: List<PoiEntity>): List<Poi> {
         return entities.map { toDomain(it) }
-    }
-    
-    /**
-     * Convert domain Poi to entity.
-     * @param poi The domain model.
-     * @return The Firestore entity.
-     */
-    fun toEntity(poi: Poi): PoiEntity {
-        return PoiEntity(
-            id = poi.id,
-            name = poi.name,
-            type = poi.type,
-            location = GeoPoint(poi.latitude, poi.longitude),
-            description = poi.description,
-            commentCount = poi.commentCount,
-            imageUrl = poi.imageUrl ?: ""
-        )
     }
 }

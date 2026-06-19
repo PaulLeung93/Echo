@@ -81,7 +81,7 @@ fun AlertsScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(uiState.alerts) { alert ->
+                        items(uiState.alerts, key = { it.postId }) { alert ->
                             AlertCard(
                                 alert = alert,
                                 onClick = {

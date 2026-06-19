@@ -25,8 +25,8 @@ Echo follows **Clean Architecture** principles combined with **MVVM (Model-View-
 
 - **Data Layer (`:app:data`)**
   - **Repository Implementations**: Fulfill the domain contracts using specific data sources (Firebase Firestore, Storage, Auth).
-  - **DTOs (Data Transfer Objects)**: Represent the structure of data in external systems (e.g., Firestore documents).
-  - **Mappers**: Transform DTOs to Domain Entities and vice versa, ensuring strict layer separation.
+  - **Entities (Data Transfer Objects)**: Represent the structure of data in external systems (e.g., Firestore documents). Live in `data/entity` and are suffixed `Entity` (e.g. `PostEntity`).
+  - **Mappers**: Transform Entities to Domain models and vice versa, ensuring strict layer separation.
 
 ### 2. Data Flow (UDF)
 
@@ -79,8 +79,8 @@ graph LR
 ```text
 app/src/main/java/com/example/echo/
 ├── data/
+│   ├── entity/          # Firestore entities (e.g. PostEntity, UserProfileEntity)
 │   ├── mapper/          # Transformation logic between layers
-│   ├── model/           # DTOs (e.g. PostDto, UserDto)
 │   └── repository/      # Repository implementations (Firebase)
 ├── di/                  # Hilt modules (Firebase, Repository, UseCase)
 ├── domain/
@@ -128,8 +128,8 @@ app/src/main/java/com/example/echo/
 ### 💾 Data Layer
 | File | Responsibility |
 | :--- | :--- |
-| `PostDto.kt` | Data structure representing the Firestore document for a post. |
-| `PostMapper.kt` | Static logic to convert between `PostDto` and `Post`. |
+| `PostEntity.kt` | Data structure representing the Firestore document for a post. |
+| `PostMapper.kt` | Logic to convert between `PostEntity` and `Post`. |
 | `PostRepositoryImpl.kt` | Firebase-specific implementation of the post repository. |
 | `PoiRepositoryImpl.kt` | Real-time synchronization of POI data from Firestore. |
 

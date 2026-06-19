@@ -35,17 +35,6 @@ interface PostRepository {
      * @param tag The tag to filter by.
      */
     fun getPostsByTag(tag: String): Flow<List<Post>>
-    
-    /**
-     * Get posts that have location data (for map display).
-     */
-    fun getPostsWithLocation(): Flow<List<Post>>
-    
-    /**
-     * Get posts by a specific user.
-     * @param username The user's username (email).
-     */
-    fun getPostsByUsername(username: String): Flow<List<Post>>
 
     /**
      * Get all posts authored by a user, keyed on the stable [authorId] (uid) so
@@ -98,9 +87,4 @@ interface PostRepository {
      * @return True if the post is now liked, false if unliked.
      */
     suspend fun toggleLike(postId: String): Boolean
-    
-    /**
-     * Refresh posts from the remote data source.
-     */
-    suspend fun refreshPosts(): Result<Unit>
 }

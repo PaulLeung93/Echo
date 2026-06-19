@@ -145,48 +145,6 @@ class PostRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }.flowOn(ioDispatcher)
     
-    override fun getPostsWithLocation(): Flow<List<Post>> = callbackFlow {
-        val listener = postsCollection
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                
-                val entities = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(PostEntity::class.java)
-                }?.filter { it.latitude != null && it.longitude != null } ?: emptyList()
-                
-                val currentUserId = auth.currentUser?.uid
-                val posts = postMapper.toDomainList(entities, currentUserId)
-                trySend(posts)
-            }
-        
-        awaitClose { listener.remove() }
-    }.flowOn(ioDispatcher)
-    
-    
-    override fun getPostsByUsername(username: String): Flow<List<Post>> = callbackFlow {
-        val listener = postsCollection
-            .whereEqualTo("username", username)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                
-                val entities = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(PostEntity::class.java)
-                } ?: emptyList()
-                
-                val currentUserId = auth.currentUser?.uid
-                val posts = postMapper.toDomainList(entities, currentUserId)
-                trySend(posts)
-            }
-        
-        awaitClose { listener.remove() }
-    }.flowOn(ioDispatcher)
-
     override fun getPostsByAuthorId(authorId: String): Flow<List<Post>> = callbackFlow {
         val listener = postsCollection
             .whereEqualTo("authorId", authorId)
@@ -317,9 +275,5 @@ class PostRepositoryImpl @Inject constructor(
 
             !isCurrentlyLiked
         }
-    }
-    
-    override suspend fun refreshPosts(): Result<Unit> {
-        return Result.success(Unit)
     }
 }

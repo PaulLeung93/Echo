@@ -14,7 +14,8 @@
 .externalNativeBuild
 .cxx
 local.properties
-local.defaults.properties
+# local.defaults.properties is committed with placeholder values so clean
+# builds/CI resolve the Maps key reference; real keys live in secrets.properties.
 secrets.properties
 
 # Release signing — never commit the keystore or its passwords
