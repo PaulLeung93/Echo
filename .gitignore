@@ -30,6 +30,10 @@ keystore.properties
 firebase-key.json
 *-serviceaccount.json
 
+# Python bytecode caches from scripts/ (py_compile, imports)
+__pycache__/
+*.pyc
+
 # Firebase emulator / CLI artifacts (rules and config are tracked; these are not)
 .firebase/
 *-debug.log

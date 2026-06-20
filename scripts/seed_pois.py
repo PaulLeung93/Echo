@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 import urllib.parse
 import urllib.request
@@ -25,6 +26,13 @@ db = firestore.client()
 WIKI_THUMB_WIDTH = 800
 # Wikimedia's API policy requires a descriptive User-Agent with contact info.
 WIKI_USER_AGENT = "EchoApp/1.0 (POI seeding; paul.leung@codepath.org)"
+
+
+def slugify(name):
+    """Stable doc ID from a POI name, e.g. 'Central Park' -> 'central-park'.
+    Using a deterministic ID (instead of an auto-generated one) is what makes
+    re-seeding idempotent: the same POI maps to the same document every run."""
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
 def commons_file_url(filename):
@@ -311,13 +319,13 @@ pois = [
 
 ]
 
-# Step 3: Clear existing POIs to avoid duplicates
-print("🗑️ Clearing existing POIs...")
-docs = db.collection("pois").stream()
-for doc in docs:
-    doc.reference.delete()
-
-# Step 4: Resolve a curated photo for each POI, then upload to Firestore
+# Step 3: Resolve a curated photo for each POI, then upsert into Firestore.
+# Idempotent: each POI is written to a deterministic doc ID (its name slug) with
+# set(merge=True), so re-running updates the same docs in place instead of
+# deleting + re-adding. No duplicates, no empty window, and — crucially — each
+# POI's `comments` subcollection stays attached because its parent ID never
+# changes. (A POI removed from this list is NOT auto-deleted; remove it by hand
+# if needed.)
 print("📷 Resolving POI photos from Wikimedia…")
 with_photo = 0
 for poi in pois:
@@ -333,8 +341,13 @@ for poi in pois:
         print(f"   ✓ {poi['name']}")
     else:
         print(f"   – {poi['name']} (no photo; type-icon fallback)")
-    poi["createdAt"] = datetime.utcnow()
-    db.collection("pois").add(poi)
 
-print(f"✅ Successfully uploaded {len(pois)} POIs to Firestore "
+    doc_ref = db.collection("pois").document(slugify(poi["name"]))
+    # Stamp createdAt only when the POI is new, so re-seeds preserve the original
+    # creation time (overwriting it every run would not be idempotent).
+    if not doc_ref.get().exists:
+        poi["createdAt"] = datetime.utcnow()
+    doc_ref.set(poi, merge=True)
+
+print(f"✅ Upserted {len(pois)} POIs to Firestore "
       f"({with_photo} with photos, {len(pois) - with_photo} fallback).")

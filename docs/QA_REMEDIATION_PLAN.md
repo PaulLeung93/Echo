@@ -80,7 +80,7 @@ Not urgent: `scripts/firebase-key.json` is gitignored and not cloud-synced. If d
 
 **Remaining:**
 - ✅ Error-handling convention (`Result` at the use-case boundary). Audit found it was already 5/7 consistent — repos throw, and the use cases adapt to `Result` (a valid translation boundary). Normalized the two outliers (`DeleteCommentUseCase`, `DeletePoiCommentUseCase`) to return `Result<Unit>` via `runCatching`; converted the two VM `try/catch` blocks to `.onFailure`. Deliberately did **not** push `Result` into the repo interfaces — that would just relocate the `try/catch` a layer down with no behavioral payoff.
-- ⏳ Seeding-script idempotency.
+- ✅ Seeding-script idempotency. `seed_pois.py` now writes each POI to a deterministic slug doc ID (e.g. `central-park`) with `set(merge=True)` instead of delete-all + `add()` (random IDs). Re-running updates the same docs in place — no duplicates, no empty window, POI `comments` subcollections stay attached. `createdAt` is stamped only on first creation. One-time wipe of the old random-ID docs done; collection re-seeded to 38 slug-ID POIs.
 - ⏳ Test coverage in the audit's Section-4 order: pure helpers → repo guards → `FeedViewModel` → extracted clustering.
 
 ---
