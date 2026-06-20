@@ -28,6 +28,7 @@ mockk = "1.13.12"
 turbine = "1.1.0"
 kotlinxSerializationJson = "1.7.1"
 coil = "2.7.0"
+room = "2.6.1"
 
 [libraries]
 accompanist-swiperefresh = { module = "com.google.accompanist:accompanist-swiperefresh", version.ref = "accompanistSwiperefresh" }
@@ -81,6 +82,11 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 
 # Image loading (remote POI photos, with disk/memory caching)
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
+
+# Room (offline feed cache — local source of truth for the feed list)
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

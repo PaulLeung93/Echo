@@ -15,13 +15,31 @@ interface PostRepository {
     fun getPosts(): Flow<List<Post>>
 
     /**
-     * Fetch one page of newest-first posts via a one-time read (not a live listener),
-     * so the feed only bills reads for the posts actually scrolled into view.
-     * @param afterTimestamp Cursor: return posts strictly older than this timestamp,
-     *   or the newest page when null.
-     * @param limit Page size.
+     * Observe the locally-cached feed (Room). This is the feed's offline-first display
+     * source of truth: it emits instantly on a cold launch and keeps working offline,
+     * and is refreshed from Firestore via [refreshFeed] / [loadMoreFeed].
      */
-    suspend fun getPostsPage(afterTimestamp: Long?, limit: Long): List<Post>
+    fun observeFeed(): Flow<List<Post>>
+
+    /**
+     * Fetch the newest page from Firestore and replace the cached feed atomically.
+     * @param limit Page size.
+     * @return The fetched page (so the caller can advance its pagination cursor).
+     */
+    suspend fun refreshFeed(limit: Long): List<Post>
+
+    /**
+     * Fetch the next page (posts strictly older than [afterTimestamp]) from Firestore
+     * and append it to the cached feed.
+     * @return The fetched page (so the caller can advance its cursor / detect the end).
+     */
+    suspend fun loadMoreFeed(afterTimestamp: Long, limit: Long): List<Post>
+
+    /**
+     * Optimistically reflect a like toggle in the cached feed so the UI updates
+     * instantly; the authoritative network write happens via [toggleLike].
+     */
+    suspend fun setCachedLike(postId: String, liked: Boolean, likeCount: Int)
 
     /**
      * Fetch located posts within [radiusMeters] of a center via geohash range queries,

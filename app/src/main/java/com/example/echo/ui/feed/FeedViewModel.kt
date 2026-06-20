@@ -49,9 +49,11 @@ class FeedViewModel @Inject constructor(
     val neighborhoodName: StateFlow<String?> = _neighborhoodName.asStateFlow()
 
     // --- Paginated (untagged) feed state ---
-    // The default feed pages in via one-time reads instead of a live 200-post
-    // listener, so a session only bills reads for what's actually scrolled to.
-    private val _pagedPosts = MutableStateFlow<List<Post>>(emptyList())
+    // The default feed is backed by a Room cache (offline-first source of truth): it
+    // paints instantly on cold launch and works offline, while pages are fetched from
+    // Firestore and written through to the cache — so a session only bills reads for
+    // what's actually scrolled to.
+    private val cachedFeed: Flow<List<Post>> = getPostsUseCase.feed()
     private val _isLoadingFirstPage = MutableStateFlow(true)
     private val _endReached = MutableStateFlow(false)
     private var oldestTimestamp: Long? = null
@@ -72,8 +74,8 @@ class FeedViewModel @Inject constructor(
 
     val uiState: StateFlow<FeedUiState> = _currentTag.flatMapLatest { tag ->
         if (tag != null) {
-            // The tag view stays live (rare and short-lived); it reflects likes via
-            // its own listener, so optimistic updates aren't needed there.
+            // The tag view is a short-lived one-shot query (not cached); blocked
+            // authors are still filtered out reactively.
             combine(
                 getPostsByTagUseCase(tag).catch { emit(emptyList()) },
                 blockedIds
@@ -85,10 +87,12 @@ class FeedViewModel @Inject constructor(
                 )
             }
         } else {
-            combine(_pagedPosts, _isLoadingFirstPage, blockedIds) { posts, loadingFirst, blocked ->
+            combine(cachedFeed, _isLoadingFirstPage, blockedIds) { posts, loadingFirst, blocked ->
                 FeedUiState(
                     posts = posts.filterNot { it.authorId in blocked },
                     currentTag = null,
+                    // With a warm cache the feed shows instantly; only spin when we have
+                    // nothing cached yet and the first network page is still loading.
                     isLoading = loadingFirst && posts.isEmpty()
                 )
             }
@@ -122,14 +126,19 @@ class FeedViewModel @Inject constructor(
             _isLoadingMore.value = true
         }
         try {
-            val page = getPostsUseCase.page(
-                afterTimestamp = if (reset) null else oldestTimestamp,
-                limit = Constants.FEED_PAGE_SIZE
-            )
+            // The repo writes the page through to Room; the cached feed flow drives the
+            // UI, so we only track the cursor / end-of-feed here.
+            val cursor = oldestTimestamp
+            val page = if (reset || cursor == null) {
+                getPostsUseCase.refresh(Constants.FEED_PAGE_SIZE)
+            } else {
+                getPostsUseCase.loadMore(cursor, Constants.FEED_PAGE_SIZE)
+            }
             _endReached.value = page.size < Constants.FEED_PAGE_SIZE
             page.lastOrNull()?.let { oldestTimestamp = it.timestamp }
-            _pagedPosts.value = if (reset) page else _pagedPosts.value + page
         } catch (e: Exception) {
+            // Offline / failed refresh: keep whatever the cache already shows and tell
+            // the user, rather than wiping the feed.
             _uiEvent.send(e.message ?: "Couldn't load posts. Please try again.")
         } finally {
             _isLoadingFirstPage.value = false
@@ -186,23 +195,16 @@ class FeedViewModel @Inject constructor(
     }
 
     fun toggleLike(postId: String) {
+        val current = uiState.value.posts.find { it.id == postId } ?: return
+        val newLiked = !current.likedByCurrentUser
+        val newCount = (current.likeCount + if (newLiked) 1 else -1).coerceAtLeast(0)
         viewModelScope.launch {
+            // Optimistically update the cache (the feed's source of truth) so the heart
+            // flips instantly; the network write follows and we revert on failure.
+            getPostsUseCase.setCachedLike(postId, newLiked, newCount)
             toggleLikeUseCase(postId)
-                .onSuccess { nowLiked ->
-                    // No live listener backs the paginated feed, so reflect the like
-                    // locally instead of re-reading the post.
-                    _pagedPosts.update { posts ->
-                        posts.map {
-                            if (it.id == postId) {
-                                it.copy(
-                                    likedByCurrentUser = nowLiked,
-                                    likeCount = (it.likeCount + if (nowLiked) 1 else -1).coerceAtLeast(0)
-                                )
-                            } else it
-                        }
-                    }
-                }
                 .onFailure { e ->
+                    getPostsUseCase.setCachedLike(postId, current.likedByCurrentUser, current.likeCount)
                     _uiEvent.send(e.message ?: "Couldn't update your like. Please try again.")
                 }
         }

@@ -47,6 +47,12 @@ object Constants {
      */
     const val MIN_POIS_ZOOM = 11f
 
+    /**
+     * Default set of map marker-type filters (everything shown). Used both as the
+     * initial state and as the fallback when no persisted preference exists yet.
+     */
+    val DEFAULT_MAP_FILTERS = setOf("user posts", "landmark", "park", "college")
+
     // Firestore Collections
     const val COLLECTION_POSTS = "posts"
     const val COLLECTION_POIS = "pois"

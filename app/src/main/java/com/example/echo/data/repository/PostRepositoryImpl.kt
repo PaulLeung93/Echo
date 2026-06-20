@@ -1,6 +1,11 @@
 package com.example.echo.data.repository
 
+import androidx.room.withTransaction
 import com.example.echo.data.entity.PostEntity
+import com.example.echo.data.local.EchoDatabase
+import com.example.echo.data.local.PostDao
+import com.example.echo.data.local.toCached
+import com.example.echo.data.local.toDomain
 import com.example.echo.data.mapper.PostMapper
 import com.example.echo.data.withWriteTimeout
 import com.example.echo.di.ApplicationScope
@@ -22,6 +27,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -37,6 +43,8 @@ class PostRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val postMapper: PostMapper,
     private val userRepository: UserRepository,
+    private val database: EchoDatabase,
+    private val postDao: PostDao,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @ApplicationScope private val appScope: CoroutineScope
 ) : PostRepository {
@@ -81,18 +89,49 @@ class PostRepositoryImpl @Inject constructor(
 
     override fun getPosts(): Flow<List<Post>> = sharedPosts
 
-    override suspend fun getPostsPage(afterTimestamp: Long?, limit: Long): List<Post> =
-        withContext(ioDispatcher) {
-            var query = postsCollection
-                .orderBy(Constants.FIELD_TIMESTAMP, Query.Direction.DESCENDING)
-                .limit(limit)
-            if (afterTimestamp != null) {
-                query = query.startAfter(afterTimestamp)
-            }
-            val snapshot = query.get().await()
-            val entities = snapshot.documents.mapNotNull { it.toObject(PostEntity::class.java) }
-            postMapper.toDomainList(entities, auth.currentUser?.uid)
+    override fun observeFeed(): Flow<List<Post>> =
+        postDao.observeFeed()
+            .map { rows -> rows.map { it.toDomain() } }
+            .flowOn(ioDispatcher)
+
+    override suspend fun refreshFeed(limit: Long): List<Post> = withContext(ioDispatcher) {
+        val page = fetchPage(afterTimestamp = null, limit = limit)
+        // Replace in one transaction so the feed flow emits the new page once rather
+        // than briefly flashing empty between the clear and the insert.
+        database.withTransaction {
+            postDao.clear()
+            postDao.upsertAll(page.map { it.toCached() })
         }
+        page
+    }
+
+    override suspend fun loadMoreFeed(afterTimestamp: Long, limit: Long): List<Post> =
+        withContext(ioDispatcher) {
+            val page = fetchPage(afterTimestamp = afterTimestamp, limit = limit)
+            postDao.upsertAll(page.map { it.toCached() })
+            page
+        }
+
+    override suspend fun setCachedLike(postId: String, liked: Boolean, likeCount: Int) =
+        withContext(ioDispatcher) {
+            postDao.updateLike(postId, liked, likeCount)
+        }
+
+    /**
+     * One-time newest-first page read (not a live listener), so the feed only bills
+     * reads for the posts actually scrolled into view. Used to refill the Room cache.
+     */
+    private suspend fun fetchPage(afterTimestamp: Long?, limit: Long): List<Post> {
+        var query = postsCollection
+            .orderBy(Constants.FIELD_TIMESTAMP, Query.Direction.DESCENDING)
+            .limit(limit)
+        if (afterTimestamp != null) {
+            query = query.startAfter(afterTimestamp)
+        }
+        val snapshot = query.get().await()
+        val entities = snapshot.documents.mapNotNull { it.toObject(PostEntity::class.java) }
+        return postMapper.toDomainList(entities, auth.currentUser?.uid)
+    }
 
     override suspend fun getPostsNear(
         latitude: Double,

@@ -5,9 +5,11 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.echo.utils.Constants
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -40,6 +42,7 @@ class UserPreferencesRepository @Inject constructor(
         val DARK_MODE = booleanPreferencesKey("dark_mode")
         val NOTIFICATIONS = booleanPreferencesKey("notifications_enabled")
         val POIS_LAST_SYNC = longPreferencesKey("pois_last_sync")
+        val MAP_MARKER_FILTERS = stringSetPreferencesKey("map_marker_filters")
     }
 
     private val prefs: Flow<Preferences> = dataStore.data.catch { e ->
@@ -59,6 +62,13 @@ class UserPreferencesRepository @Inject constructor(
      */
     val poisLastSync: Flow<Long> = prefs.map { it[Keys.POIS_LAST_SYNC] ?: 0L }
 
+    /**
+     * The map's active marker-type filters, persisted so the user's chosen view
+     * (e.g. parks only) survives app restarts. Defaults to everything shown.
+     */
+    val mapMarkerFilters: Flow<Set<String>> =
+        prefs.map { it[Keys.MAP_MARKER_FILTERS] ?: Constants.DEFAULT_MAP_FILTERS }
+
     suspend fun setDarkMode(enabled: Boolean) {
         dataStore.edit { it[Keys.DARK_MODE] = enabled }
     }
@@ -69,5 +79,9 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setPoisLastSync(epochMillis: Long) {
         dataStore.edit { it[Keys.POIS_LAST_SYNC] = epochMillis }
+    }
+
+    suspend fun setMapMarkerFilters(filters: Set<String>) {
+        dataStore.edit { it[Keys.MAP_MARKER_FILTERS] = filters }
     }
 }

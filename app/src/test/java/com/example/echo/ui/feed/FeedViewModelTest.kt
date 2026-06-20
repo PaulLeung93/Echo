@@ -1,6 +1,7 @@
 package com.example.echo.ui.feed
 
 import com.example.echo.domain.model.Coordinates
+import com.example.echo.domain.repository.AuthRepository
 import com.example.echo.domain.repository.LocationProvider
 import com.example.echo.domain.usecase.post.GetPostsUseCase
 import com.example.echo.domain.usecase.post.GetPostsByTagUseCase
@@ -8,7 +9,6 @@ import com.example.echo.domain.usecase.post.ToggleLikeUseCase
 import com.example.echo.domain.usecase.report.SubmitReportUseCase
 import com.example.echo.domain.usecase.user.BlockUserUseCase
 import com.example.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
-import com.google.firebase.auth.FirebaseAuth
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -34,7 +34,7 @@ class FeedViewModelTest {
     private val blockUserUseCase: BlockUserUseCase = mockk()
     private val observeBlockedUserIdsUseCase: ObserveHiddenAuthorIdsUseCase = mockk()
     private val locationProvider: LocationProvider = mockk()
-    private val auth: FirebaseAuth = mockk()
+    private val authRepository: AuthRepository = mockk()
 
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -44,10 +44,11 @@ class FeedViewModelTest {
 
         // Default mocks
         every { getPostsUseCase() } returns flowOf(emptyList())
-        coEvery { getPostsUseCase.page(any(), any()) } returns emptyList()
+        every { getPostsUseCase.feed() } returns flowOf(emptyList())
+        coEvery { getPostsUseCase.refresh(any()) } returns emptyList()
         every { getPostsByTagUseCase(any()) } returns flowOf(emptyList())
         every { observeBlockedUserIdsUseCase() } returns flowOf(emptySet())
-        every { auth.currentUser } returns null
+        every { authRepository.getCurrentUser() } returns null
     }
 
     private fun createViewModel() = FeedViewModel(
@@ -58,7 +59,7 @@ class FeedViewModelTest {
         blockUserUseCase,
         observeBlockedUserIdsUseCase,
         locationProvider,
-        auth
+        authRepository
     )
 
     @After

@@ -150,6 +150,11 @@ dependencies {
     // DataStore (user preferences: theme, notifications)
     implementation("androidx.datastore:datastore-preferences:1.1.7")
 
+    // Room (offline feed cache — local source of truth for the feed list)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+
     // Serialization (for type-safe navigation)
     implementation(libs.kotlinx.serialization.json)
 

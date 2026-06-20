@@ -465,8 +465,27 @@ Deferred until shipped; captured so they aren't lost.
         Manager / App Check Play Integrity if adopted later).
 
 ### Technical
-- [ ] Offline cache / Room layer for feed resilience.
-- [ ] Search/filter persistence across sessions.
+- [x] **Offline cache / Room layer for feed resilience** *(2026-06-20).* The feed is
+      now **offline-first**: a Room table (`cached_feed_posts`) is the feed list's
+      display source of truth. `FeedViewModel` observes the cache
+      (`GetPostsUseCase.feed()`), so the feed paints **instantly** on cold launch and
+      keeps working offline instead of spinning on a Firestore round-trip. Network
+      pages are written through to Room — `refreshFeed()` replaces page one in a single
+      transaction (no empty flash), `loadMoreFeed()` appends — and a failed/offline
+      refresh keeps the cached feed up and just snackbars. Likes update optimistically
+      against the cache (`setCachedLike`, reverted on failure). New files:
+      `data/local/{EchoDatabase,PostDao,CachedPostEntity,Converters,PostCacheMapper}.kt`
+      + `di/DatabaseModule.kt`. *(Complements Firestore's own persistent disk cache:
+      that already served offline reads, but this adds an app-owned source of truth +
+      instant first-paint. The DB is disposable — `fallbackToDestructiveMigration`.)*
+- [x] **Search/filter persistence across sessions** *(2026-06-20).* The map's
+      marker-type filters (user posts / landmark / park / college) now persist via
+      DataStore (`UserPreferencesRepository.mapMarkerFilters`), so a chosen view (e.g.
+      parks only) survives restarts. `MapViewModel.activeFilters` is sourced from the
+      preference and `filterByMarkerTypes` writes it back (single source of truth).
+      *(Scoped to the deliberate marker-type toggles; the transient tag/search filters
+      are intentionally left session-only so a cold launch doesn't silently reopen into
+      a filtered view + an extra read.)*
 - [x] **Backfill POI photos (2026-06-15).** POI detail shows a curated `imageUrl`
       with a type-icon fallback when absent. The seeding script
       (`C:\Users\Paul\OneDrive\Desktop\Echo\seed_pois.py`) now resolves a free

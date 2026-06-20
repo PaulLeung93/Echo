@@ -19,12 +19,21 @@ class GetPostsUseCase @Inject constructor(
     operator fun invoke(): Flow<List<Post>> = postRepository.getPosts()
 
     /**
-     * Fetch one newest-first page via a one-time read (for the paginated feed).
-     * @param afterTimestamp Cursor; null for the first page.
-     * @param limit Page size.
+     * Observe the offline-first cached feed (Room). Emits instantly on cold launch and
+     * works offline; refreshed from the network via [refresh] / [loadMore].
      */
-    suspend fun page(afterTimestamp: Long?, limit: Long): List<Post> =
-        postRepository.getPostsPage(afterTimestamp, limit)
+    fun feed(): Flow<List<Post>> = postRepository.observeFeed()
+
+    /** Fetch the newest page and replace the cached feed. Returns the fetched page. */
+    suspend fun refresh(limit: Long): List<Post> = postRepository.refreshFeed(limit)
+
+    /** Fetch the next page (older than [afterTimestamp]) and append to the cache. */
+    suspend fun loadMore(afterTimestamp: Long, limit: Long): List<Post> =
+        postRepository.loadMoreFeed(afterTimestamp, limit)
+
+    /** Optimistically reflect a like toggle in the cached feed. */
+    suspend fun setCachedLike(postId: String, liked: Boolean, likeCount: Int) =
+        postRepository.setCachedLike(postId, liked, likeCount)
 
     /**
      * Fetch located posts within [radiusMeters] of a center (geohash range query),

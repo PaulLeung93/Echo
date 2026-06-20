@@ -8,6 +8,7 @@ import com.example.echo.domain.model.Post
 import com.example.echo.domain.usecase.poi.GetPoisUseCase
 import com.example.echo.domain.usecase.post.GetPostsUseCase
 import com.example.echo.domain.usecase.post.ToggleLikeUseCase
+import com.example.echo.data.preferences.UserPreferencesRepository
 import com.example.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
 import com.example.echo.utils.Constants
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -24,13 +25,22 @@ class MapViewModel @Inject constructor(
     private val getPostsUseCase: GetPostsUseCase,
     private val getPoisUseCase: GetPoisUseCase,
     private val toggleLikeUseCase: ToggleLikeUseCase,
+    private val userPreferences: UserPreferencesRepository,
     observeHiddenAuthorIdsUseCase: ObserveHiddenAuthorIdsUseCase
 ) : ViewModel() {
 
     private val blockedIds: Flow<Set<String>> = observeHiddenAuthorIdsUseCase()
 
     private val _currentTag = MutableStateFlow<String?>(null)
-    private val _activeFilters = MutableStateFlow(setOf("user posts", "landmark", "park", "college"))
+
+    /**
+     * Active marker-type filters, persisted across sessions via DataStore so a user's
+     * chosen view survives restarts. [filterByMarkerTypes] writes the preference and
+     * this flow re-emits, keeping it the single source of truth.
+     */
+    private val activeFilters: StateFlow<Set<String>> = userPreferences.mapMarkerFilters
+        .stateIn(viewModelScope, SharingStarted.Eagerly, Constants.DEFAULT_MAP_FILTERS)
+
     private val _selectedPost = MutableStateFlow<Post?>(null)
     private val _selectedCluster = MutableStateFlow<ClusterGroup?>(null)
     private val _selectedPoiId = MutableStateFlow<String?>(null)
@@ -113,7 +123,7 @@ class MapViewModel @Inject constructor(
     /** Posts that can be plotted: located, pass the type filter, and not from a blocked user. */
     private val mappablePosts: Flow<List<Post>> = combine(
         postSource,
-        _activeFilters,
+        activeFilters,
         blockedIds
     ) { posts, filters, blocked ->
         if ("user posts" in filters) {
@@ -151,7 +161,7 @@ class MapViewModel @Inject constructor(
     /** All POIs matching the active type filter (used for selection lookup). */
     private val filteredPois: Flow<List<Poi>> = combine(
         getPoisUseCase(),
-        _activeFilters
+        activeFilters
     ) { pois, filters ->
         pois.filter { it.type.lowercase() in filters }
     }
@@ -188,7 +198,7 @@ class MapViewModel @Inject constructor(
 
     private val filterState: Flow<FilterState> = combine(
         _currentTag,
-        _activeFilters,
+        activeFilters,
         _postsZoomEnabled
     ) { tag, filters, postsEnabled ->
         FilterState(tag, filters, postsZoomedOut = !postsEnabled)
@@ -273,7 +283,8 @@ class MapViewModel @Inject constructor(
     }
 
     fun filterByMarkerTypes(types: Set<String>) {
-        _activeFilters.value = types
+        // Persist the choice; the activeFilters flow re-emits and updates the map.
+        viewModelScope.launch { userPreferences.setMapMarkerFilters(types) }
     }
 
     fun updateZoom(zoom: Float) {
