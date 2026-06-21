@@ -16,6 +16,7 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
@@ -37,6 +38,7 @@ import javax.inject.Singleton
 class UserRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
+    private val storage: FirebaseStorage,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @ApplicationScope private val appScope: CoroutineScope
 ) : UserRepository {
@@ -191,6 +193,23 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updateAvatar(imageBytes: ByteArray): Result<String> = withContext(ioDispatcher) {
+        val user = auth.currentUser
+            ?: return@withContext Result.failure(IllegalStateException("You must be signed in."))
+        try {
+            // One file per user (overwritten on each change) so we never accumulate
+            // orphaned avatars. The path is keyed on the uid, which the Storage rules
+            // require the writer to own.
+            val ref = storage.reference.child("avatars/${user.uid}.jpg")
+            ref.putBytes(imageBytes).await()
+            val url = ref.downloadUrl.await().toString()
+            usersCollection.document(user.uid).update("photoUrl", url).await()
+            Result.success(url)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override fun observeCurrentUserProfile(): Flow<UserProfile?> = callbackFlow {
         val uid = auth.currentUser?.uid
         if (uid == null) {
@@ -310,6 +329,7 @@ class UserRepositoryImpl @Inject constructor(
             firstName = firstName,
             lastName = lastName,
             bio = bio,
+            photoUrl = photoUrl.ifBlank { null },
             blockedUserIds = blockedUserIds
         )
     }

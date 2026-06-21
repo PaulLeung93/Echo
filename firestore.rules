@@ -164,9 +164,9 @@ service cloud.firestore {
              ['uid', 'username', 'firstName', 'lastName', 'bio', 'createdAt']
            );
 
-      // Owner-only updates: either (a) edit name + bio, or (b) change the blocked
-      // list. username/uid/email are immutable. Split so a block/unblock write
-      // (which doesn't carry name/bio) isn't rejected, and vice versa.
+      // Owner-only updates: (a) edit name + bio, (b) change the avatar photoUrl, or
+      // (c) change the blocked list. username/uid/email are immutable. Split so each
+      // kind of write (which carries only its own keys) isn't rejected by the others.
       allow update: if isNotAnonymous()
         && uid == request.auth.uid
         && (
@@ -175,6 +175,8 @@ service cloud.firestore {
             && request.resource.data.firstName.size() > 0
             && request.resource.data.bio is string
             && request.resource.data.bio.size() <= 160)
+          || (changedKeys().hasOnly(['photoUrl'])
+            && request.resource.data.photoUrl is string)
           || (changedKeys().hasOnly(['blockedUserIds'])
             && request.resource.data.blockedUserIds is list)
         );

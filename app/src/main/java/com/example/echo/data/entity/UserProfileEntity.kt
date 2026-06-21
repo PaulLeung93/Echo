@@ -11,5 +11,7 @@ data class UserProfileEntity(
     val firstName: String = "",
     val lastName: String = "",
     val bio: String = "",
+    /** Download URL of the user's avatar in Cloud Storage; blank when none set. */
+    val photoUrl: String = "",
     val blockedUserIds: List<String> = emptyList()
 )

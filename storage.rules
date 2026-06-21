@@ -2,12 +2,27 @@ rules_version = '2';
 
 // Echo Cloud Storage rules.
 //
-// The app has no Storage feature yet (no uploads or downloads in the client),
-// so the bucket is locked down entirely. When image upload lands, replace the
-// deny-all below with auth-scoped rules enforcing owner paths plus size/type
-// limits (ROADMAP Phase 3: "Storage rules for image uploads").
+// Avatars live at `avatars/{uid}.jpg` — one file per user. Any signed-in user may
+// read them (so profiles can show photos); only the owning, non-anonymous user may
+// write their own file, and only a reasonably-sized image. Everything else is denied.
 service firebase.storage {
   match /b/{bucket}/o {
+
+    function isNotAnonymous() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    match /avatars/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if isNotAnonymous()
+        && fileName == request.auth.uid + '.jpg'
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isNotAnonymous() && fileName == request.auth.uid + '.jpg';
+    }
+
+    // Deny everything not explicitly matched above.
     match /{allPaths=**} {
       allow read, write: if false;
     }

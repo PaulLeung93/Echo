@@ -10,6 +10,8 @@ data class UserProfile(
     val firstName: String,
     val lastName: String,
     val bio: String = "",
+    /** Avatar image URL (Cloud Storage download URL); null when the user has none. */
+    val photoUrl: String? = null,
     /** Uids this user has blocked; their posts/comments are hidden from this user. */
     val blockedUserIds: List<String> = emptyList()
 ) {

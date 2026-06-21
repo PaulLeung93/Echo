@@ -421,10 +421,23 @@ Deferred until shipped; captured so they aren't lost.
       **Rules deployed** — ✅ confirmed live in the Firebase Console Rules tab
       (2026-06-16): the `users create` rule lists `bio` in `hasOnly` and the
       owner-only `users update` rule is present, so new sign-ups and bio edits work.
-- [~] Avatar upload — *blocked on the free (Spark) plan:* image uploads need
-      Firebase **Storage**, which requires Blaze. The Edit profile screen keeps
-      the initials avatar with a "Photo uploads coming soon" caption as the
-      placeholder. Revisit if/when Blaze is on the table (same gate as SMS 2FA).
+- [~] **Avatar upload — code complete (2026-06-20), pending console enablement.**
+      Now on **Blaze**, so the old Spark blocker is gone. Implemented end-to-end in
+      code: a `photoUrl` field on `UserProfile`/`users/{uid}`; **Edit profile** has a
+      tappable avatar (Android Photo Picker → downscale to 512px JPEG via `ImageUtils`
+      → upload to Cloud Storage `avatars/{uid}.jpg` → persist the download URL), with
+      an upload spinner + camera badge; a reusable `ProfileAvatar` renders the photo
+      (Coil) with an initials fallback on Profile + Edit profile. `storage.rules`
+      rewritten from deny-all to owner-scoped avatar writes (≤5MB, image/* only) with
+      signed-in read; `firestore.rules` `users update` gains a `photoUrl`-only branch.
+      **⚠ Still required to work in production (console/CLI, not code):**
+      1. **Provision Storage** in the Firebase Console ("Get Started" on `echo-2b5ba`) —
+         the bucket doesn't exist yet, so uploads fail until then.
+      2. **Deploy rules:** `firebase deploy --only storage,firestore:rules` (the
+         `photoUrl` Firestore branch must be live or the URL write is `PERMISSION_DENIED`).
+      Posts/comments still show **initials** (their `AuthorAvatar` only has a username,
+      not the author's photo); showing avatars there would need denormalizing
+      `photoUrl` onto posts/comments + a backfill — deferred.
 - [x] **Post history with stats** *(already shipped).* The Profile screen shows
       Posts / total Likes / total Comments stat tiles plus the full post list
       (`ProfileViewModel` sums `likeCount`/`commentCount` across the user's posts).

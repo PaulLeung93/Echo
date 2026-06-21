@@ -121,6 +121,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    // Cloud Storage — user avatar uploads (Blaze plan).
+    implementation(libs.firebase.storage)
     // Geohash utilities (no Realtime DB) for viewport-bounded post queries on the map.
     implementation(libs.geofire.android.common)
     // App Check — attests requests come from the genuine, unmodified app.

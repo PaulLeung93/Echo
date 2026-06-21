@@ -1,5 +1,9 @@
 package com.example.echo.ui.profile
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -9,17 +13,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import com.example.echo.components.ProfileAvatar
 import com.example.echo.domain.usecase.user.BIO_MAX_LENGTH
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,6 +35,11 @@ fun EditProfileScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Android photo picker (no storage permission needed); images only.
+    val photoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let(viewModel::onAvatarPicked) }
 
     LaunchedEffect(state.error) {
         state.error?.let {
@@ -95,9 +105,19 @@ fun EditProfileScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            InitialsAvatar(firstName = state.firstName, lastName = state.lastName)
+            EditableAvatar(
+                photoUrl = state.photoUrl,
+                firstName = state.firstName,
+                lastName = state.lastName,
+                isUploading = state.isUploadingPhoto,
+                onClick = {
+                    photoPicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                }
+            )
             Text(
-                text = "Photo uploads coming soon",
+                text = if (state.isUploadingPhoto) "Uploading photo…" else "Tap to change photo",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -167,26 +187,52 @@ fun EditProfileScreen(
     }
 }
 
-/** Coral circle with up to two initials from the name. */
+/**
+ * Tappable 96dp avatar: the user's photo (or initials fallback) with a camera badge,
+ * dimmed under a progress spinner while an upload is in flight.
+ */
 @Composable
-private fun InitialsAvatar(firstName: String, lastName: String) {
-    val initials = buildString {
-        firstName.firstOrNull()?.let { append(it.uppercaseChar()) }
-        lastName.firstOrNull()?.let { append(it.uppercaseChar()) }
-    }.ifEmpty { "?" }
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.primary,
-        shadowElevation = 4.dp,
-        modifier = Modifier.size(96.dp)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = initials,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimary
-            )
+private fun EditableAvatar(
+    photoUrl: String?,
+    firstName: String,
+    lastName: String,
+    isUploading: Boolean,
+    onClick: () -> Unit
+) {
+    val name = "$firstName $lastName"
+    Box(contentAlignment = Alignment.BottomEnd) {
+        Surface(
+            shape = CircleShape,
+            shadowElevation = 4.dp,
+            modifier = Modifier
+                .size(96.dp)
+                .clickable(enabled = !isUploading, onClick = onClick)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                ProfileAvatar(photoUrl = photoUrl, name = name, size = 96.dp)
+                if (isUploading) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+        }
+        // Camera badge to signal the avatar is editable.
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            shadowElevation = 2.dp,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Filled.PhotoCamera,
+                    contentDescription = "Change photo",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }

@@ -17,8 +17,8 @@ import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Settings
-import com.example.echo.components.AuthorAvatar
 import com.example.echo.components.EmptyState
+import com.example.echo.components.ProfileAvatar
 import com.example.echo.components.PostCard
 import com.example.echo.components.PostCardSkeleton
 import com.example.echo.domain.model.Post
@@ -112,7 +112,11 @@ fun ProfileScreen(
                         modifier = Modifier.size(96.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            AuthorAvatar(name = displayName, size = 84.dp)
+                            ProfileAvatar(
+                                photoUrl = profile?.photoUrl,
+                                name = displayName,
+                                size = 84.dp
+                            )
                         }
                     }
                     Spacer(Modifier.height(12.dp))

@@ -36,6 +36,13 @@ interface UserRepository {
     /** Update the current user's editable profile fields (name + bio). */
     suspend fun updateProfile(firstName: String, lastName: String, bio: String): Result<Unit>
 
+    /**
+     * Upload [imageBytes] (a compressed JPEG) as the current user's avatar to Cloud
+     * Storage, then persist the resulting download URL to their profile's `photoUrl`.
+     * @return the download URL on success.
+     */
+    suspend fun updateAvatar(imageBytes: ByteArray): Result<String>
+
     /** Add [blockedUid] to the current user's blocked list (idempotent). */
     suspend fun blockUser(blockedUid: String): Result<Unit>
 

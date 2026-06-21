@@ -1,22 +1,33 @@
 package com.example.echo.ui.profile
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.echo.di.IoDispatcher
 import com.example.echo.domain.usecase.user.BIO_MAX_LENGTH
 import com.example.echo.domain.usecase.user.GetCurrentUserProfileUseCase
+import com.example.echo.domain.usecase.user.UpdateAvatarUseCase
 import com.example.echo.domain.usecase.user.UpdateUserProfileUseCase
+import com.example.echo.utils.ImageUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
 class EditProfileViewModel @Inject constructor(
     private val getCurrentUserProfileUseCase: GetCurrentUserProfileUseCase,
-    private val updateUserProfileUseCase: UpdateUserProfileUseCase
+    private val updateUserProfileUseCase: UpdateUserProfileUseCase,
+    private val updateAvatarUseCase: UpdateAvatarUseCase,
+    @ApplicationContext private val context: Context,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
 
     data class State(
@@ -24,12 +35,15 @@ class EditProfileViewModel @Inject constructor(
         val lastName: String = "",
         val bio: String = "",
         val username: String = "",
+        val photoUrl: String? = null,
         val isLoading: Boolean = true,
         val isSaving: Boolean = false,
+        val isUploadingPhoto: Boolean = false,
         val error: String? = null
     ) {
         val canSave: Boolean
-            get() = firstName.isNotBlank() && lastName.isNotBlank() && !isLoading && !isSaving
+            get() = firstName.isNotBlank() && lastName.isNotBlank() &&
+                !isLoading && !isSaving && !isUploadingPhoto
     }
 
     private val _state = MutableStateFlow(State())
@@ -46,6 +60,7 @@ class EditProfileViewModel @Inject constructor(
                                 lastName = profile.lastName,
                                 bio = profile.bio,
                                 username = profile.username,
+                                photoUrl = profile.photoUrl,
                                 isLoading = false
                             )
                         }
@@ -55,6 +70,30 @@ class EditProfileViewModel @Inject constructor(
                 }
                 .onFailure { e ->
                     _state.update { it.copy(isLoading = false, error = e.message ?: "Couldn't load your profile.") }
+                }
+        }
+    }
+
+    /** Compress the picked image off the main thread, upload it, and persist the URL. */
+    fun onAvatarPicked(uri: Uri) {
+        viewModelScope.launch {
+            _state.update { it.copy(isUploadingPhoto = true, error = null) }
+            val bytes = withContext(ioDispatcher) { ImageUtils.compressImageForUpload(context, uri) }
+            if (bytes == null) {
+                _state.update {
+                    it.copy(isUploadingPhoto = false, error = "Couldn't read that image. Try another.")
+                }
+                return@launch
+            }
+            updateAvatarUseCase(bytes)
+                .onSuccess { url -> _state.update { it.copy(isUploadingPhoto = false, photoUrl = url) } }
+                .onFailure { e ->
+                    _state.update {
+                        it.copy(
+                            isUploadingPhoto = false,
+                            error = e.message ?: "Couldn't update your photo. Please try again."
+                        )
+                    }
                 }
         }
     }
