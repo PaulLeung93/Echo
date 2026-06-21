@@ -1,6 +1,7 @@
 package com.example.echo.di
 
 import com.example.echo.data.location.LocationProviderImpl
+import com.example.echo.data.repository.AuthorAvatarResolverImpl
 import com.example.echo.data.repository.AuthRepositoryImpl
 import com.example.echo.data.repository.CommentRepositoryImpl
 import com.example.echo.data.repository.PoiRepositoryImpl
@@ -8,6 +9,7 @@ import com.example.echo.data.repository.PostRepositoryImpl
 import com.example.echo.data.repository.ReportRepositoryImpl
 import com.example.echo.data.repository.UserRepositoryImpl
 import com.example.echo.domain.repository.AuthRepository
+import com.example.echo.domain.repository.AuthorAvatarResolver
 import com.example.echo.domain.repository.CommentRepository
 import com.example.echo.domain.repository.LocationProvider
 import com.example.echo.domain.repository.PoiRepository
@@ -54,4 +56,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindReportRepository(impl: ReportRepositoryImpl): ReportRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAuthorAvatarResolver(impl: AuthorAvatarResolverImpl): AuthorAvatarResolver
 }

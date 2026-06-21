@@ -91,7 +91,12 @@ fun PostCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                ProfileAvatar(photoUrl = post.authorPhotoUrl, name = post.username, size = 40.dp)
+                AuthorPhotoAvatar(
+                    authorId = post.authorId,
+                    name = post.username,
+                    fallbackPhotoUrl = post.authorPhotoUrl,
+                    size = 40.dp
+                )
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

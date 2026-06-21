@@ -10,13 +10,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.echo.components.LocalAuthorAvatarResolver
 import com.example.echo.data.preferences.UserPreferencesRepository
+import com.example.echo.domain.repository.AuthorAvatarResolver
 import com.example.echo.navigation.RootNavHost
 import com.example.echo.ui.auth.AuthViewModel
 import com.example.echo.ui.common.BottomNavigationBar
@@ -30,6 +33,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var preferences: UserPreferencesRepository
 
+    @Inject
+    lateinit var authorAvatarResolver: AuthorAvatarResolver
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -37,6 +43,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val darkMode by preferences.darkMode.collectAsState(initial = false)
             EchoTheme(darkTheme = darkMode) {
+              CompositionLocalProvider(LocalAuthorAvatarResolver provides authorAvatarResolver) {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
@@ -82,6 +89,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
+              }
             }
         }
     }
