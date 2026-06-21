@@ -25,7 +25,7 @@ val keystoreProperties = Properties().apply {
 val hasReleaseKeystore = keystorePropertiesFile.exists()
 
 android {
-    namespace = "com.example.echo"
+    namespace = "dev.echoapp.echo"
     compileSdk = 35
 
     secrets {
@@ -34,7 +34,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.echo"
+        applicationId = "dev.echoapp.echo"
         minSdk = 24
         targetSdk = 35
         versionCode = 1

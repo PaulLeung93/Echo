@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-18
 **Source:** Derived from [QA_AUDIT.md](QA_AUDIT.md), after independently verifying each finding against the actual code, Google Play policy (via Google Developer Knowledge), and [architecture.md](architecture.md).
-**Status:** Batches B, C, and A2 complete. A1, A3, A4, and Batch D remain.
+**Status:** Batches A1, A2, B, C complete. A3, A4, and Batch D remain.
 
 ## Verification summary
 
@@ -21,13 +21,12 @@ Confirmed valid:
 
 ## Batch A — Launch blockers
 
-### A1. Rename applicationId *(blocked: needs a real owned identifier — deferred)* ⏳
-Permanent once published, so it must be right before first upload.
-- `app/build.gradle.kts:28` `namespace`, `:37` `applicationId`.
-- Regenerate `google-services.json` from a re-registered app in the Firebase Console (package name is baked in).
-- Re-add SHA-1/SHA-256 fingerprints (debug + release/Play app-signing) to the new Firebase app — also affects Google Sign-In and the Maps key's package restriction.
-- Move the source package `com.example.echo` → new package (large mechanical refactor; its own commit).
-- **Dependency:** decide the identifier first. Do this *before* A3 to avoid re-doing Google Sign-In config twice.
+### A1. Rename applicationId — ✅ DONE
+- `namespace` + `applicationId` → `dev.echoapp.echo` (`app/build.gradle.kts`).
+- All 149 Kotlin source files renamed; source directories moved from `com/example/echo/` → `dev/echoapp/echo/` across main, test, androidTest, debug, and release source sets.
+- `proguard-rules.pro` keep rule updated.
+- New Firebase Android app registered (`dev.echoapp.echo`); debug SHA-1 (`B7:E9:…:E4`) + release SHA-1 (`86:B0:…:4D`) added; fresh `google-services.json` downloaded and in place.
+- Build verified green (`assembleDebug` + `testDebugUnitTest`).
 
 ### A2. Remove email from the publicly-readable profile — ✅ DONE
 **Decision:** dropped the `email` field entirely instead of moving it to a private subdoc. Verified that nothing in the app ever reads `UserProfile.email`; every place that needs the user's own email reads `FirebaseAuth.currentUser.email` (e.g. `ProfileScreen.kt:45`, `PoiDetailViewModel.kt:53`). If no one reads it, there's no reason to store it — this fully removes the exposure with less surface area than a subdoc.

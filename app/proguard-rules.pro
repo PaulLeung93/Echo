@@ -34,4 +34,4 @@
 # constructor, fields, or accessors, or deserialization returns empty objects.
 # (-keep class { *; } already retains all members, so a separate
 # -keepclassmembers rule would be redundant.)
--keep class com.example.echo.data.entity.** { *; }
+-keep class dev.echoapp.echo.data.entity.** { *; }
