@@ -78,14 +78,16 @@ class CommentMapperTest {
         // Given
         val authorId = "uid-123"
         val username = "test@test.com"
+        val photoUrl = "https://example.com/avatars/uid-123.jpg"
         val message = "Test comment message"
 
         // When
-        val result = mapper.toFirestoreMap(authorId, username, message)
+        val result = mapper.toFirestoreMap(authorId, username, photoUrl, message)
 
         // Then
         assertEquals(authorId, result["authorId"])
         assertEquals(username, result["username"])
+        assertEquals(photoUrl, result["authorPhotoUrl"])
         assertEquals(message, result["message"])
         assertTrue(result.containsKey("timestamp"))
     }

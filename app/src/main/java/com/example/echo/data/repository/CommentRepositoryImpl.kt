@@ -5,6 +5,7 @@ import com.example.echo.data.mapper.CommentMapper
 import com.example.echo.data.withWriteTimeout
 import com.example.echo.di.IoDispatcher
 import com.example.echo.domain.model.Comment
+import com.example.echo.domain.model.UserProfile
 import com.example.echo.domain.repository.CommentRepository
 import com.example.echo.domain.repository.UserRepository
 import com.example.echo.utils.Constants
@@ -34,10 +35,10 @@ class CommentRepositoryImpl @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : CommentRepository {
 
-    /** The caller's chosen handle (validated by the rules), or fail if no profile. */
-    private suspend fun requireUsername(): String {
+    /** The caller's profile (handle validated by the rules), or fail if none exists. */
+    private suspend fun requireProfile(): UserProfile {
         val result = userRepository.getCurrentUserProfile()
-        return result.getOrNull()?.username
+        return result.getOrNull()
             ?: throw (result.exceptionOrNull()
                 ?: IllegalStateException("Please finish setting up your profile before commenting."))
     }
@@ -76,10 +77,12 @@ class CommentRepositoryImpl @Inject constructor(
                 throw IllegalStateException("Anonymous users cannot comment")
             }
 
-            val username = requireUsername()
+            val profile = requireProfile()
+            val username = profile.username
             val commentMap = commentMapper.toFirestoreMap(
                 authorId = currentUser.uid,
                 username = username,
+                photoUrl = profile.photoUrl,
                 message = message
             )
 
@@ -99,6 +102,7 @@ class CommentRepositoryImpl @Inject constructor(
                 id = commentRef.id,
                 authorId = currentUser.uid,
                 username = username,
+                authorPhotoUrl = profile.photoUrl,
                 message = message,
                 timestamp = System.currentTimeMillis()
             )
@@ -151,10 +155,12 @@ class CommentRepositoryImpl @Inject constructor(
                 throw IllegalStateException("Anonymous users cannot comment")
             }
 
-            val username = requireUsername()
+            val profile = requireProfile()
+            val username = profile.username
             val commentMap = commentMapper.toFirestoreMap(
                 authorId = currentUser.uid,
                 username = username,
+                photoUrl = profile.photoUrl,
                 message = message
             )
 
@@ -172,6 +178,7 @@ class CommentRepositoryImpl @Inject constructor(
                 id = commentRef.id,
                 authorId = currentUser.uid,
                 username = username,
+                authorPhotoUrl = profile.photoUrl,
                 message = message,
                 timestamp = System.currentTimeMillis()
             )

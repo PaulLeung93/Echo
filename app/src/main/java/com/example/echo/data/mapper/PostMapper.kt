@@ -23,6 +23,7 @@ class PostMapper @Inject constructor() {
             id = entity.id,
             authorId = entity.authorId,
             username = entity.username,
+            authorPhotoUrl = entity.authorPhotoUrl?.ifBlank { null },
             message = entity.message,
             timestamp = entity.timestamp,
             latitude = entity.latitude,
@@ -58,6 +59,7 @@ class PostMapper @Inject constructor() {
     fun toFirestoreMap(
         authorId: String,
         username: String,
+        photoUrl: String?,
         message: String,
         latitude: Double?,
         longitude: Double?,
@@ -68,6 +70,9 @@ class PostMapper @Inject constructor() {
             put("id", postId)
             put("authorId", authorId)
             put("username", username)
+            // Denormalized author avatar so the feed/cards don't need a profile read.
+            // Only written when set, so the create-rule's optional field stays absent otherwise.
+            if (!photoUrl.isNullOrBlank()) put("authorPhotoUrl", photoUrl)
             put("message", message)
             put("timestamp", System.currentTimeMillis())
             // Store tags normalized (lowercased, de-duped) so the server-side

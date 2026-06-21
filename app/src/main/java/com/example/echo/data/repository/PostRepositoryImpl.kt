@@ -241,7 +241,7 @@ class PostRepositoryImpl @Inject constructor(
             // their profile by the security rules. Distinguish a read error from a
             // genuinely missing profile so the user sees the right message.
             val profileResult = userRepository.getCurrentUserProfile()
-            val username = profileResult.getOrNull()?.username
+            val profile = profileResult.getOrNull()
                 ?: return@withContext Result.failure(
                     profileResult.exceptionOrNull()
                         ?: IllegalStateException("Please finish setting up your profile before posting.")
@@ -250,7 +250,8 @@ class PostRepositoryImpl @Inject constructor(
             val newDocRef = postsCollection.document()
             val postMap = postMapper.toFirestoreMap(
                 authorId = currentUser.uid,
-                username = username,
+                username = profile.username,
+                photoUrl = profile.photoUrl,
                 message = message,
                 latitude = latitude,
                 longitude = longitude,

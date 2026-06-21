@@ -19,6 +19,7 @@ class CommentMapper @Inject constructor() {
             id = entity.id ?: "",
             authorId = entity.authorId,
             username = entity.username,
+            authorPhotoUrl = entity.authorPhotoUrl?.ifBlank { null },
             message = entity.message,
             timestamp = entity.timestamp
         )
@@ -40,12 +41,20 @@ class CommentMapper @Inject constructor() {
      * @param message The comment message.
      * @return Map representation for Firestore document.
      */
-    fun toFirestoreMap(authorId: String, username: String, message: String): Map<String, Any> {
-        return mapOf(
-            "authorId" to authorId,
-            "username" to username,
-            "message" to message,
-            "timestamp" to System.currentTimeMillis()
-        )
+    fun toFirestoreMap(
+        authorId: String,
+        username: String,
+        photoUrl: String?,
+        message: String
+    ): Map<String, Any> {
+        return buildMap {
+            put("authorId", authorId)
+            put("username", username)
+            // Denormalized author avatar; only written when set so the create rule's
+            // optional field stays absent otherwise.
+            if (!photoUrl.isNullOrBlank()) put("authorPhotoUrl", photoUrl)
+            put("message", message)
+            put("timestamp", System.currentTimeMillis())
+        }
     }
 }

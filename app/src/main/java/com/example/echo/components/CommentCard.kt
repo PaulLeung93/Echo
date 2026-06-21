@@ -57,7 +57,7 @@ fun CommentCard(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.Top
         ) {
-            AuthorAvatar(name = comment.username, size = 36.dp)
+            ProfileAvatar(photoUrl = comment.authorPhotoUrl, name = comment.username, size = 36.dp)
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

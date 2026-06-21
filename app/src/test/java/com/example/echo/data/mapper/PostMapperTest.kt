@@ -125,6 +125,7 @@ class PostMapperTest {
         // Given
         val authorId = "uid-123"
         val username = "test@test.com"
+        val photoUrl = "https://example.com/avatars/uid-123.jpg"
         val message = "Hello World"
         val latitude = 40.7128
         val longitude = -74.0060
@@ -132,18 +133,30 @@ class PostMapperTest {
         val postId = "newPost123"
 
         // When
-        val result = mapper.toFirestoreMap(authorId, username, message, latitude, longitude, tags, postId)
+        val result = mapper.toFirestoreMap(authorId, username, photoUrl, message, latitude, longitude, tags, postId)
 
         // Then
         assertEquals(postId, result["id"])
         assertEquals(authorId, result["authorId"])
         assertEquals(username, result["username"])
+        assertEquals(photoUrl, result["authorPhotoUrl"])
         assertEquals(message, result["message"])
         assertEquals(tags, result["tags"])
         assertEquals(latitude, result["latitude"])
         assertEquals(longitude, result["longitude"])
         assertEquals(0, result["likeCount"])
         assertEquals(0, result["commentCount"])
+    }
+
+    @Test
+    fun `given null photoUrl, when toFirestoreMap called, then map omits authorPhotoUrl`() {
+        // When
+        val result = mapper.toFirestoreMap(
+            "uid-123", "test@test.com", null, "Hello", null, null, emptyList(), "p1"
+        )
+
+        // Then
+        assertFalse(result.containsKey("authorPhotoUrl"))
     }
     
     @Test
@@ -156,7 +169,7 @@ class PostMapperTest {
         val postId = "newPost123"
 
         // When
-        val result = mapper.toFirestoreMap(authorId, username, message, null, null, tags, postId)
+        val result = mapper.toFirestoreMap(authorId, username, null, message, null, null, tags, postId)
         
         // Then
         assertFalse(result.containsKey("latitude"))

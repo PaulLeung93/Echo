@@ -14,6 +14,7 @@ data class CachedPostEntity(
     @PrimaryKey val id: String,
     val authorId: String,
     val username: String,
+    val authorPhotoUrl: String?,
     val message: String,
     val timestamp: Long,
     val latitude: Double?,

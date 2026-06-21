@@ -50,7 +50,7 @@ service cloud.firestore {
         && d.message.size() > 0
         && d.message.size() <= 1000
         && d.timestamp is int
-        && d.keys().hasOnly(['authorId', 'username', 'message', 'timestamp']);
+        && d.keys().hasOnly(['authorId', 'username', 'authorPhotoUrl', 'message', 'timestamp']);
     }
 
     // The like array changed by exactly the caller's own uid (added or removed),
@@ -88,7 +88,7 @@ service cloud.firestore {
         && request.resource.data.commentCount == 0
         && request.resource.data.likes.size() == 0
         && request.resource.data.keys().hasOnly([
-             'id', 'authorId', 'username', 'message', 'timestamp',
+             'id', 'authorId', 'username', 'authorPhotoUrl', 'message', 'timestamp',
              'tags', 'likeCount', 'commentCount', 'likes',
              'latitude', 'longitude', 'geohash'
            ]);
