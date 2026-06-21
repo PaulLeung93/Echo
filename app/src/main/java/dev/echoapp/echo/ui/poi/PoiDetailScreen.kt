@@ -18,8 +18,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.NearMe
@@ -46,13 +47,12 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import dev.echoapp.echo.R
 import dev.echoapp.echo.components.BlockUserDialog
-import dev.echoapp.echo.components.CommentCard
+import dev.echoapp.echo.components.PostCard
 import dev.echoapp.echo.components.ReportDialog
-import dev.echoapp.echo.domain.model.Comment
 import dev.echoapp.echo.domain.model.Poi
+import dev.echoapp.echo.domain.model.Post
 import dev.echoapp.echo.utils.Constants
 import dev.echoapp.echo.utils.formatDistance
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,33 +63,17 @@ fun PoiDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    var newComment by remember { mutableStateOf("") }
-    var commentJustAdded by remember { mutableStateOf(false) }
-    var reportingComment by remember { mutableStateOf<Comment?>(null) }
+    var reportTarget by remember { mutableStateOf<Post?>(null) }
     var blockTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
 
-    // Lightweight client-side rate limiting (real enforcement is server-side).
-    val commentTimestamps = remember { mutableStateListOf<Long>() }
-    val maxComments = 5
-    val windowMs = 30_000L
-    val rateLimitedMessage = stringResource(R.string.comment_rate_limited)
     val proximityKm = (Constants.PROXIMITY_RADIUS_METERS / 1000).toInt()
 
-    // Surface transient action errors (failed add/delete) as snackbars.
+    // Surface transient action errors (failed like/report) as snackbars.
     LaunchedEffect(Unit) {
         viewModel.uiEvent.collect { message ->
             snackbarHostState.showSnackbar(message)
-        }
-    }
-
-    // Scroll to the newest comment after one is added.
-    LaunchedEffect(uiState.comments.size, commentJustAdded) {
-        if (commentJustAdded && uiState.comments.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.comments.size)
-            commentJustAdded = false
         }
     }
 
@@ -120,24 +104,12 @@ fun PoiDetailScreen(
             )
         },
         bottomBar = {
-            if (uiState.poi != null) {
-                CommentComposer(
-                    canComment = uiState.canComment,
-                    gateMessage = commentGateMessage(uiState, proximityKm),
-                    value = newComment,
-                    onValueChange = { newComment = it },
-                    onSend = {
-                        val now = System.currentTimeMillis()
-                        val recent = commentTimestamps.filter { now - it < windowMs }
-                        if (recent.size >= maxComments) {
-                            scope.launch { snackbarHostState.showSnackbar(rateLimitedMessage) }
-                        } else if (newComment.isNotBlank()) {
-                            commentTimestamps.add(now)
-                            viewModel.addComment(newComment) {
-                                newComment = ""
-                                commentJustAdded = true
-                            }
-                        }
+            uiState.poi?.let { poi ->
+                AddPostBar(
+                    canPost = uiState.canPost,
+                    gateMessage = postGateMessage(uiState, proximityKm),
+                    onAddPost = {
+                        navController.navigate("${Constants.ROUTE_CREATE_POST}?poiId=${poi.id}")
                     }
                 )
             }
@@ -187,15 +159,19 @@ fun PoiDetailScreen(
                                 Spacer(Modifier.height(20.dp))
                                 ProximityBanner(uiState)
                                 Spacer(Modifier.height(28.dp))
-                                EchoesHeader(count = uiState.comments.size)
+                                ThreadHeader(
+                                    count = uiState.posts.size,
+                                    sortDescending = uiState.sortDescending,
+                                    onToggleSort = viewModel::toggleSort
+                                )
                                 Spacer(Modifier.height(16.dp))
                             }
                         }
 
-                        if (uiState.comments.isEmpty()) {
+                        if (uiState.posts.isEmpty()) {
                             item {
                                 Text(
-                                    text = stringResource(R.string.no_comments_yet),
+                                    text = stringResource(R.string.poi_thread_empty),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
@@ -205,26 +181,28 @@ fun PoiDetailScreen(
                                 )
                             }
                         } else {
-                            items(uiState.comments, key = { it.id }) { comment ->
-                                val isOwnComment = uiState.currentUserId != null &&
-                                    comment.authorId.isNotEmpty() &&
-                                    comment.authorId == uiState.currentUserId
-                                CommentCard(
-                                    comment = comment,
-                                    isAuthor = isOwnComment,
-                                    onDelete = if (isOwnComment) {
-                                        { viewModel.deleteComment(comment.id) }
+                            items(uiState.posts, key = { it.id }) { post ->
+                                val isOwnPost = uiState.currentUserId != null &&
+                                    post.authorId.isNotEmpty() &&
+                                    post.authorId == uiState.currentUserId
+                                val canModerate = !uiState.isGuest && !isOwnPost &&
+                                    post.authorId.isNotEmpty()
+                                PostCard(
+                                    post = post,
+                                    isLiked = post.likedByCurrentUser,
+                                    likeCount = post.likeCount,
+                                    commentCount = post.commentCount,
+                                    onLikeClick = { viewModel.toggleLike(post.id) },
+                                    onClick = {
+                                        navController.navigate("${Constants.ROUTE_POST_DETAILS}/${post.id}")
+                                    },
+                                    onReport = if (canModerate) {
+                                        { reportTarget = post }
                                     } else null,
-                                    onReport = if (!uiState.isGuest && !isOwnComment &&
-                                        comment.authorId.isNotEmpty()
-                                    ) {
-                                        { reportingComment = comment }
+                                    onBlock = if (canModerate) {
+                                        { blockTarget = post.authorId to post.username }
                                     } else null,
-                                    onBlock = if (!uiState.isGuest && !isOwnComment &&
-                                        comment.authorId.isNotEmpty()
-                                    ) {
-                                        { blockTarget = comment.authorId to comment.username }
-                                    } else null,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
                                 )
                                 Spacer(Modifier.height(12.dp))
                             }
@@ -235,12 +213,12 @@ fun PoiDetailScreen(
         }
     }
 
-    reportingComment?.let { comment ->
+    reportTarget?.let { post ->
         ReportDialog(
-            onDismiss = { reportingComment = null },
+            onDismiss = { reportTarget = null },
             onSubmit = { reason ->
-                viewModel.reportComment(comment, reason)
-                reportingComment = null
+                viewModel.reportPost(post, reason)
+                reportTarget = null
             }
         )
     }
@@ -482,44 +460,82 @@ private fun ProximityRipple(active: Boolean) {
 }
 
 @Composable
-private fun EchoesHeader(count: Int) {
+private fun ThreadHeader(
+    count: Int,
+    sortDescending: Boolean,
+    onToggleSort: () -> Unit
+) {
     Row(
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Forum,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = stringResource(R.string.echoes_header),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = count.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+            Icon(
+                imageVector = Icons.Outlined.Forum,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
             )
+            Text(
+                text = stringResource(R.string.poi_thread_header),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh
+            ) {
+                Text(
+                    text = count.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            }
+        }
+
+        // Only worth showing the order toggle once there's more than one post.
+        if (count > 1) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.clickable(onClick = onToggleSort)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.SwapVert,
+                        contentDescription = stringResource(R.string.poi_sort_toggle),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = stringResource(
+                            if (sortDescending) R.string.poi_sort_newest else R.string.poi_sort_oldest
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun CommentComposer(
-    canComment: Boolean,
+private fun AddPostBar(
+    canPost: Boolean,
     gateMessage: String?,
-    value: String,
-    onValueChange: (String) -> Unit,
-    onSend: () -> Unit
+    onAddPost: () -> Unit
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -528,10 +544,6 @@ private fun CommentComposer(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                // The parent (MainActivity Scaffold) already pads for the navigation
-                // bar, so only handle the keyboard here — excluding the nav-bar inset
-                // it overlaps — to avoid double-padding the bottom.
-                .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars))
                 .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp)
         ) {
             if (gateMessage != null) {
@@ -545,68 +557,38 @@ private fun CommentComposer(
                         .padding(bottom = 8.dp)
                 )
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Button(
+                onClick = onAddPost,
+                enabled = canPost,
+                shape = RoundedCornerShape(percent = 50),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
             ) {
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    placeholder = { Text(stringResource(R.string.write_comment_hint)) },
-                    enabled = canComment,
-                    shape = RoundedCornerShape(24.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-                    ),
-                    maxLines = 4,
-                    modifier = Modifier.weight(1f)
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
                 )
-                val sendEnabled = canComment && value.isNotBlank()
-                Surface(
-                    shape = CircleShape,
-                    color = if (sendEnabled) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                    },
-                    shadowElevation = if (sendEnabled) 3.dp else 0.dp,
-                    modifier = Modifier
-                        .height(48.dp)
-                        .clickable(enabled = sendEnabled, onClick = onSend)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 18.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.send),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.poi_add_post),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
 }
 
-/** Returns the reason commenting is unavailable, or null when the user may comment. */
+/** Returns the reason posting is unavailable, or null when the user may post. */
 @Composable
-private fun commentGateMessage(uiState: PoiDetailUiState, proximityKm: Int): String? = when {
-    uiState.canComment -> null
-    uiState.isGuest -> stringResource(R.string.comment_guest_prompt)
-    !uiState.locationChecked -> null // still resolving location; show the input disabled
-    uiState.distanceMeters == null -> stringResource(R.string.comment_location_unknown)
-    else -> stringResource(R.string.comment_out_of_range, proximityKm)
+private fun postGateMessage(uiState: PoiDetailUiState, proximityKm: Int): String? = when {
+    uiState.canPost -> null
+    uiState.isGuest -> stringResource(R.string.poi_post_guest_prompt)
+    !uiState.locationChecked -> null // still resolving location; show the button disabled
+    uiState.distanceMeters == null -> stringResource(R.string.poi_post_location_unknown)
+    else -> stringResource(R.string.poi_post_out_of_range, proximityKm)
 }
 
 /** The proximity-banner message and whether the user is in range (drives the accent). */

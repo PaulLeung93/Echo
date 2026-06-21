@@ -34,6 +34,12 @@ via a full `assembleDebug`, then smoke-tested on a Pixel_9_Pro emulator.
 
 ## 🧩 Phase 1 — Finish the in-flight feature: POI Comments — ✅ COMPLETE (2026-06-10)
 
+> **⚠️ Superseded (2026-06-21):** POI *comments* were replaced by POI **post threads**
+> — a POI is now a thread of full posts rather than a comment box. See the
+> "POI post threads" entry below and [poi_documentation.md](poi_documentation.md) §4.
+> The proximity-gating and ownership work from this phase carried over to the new
+> "Add post" flow.
+
 Proximity-gated POI commenting is now implemented and verified via a green
 `assembleDebug` + 8 passing unit tests. (Live UI tap-through on the emulator was
 blocked by a map-tile rendering quirk — see note below — so visual confirmation
@@ -66,6 +72,30 @@ of the screen is pending a real-device run.)
 > Pixel_9_Pro emulator despite a valid API key (no auth-failure in logs, Firestore
 > works) — most likely an emulator rendering quirk; verify on a real device. This
 > is the only entry point to POI detail, so it also blocked live UI verification.
+
+### ➡️ POI post threads (2026-06-21) — replaces POI comments
+
+A POI is now a **thread of full posts** instead of a comment box. Each POI post is an
+ordinary `posts` document tagged with `poiId` + denormalized `poiName`, so it is
+likeable, comment-able, and openable exactly like a feed post, and appears in the feed
+and on the map.
+
+- [x] Schema: `Post.poiId` / `Post.poiName` (+ entity, Room cache v3, mapper);
+      `Poi.commentCount` → `Poi.postCount`.
+- [x] `PostRepository.getPostsForPoi(poiId, descending)` + `createPost(..., poiId, poiName)`
+      (batched post + POI `postCount` increment); `GetPoiPostsUseCase`.
+- [x] Create flow snaps location to the POI (`create_post?poiId=…`, "Posting to {name}").
+- [x] `PoiDetailScreen` rebuilt as a `PostCard` thread with a newest/oldest sort toggle
+      and a proximity-gated "Add post" button.
+- [x] Feed/map badge shows the POI name; tapping it opens the POI thread.
+- [x] Security rules: `poiId`/`poiName` allowed on posts + anti-spoof `isValidPoiRef`;
+      POI counter is now `postCount`; POI comments subcollection rules removed.
+- [x] Cascade-delete Cloud Function (`functions/`): deletes a post's comments and
+      decrements its POI's `postCount`. **Deploy needed:** `firebase deploy --only functions`.
+- [x] Composite indexes for `posts` (`poiId` + `timestamp`, both directions).
+- [x] Removed POI-comment use cases + `CommentRepository` POI methods.
+- [ ] **Deploy:** `firebase deploy --only firestore:rules,firestore:indexes,functions`.
+- [ ] Optional cleanup of legacy POI comments: `scripts/drop_poi_comments.py`.
 
 ---
 

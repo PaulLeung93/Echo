@@ -43,42 +43,52 @@ To add or modify POIs:
 
 ---
 
-## 4. POI Comments (in-flight feature)
+## 4. POI Post Threads
 
-POIs support their own comment thread, separate from post comments, mirroring the
-proximity-based commenting model used for posts.
+A POI is a **thread of posts**. Instead of a lightweight comment box, each POI gathers
+full posts (likeable, comment-able, individually openable like any feed post). This
+replaced the earlier POI-comments feature.
 
-### Data Structure (Firestore Schema)
-- **Subcollection**: `pois/{poiId}/comments/{commentId}`, same shape as post comments
-  (`username`, `message`, `timestamp`).
-- **`commentCount` (Number)**: Stored on the parent `pois/{poiId}` document. Kept in sync
-  via `FieldValue.increment(1)` / `increment(-1)` whenever a comment is added or deleted.
-  Surfaced through `PoiEntity.commentCount` → `Poi.commentCount`.
+### Data Model
+A POI post is an ordinary document in the top-level `posts` collection carrying two extra
+denormalized fields:
+- **`poiId` (String)** — the POI the post belongs to. Drives the thread query
+  (`posts where poiId == {poiId} orderBy timestamp`). Absent on ordinary feed posts.
+- **`poiName` (String)** — the POI's name, copied at create time so the feed badge can
+  show the place name without an extra read. Validated against the real POI by the
+  security rules (`isValidPoiRef`) so it can't be spoofed.
+
+POI posts appear everywhere ordinary posts do (feed + map). The POI's location is snapped
+onto the post at create time. A denormalized **`postCount`** on the `pois/{poiId}` document
+tracks thread size (was `commentCount`); it is incremented in the create batch and
+decremented by the cascade-delete Cloud Function.
 
 ### Technical Implementation
-- **`CommentRepositoryImpl.kt`**: Extends the existing post-comment repository with
-  `getCommentsForPoi`, `addCommentToPoi`, and `deleteCommentFromPoi`, using the
-  `pois/{poiId}/comments` subcollection and incrementing/decrementing `commentCount` on
-  the POI document.
-- **Use Cases** (`domain/usecase/comment/`):
-  - `GetPoiCommentsUseCase` — streams comments for a POI.
-  - `AddPoiCommentUseCase` — validates the user is signed in (non-anonymous) and the
-    message is non-blank before delegating to the repository.
-  - `DeletePoiCommentUseCase` — deletes a comment by id.
-- **Presentation**: `PoiDetailViewModel` + `PoiDetailScreen`
-  (`feature/map/presentation/`) load the POI (via `getPoiByIdFlow`) and its comments,
-  and expose add/delete actions. Wired into `NavGraph` at
-  `${Destinations.POI_DETAILS}/{poiId}`, navigated to from map markers.
+- **`PostRepositoryImpl`**: `getPostsForPoi(poiId, descending)` streams the thread;
+  `createPost(..., poiId, poiName)` writes the post and bumps the POI `postCount` in one
+  batch when `poiId` is set.
+- **Use Case**: `GetPoiPostsUseCase` (`domain/usecase/post/`) wraps the thread stream.
+- **Create flow**: `CreatePostScreen` is launched as `create_post?poiId={poiId}`;
+  `CreatePostViewModel` loads the POI, snaps the location to it, and hides the location
+  toggle (showing a "Posting to {name}" banner instead).
+- **Presentation**: `PoiDetailViewModel` + `PoiDetailScreen` (`ui/poi/`) load the POI
+  (via `getPoiByIdFlow`) and its post thread, with a newest/oldest sort toggle and an
+  "Add post" button gated by the 5km proximity rule. Each post is a reused `PostCard`
+  (like / report / block; tap opens `PostDetailScreen`). Wired into `NavGraph` at
+  `${Destinations.POI_DETAILS}/{poiId}`, navigated to from map markers and from POI-post
+  badges in the feed.
+- **Cascade delete**: `functions/index.js` `onPostDeleted` deletes a deleted post's
+  `comments` subcollection and decrements its POI's `postCount`.
 
-### Status / Known Gaps
-Per `ROADMAP.md` Phase 1, this feature is functional but unfinished:
-- The 5km proximity rule (enforced for post comments) is **not yet enforced** for POI
-  comments.
-- Comment-ownership check for delete compares `comment.username` to the current user's
-  **email**, which needs correcting to a stable user id.
-- `feature/map/presentation/` and `feature/map/domain/` currently duplicate some files
-  under `domain/usecase/comment/` and `ui/map/` — the roadmap calls for collapsing this
-  into the documented `ui/` tree.
+### Proximity
+Adding a post to a POI requires being within `Constants.PROXIMITY_RADIUS_METERS` (5km),
+client-gated via `PoiDetailUiState.canPost` (same model as before). As with all posts,
+`firestore.rules` cannot enforce proximity (no trusted location source); see the rules
+header and ROADMAP Phase 3.
+
+### Migration note
+The previous `pois/{poiId}/comments` subcollections are no longer read or written. They
+can be left in place (harmless) or removed with `scripts/drop_poi_comments.py`.
 
 ---
-*Last Updated: 2026-06-10*
+*Last Updated: 2026-06-21*

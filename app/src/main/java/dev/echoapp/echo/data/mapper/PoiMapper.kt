@@ -23,7 +23,7 @@ class PoiMapper @Inject constructor() {
             latitude = entity.location.latitude,
             longitude = entity.location.longitude,
             description = entity.description,
-            commentCount = entity.commentCount,
+            postCount = entity.postCount,
             imageUrl = entity.imageUrl.ifBlank { null }
         )
     }

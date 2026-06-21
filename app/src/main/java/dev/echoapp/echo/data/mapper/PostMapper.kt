@@ -31,7 +31,9 @@ class PostMapper @Inject constructor() {
             tags = entity.tags,
             likeCount = entity.likeCount ?: entity.likes.size,
             commentCount = entity.commentCount ?: 0,
-            likedByCurrentUser = currentUserId != null && entity.likes.contains(currentUserId)
+            likedByCurrentUser = currentUserId != null && entity.likes.contains(currentUserId),
+            poiId = entity.poiId?.ifBlank { null },
+            poiName = entity.poiName?.ifBlank { null }
         )
     }
     
@@ -64,7 +66,9 @@ class PostMapper @Inject constructor() {
         latitude: Double?,
         longitude: Double?,
         tags: List<String>,
-        postId: String
+        postId: String,
+        poiId: String? = null,
+        poiName: String? = null
     ): Map<String, Any?> {
         return buildMap {
             put("id", postId)
@@ -87,6 +91,13 @@ class PostMapper @Inject constructor() {
                 // Geohash lets the map fetch only posts within the visible viewport
                 // (server-side range query) instead of downloading the whole feed.
                 put("geohash", GeoFireUtils.getGeoHashForLocation(GeoLocation(latitude, longitude)))
+            }
+            // POI posts carry their POI's id (for the thread query) and a denormalized
+            // name (for the feed badge). Only written for POI posts, so ordinary posts
+            // keep these keys absent and the create rule's hasOnly() stays satisfied.
+            if (!poiId.isNullOrBlank()) {
+                put("poiId", poiId)
+                if (!poiName.isNullOrBlank()) put("poiName", poiName)
             }
         }
     }

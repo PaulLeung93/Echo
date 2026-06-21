@@ -105,9 +105,12 @@ fun PostCard(
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    if (distanceLabel != null) {
+                    // A POI post shows its place name in the badge; an ordinary located
+                    // post shows the distance. POI name wins when present.
+                    val locationText = post.poiName ?: distanceLabel
+                    if (locationText != null) {
                         Spacer(Modifier.height(2.dp))
-                        // Tapping the location badge opens this post on the map; the rest
+                        // Tapping the location badge opens this post's place/map; the rest
                         // of the card still opens the detail view. A nested clickable
                         // consumes the tap before it reaches the card's onClick.
                         Surface(
@@ -121,7 +124,7 @@ fun PostCard(
                             }
                         ) {
                             Text(
-                                text = "$distanceLabel · ${formatTimestamp(post.timestamp)}",
+                                text = "$locationText · ${formatTimestamp(post.timestamp)}",
                                 style = MaterialTheme.typography.labelSmall,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )

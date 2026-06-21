@@ -19,7 +19,9 @@ fun Post.toCached(): CachedPostEntity = CachedPostEntity(
     tags = tags,
     likeCount = likeCount,
     commentCount = commentCount,
-    likedByCurrentUser = likedByCurrentUser
+    likedByCurrentUser = likedByCurrentUser,
+    poiId = poiId,
+    poiName = poiName
 )
 
 fun CachedPostEntity.toDomain(): Post = Post(
@@ -34,5 +36,7 @@ fun CachedPostEntity.toDomain(): Post = Post(
     tags = tags,
     likeCount = likeCount,
     commentCount = commentCount,
-    likedByCurrentUser = likedByCurrentUser
+    likedByCurrentUser = likedByCurrentUser,
+    poiId = poiId,
+    poiName = poiName
 )

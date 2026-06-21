@@ -71,6 +71,26 @@ service cloud.firestore {
       return (after == before + 1 || after == before - 1) && after >= 0;
     }
 
+    // postCount moved by exactly +/-1 (a single post added to or removed from a POI
+    // thread). The -1 path is normally performed by the cascade-delete Cloud Function
+    // (admin, bypasses rules); +1 is the client's create batch.
+    function postCountMovedByOne() {
+      let before = resource.data.get('postCount', 0);
+      let after = request.resource.data.postCount;
+      return (after == before + 1 || after == before - 1) && after >= 0;
+    }
+
+    // A POI post must reference a real POI and carry that POI's actual name, so the
+    // denormalized `poiName` shown on the feed badge can't be spoofed. Ordinary posts
+    // (no `poiId`) pass trivially.
+    function isValidPoiRef() {
+      let d = request.resource.data;
+      return !('poiId' in d) || (
+        exists(/databases/$(database)/documents/pois/$(d.poiId))
+        && d.poiName == get(/databases/$(database)/documents/pois/$(d.poiId)).data.name
+      );
+    }
+
     // ----- Posts -----
     match /posts/{postId} {
       allow read: if isSignedIn();
@@ -90,8 +110,9 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
              'id', 'authorId', 'username', 'authorPhotoUrl', 'message', 'timestamp',
              'tags', 'likeCount', 'commentCount', 'likes',
-             'latitude', 'longitude', 'geohash'
-           ]);
+             'latitude', 'longitude', 'geohash', 'poiId', 'poiName'
+           ])
+        && isValidPoiRef();
 
       // All post writes require a real (non-guest) account. Guests can read only.
       allow update: if isNotAnonymous() && (
@@ -121,23 +142,18 @@ service cloud.firestore {
     }
 
     // ----- Points of Interest (seeded server-side) -----
+    // A POI is now a thread of posts (see /posts with a `poiId`); it no longer carries
+    // its own comments subcollection.
     match /pois/{poiId} {
       allow read: if isSignedIn();
       allow create, delete: if false; // managed out-of-band, never by clients
 
-      // Only the denormalized commentCount may change, by +/-1 (commenting requires
-      // a real account, so guests never reach this).
+      // Only the denormalized postCount may change, by +/-1 (a single post added to or
+      // removed from this POI's thread; posting requires a real account, so guests
+      // never reach this).
       allow update: if isNotAnonymous()
-        && changedKeys().hasOnly(['commentCount'])
-        && commentCountMovedByOne();
-
-      // ----- Comments on a POI -----
-      match /comments/{commentId} {
-        allow read: if isSignedIn();
-        allow create: if isNotAnonymous() && isValidNewComment();
-        allow update: if false; // comments are immutable
-        allow delete: if isNotAnonymous() && request.auth.uid == resource.data.authorId;
-      }
+        && changedKeys().hasOnly(['postCount'])
+        && postCountMovedByOne();
     }
 
     // Valid username: 3–20 chars, lowercase letters/digits/underscore, no

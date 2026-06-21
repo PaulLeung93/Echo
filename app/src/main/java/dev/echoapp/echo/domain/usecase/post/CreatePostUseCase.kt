@@ -24,7 +24,9 @@ class CreatePostUseCase @Inject constructor(
         includeLocation: Boolean,
         latitude: Double?,
         longitude: Double?,
-        tags: List<String>
+        tags: List<String>,
+        poiId: String? = null,
+        poiName: String? = null
     ): Result<Unit> {
         // Validate message
         val trimmedMessage = message.trim()
@@ -48,12 +50,14 @@ class CreatePostUseCase @Inject constructor(
         // Determine location to store
         val finalLatitude = if (includeLocation) latitude else null
         val finalLongitude = if (includeLocation) longitude else null
-        
+
         return postRepository.createPost(
             message = trimmedMessage,
             latitude = finalLatitude,
             longitude = finalLongitude,
-            tags = tags.map { it.trim().lowercase() }
+            tags = tags.map { it.trim().lowercase() },
+            poiId = poiId,
+            poiName = poiName
         )
     }
     

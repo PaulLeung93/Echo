@@ -19,5 +19,9 @@ data class Post(
     val tags: List<String>,
     val likeCount: Int,
     val commentCount: Int,
-    val likedByCurrentUser: Boolean
+    val likedByCurrentUser: Boolean,
+    /** Id of the POI this post belongs to, or null for an ordinary feed post. */
+    val poiId: String? = null,
+    /** Denormalized POI name (copied at create time) so the feed badge needs no extra read. */
+    val poiName: String? = null
 )

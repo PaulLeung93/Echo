@@ -223,16 +223,36 @@ class PostRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }.flowOn(ioDispatcher)
     
+    override fun getPostsForPoi(poiId: String, descending: Boolean): Flow<List<Post>> = callbackFlow {
+        val direction = if (descending) Query.Direction.DESCENDING else Query.Direction.ASCENDING
+        val listener = postsCollection
+            .whereEqualTo("poiId", poiId)
+            .orderBy(Constants.FIELD_TIMESTAMP, direction)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val entities = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(PostEntity::class.java)
+                } ?: emptyList()
+                trySend(postMapper.toDomainList(entities, auth.currentUser?.uid))
+            }
+        awaitClose { listener.remove() }
+    }.flowOn(ioDispatcher)
+
     override suspend fun createPost(
         message: String,
         latitude: Double?,
         longitude: Double?,
-        tags: List<String>
+        tags: List<String>,
+        poiId: String?,
+        poiName: String?
     ): Result<Unit> = withContext(ioDispatcher) {
         try {
-            val currentUser = auth.currentUser 
+            val currentUser = auth.currentUser
                 ?: return@withContext Result.failure(IllegalStateException("User must be signed in to create a post"))
-            
+
             if (currentUser.isAnonymous) {
                 return@withContext Result.failure(IllegalStateException("Anonymous users cannot create posts"))
             }
@@ -256,10 +276,25 @@ class PostRepositoryImpl @Inject constructor(
                 latitude = latitude,
                 longitude = longitude,
                 tags = tags,
-                postId = newDocRef.id
+                postId = newDocRef.id,
+                poiId = poiId,
+                poiName = poiName
             )
-            
-            withWriteTimeout { newDocRef.set(postMap).await() }
+
+            withWriteTimeout {
+                if (poiId.isNullOrBlank()) {
+                    newDocRef.set(postMap).await()
+                } else {
+                    // POI post: write the post and bump the POI's denormalized postCount in
+                    // one batch so they can't drift. The cascade-delete Cloud Function
+                    // performs the matching -1 when a POI post is deleted.
+                    val poiRef = firestore.collection(Constants.COLLECTION_POIS).document(poiId)
+                    firestore.batch().apply {
+                        set(newDocRef, postMap)
+                        update(poiRef, "postCount", com.google.firebase.firestore.FieldValue.increment(1))
+                    }.commit().await()
+                }
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

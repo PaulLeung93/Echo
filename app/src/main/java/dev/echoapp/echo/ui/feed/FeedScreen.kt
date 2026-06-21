@@ -240,19 +240,26 @@ fun FeedScreen(
                                         likeCount = post.likeCount,
                                         commentCount = post.commentCount,
                                         distanceLabel = distanceLabel,
-                                        onLocationClick = if (post.latitude != null && post.longitude != null) {
-                                            {
-                                                feedViewModel.focusPostOnMap(post)
-                                                // Navigate to the Map *tab* with the same options the bottom nav
-                                                // uses, so the back stack stays consistent and the Feed tab can
-                                                // still return. The post to focus rides along via MapFocusManager.
-                                                navController.navigate(Destinations.MAP) {
-                                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                                    launchSingleTop = true
-                                                    restoreState = true
+                                        onLocationClick = when {
+                                            // A POI post's badge opens that POI's thread.
+                                            post.poiId != null -> {
+                                                { navController.navigate("${Constants.ROUTE_POI_DETAILS}/${post.poiId}") }
+                                            }
+                                            post.latitude != null && post.longitude != null -> {
+                                                {
+                                                    feedViewModel.focusPostOnMap(post)
+                                                    // Navigate to the Map *tab* with the same options the bottom nav
+                                                    // uses, so the back stack stays consistent and the Feed tab can
+                                                    // still return. The post to focus rides along via MapFocusManager.
+                                                    navController.navigate(Destinations.MAP) {
+                                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                                        launchSingleTop = true
+                                                        restoreState = true
+                                                    }
                                                 }
                                             }
-                                        } else null,
+                                            else -> null
+                                        },
                                         onLikeClick = {
                                             if (isGuest) {
                                                 scope.launch {
