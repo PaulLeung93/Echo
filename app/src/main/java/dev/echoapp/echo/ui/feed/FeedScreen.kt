@@ -240,6 +240,19 @@ fun FeedScreen(
                                         likeCount = post.likeCount,
                                         commentCount = post.commentCount,
                                         distanceLabel = distanceLabel,
+                                        onLocationClick = if (post.latitude != null && post.longitude != null) {
+                                            {
+                                                feedViewModel.focusPostOnMap(post)
+                                                // Navigate to the Map *tab* with the same options the bottom nav
+                                                // uses, so the back stack stays consistent and the Feed tab can
+                                                // still return. The post to focus rides along via MapFocusManager.
+                                                navController.navigate(Destinations.MAP) {
+                                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
+                                            }
+                                        } else null,
                                         onLikeClick = {
                                             if (isGuest) {
                                                 scope.launch {

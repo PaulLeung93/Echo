@@ -15,6 +15,7 @@ import dev.echoapp.echo.domain.usecase.post.ToggleLikeUseCase
 import dev.echoapp.echo.domain.usecase.report.SubmitReportUseCase
 import dev.echoapp.echo.domain.usecase.user.BlockUserUseCase
 import dev.echoapp.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
+import dev.echoapp.echo.ui.common.MapFocusManager
 import dev.echoapp.echo.utils.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -31,8 +32,20 @@ class FeedViewModel @Inject constructor(
     private val blockUserUseCase: BlockUserUseCase,
     observeHiddenAuthorIdsUseCase: ObserveHiddenAuthorIdsUseCase,
     private val locationProvider: LocationProvider,
+    private val mapFocusManager: MapFocusManager,
     authRepository: AuthRepository
 ) : ViewModel() {
+
+    /**
+     * Record which located post the user tapped to view on the map; the screen then
+     * navigates to the Map tab, where [mapFocusManager]'s request is consumed. No-op for
+     * a post without coordinates.
+     */
+    fun focusPostOnMap(post: Post) {
+        val lat = post.latitude ?: return
+        val lng = post.longitude ?: return
+        mapFocusManager.request(post.id, lat, lng)
+    }
 
     /** Current user's uid, to distinguish own posts (no report/block) from others'. */
     val currentUserId: String? = authRepository.getCurrentUser()?.id

@@ -10,6 +10,7 @@ import dev.echoapp.echo.domain.usecase.post.GetPostsUseCase
 import dev.echoapp.echo.domain.usecase.post.ToggleLikeUseCase
 import dev.echoapp.echo.data.preferences.UserPreferencesRepository
 import dev.echoapp.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
+import dev.echoapp.echo.ui.common.MapFocusManager
 import dev.echoapp.echo.utils.Constants
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
@@ -26,8 +27,15 @@ class MapViewModel @Inject constructor(
     private val getPoisUseCase: GetPoisUseCase,
     private val toggleLikeUseCase: ToggleLikeUseCase,
     private val userPreferences: UserPreferencesRepository,
+    private val mapFocusManager: MapFocusManager,
     observeHiddenAuthorIdsUseCase: ObserveHiddenAuthorIdsUseCase
 ) : ViewModel() {
+
+    /** Pending "open this post on the map" request from the feed; null when none. */
+    val mapFocus = mapFocusManager.request
+
+    /** Clear the focus request once the map has centered on and selected the post. */
+    fun consumeMapFocus() = mapFocusManager.consume()
 
     private val blockedIds: Flow<Set<String>> = observeHiddenAuthorIdsUseCase()
 
@@ -265,7 +273,7 @@ class MapViewModel @Inject constructor(
                 }
 
                 nearest?.let {
-                    camera.animate(
+                    camera.animateSafely(
                         CameraUpdateFactory.newLatLngZoom(
                             LatLng(it.latitude!!, it.longitude!!),
                             camera.position.zoom
@@ -323,7 +331,7 @@ class MapViewModel @Inject constructor(
         _selectedPoiId.value = null
         val latLng = LatLng(post.latitude ?: return, post.longitude ?: return)
         viewModelScope.launch {
-            camera.animate(CameraUpdateFactory.newLatLng(latLng))
+            camera.animateSafely(CameraUpdateFactory.newLatLng(latLng))
         }
     }
 
@@ -333,7 +341,7 @@ class MapViewModel @Inject constructor(
         _selectedCluster.value = null
         val latLng = LatLng(poi.latitude, poi.longitude)
         viewModelScope.launch {
-            camera.animate(CameraUpdateFactory.newLatLng(latLng))
+            camera.animateSafely(CameraUpdateFactory.newLatLng(latLng))
         }
     }
 
@@ -348,7 +356,7 @@ class MapViewModel @Inject constructor(
         _selectedPost.value = cluster.posts.firstOrNull()
         _selectedPoiId.value = null
         viewModelScope.launch {
-            camera.animate(CameraUpdateFactory.newLatLng(cluster.position))
+            camera.animateSafely(CameraUpdateFactory.newLatLng(cluster.position))
         }
     }
 

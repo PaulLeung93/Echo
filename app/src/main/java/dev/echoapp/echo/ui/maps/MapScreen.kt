@@ -71,9 +71,21 @@ fun MapScreen(
     var tagInput by remember { mutableStateOf("") }
     var filterAttempted by remember { mutableStateOf(false) }
 
+    // A pending "open this post on the map" request from the feed (see MapFocusManager).
+    val mapFocus by mapViewModel.mapFocus.collectAsStateWithLifecycle()
+    // Whether this entry was opened by a focus request, captured once at composition so
+    // the user-location auto-center below doesn't fight the focus animation.
+    val openedWithFocus = remember { mapViewModel.mapFocus.value != null }
+
     val defaultLocation = LatLng(40.7128, -74.0060)
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(defaultLocation, 12f)
+        // On a fresh focus entry, start already centered on the post (zoomed in past
+        // MIN_POSTS_ZOOM so its marker loads) instead of the default view.
+        val initialFocus = mapViewModel.mapFocus.value
+        position = CameraPosition.fromLatLngZoom(
+            initialFocus?.let { LatLng(it.latitude, it.longitude) } ?: defaultLocation,
+            if (initialFocus != null) 16f else 12f
+        )
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -105,16 +117,40 @@ fun MapScreen(
         }
     }
 
-    // Center camera on user location when acquired
+    // Center camera on user location when acquired — unless we were opened to focus on
+    // a specific post, in which case that location wins and shouldn't be overridden.
     LaunchedEffect(userLocation) {
-        userLocation?.let {
-            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(it, 14f))
+        if (!openedWithFocus) {
+            userLocation?.let {
+                cameraPositionState.animateSafely(CameraUpdateFactory.newLatLngZoom(it, 14f))
+            }
         }
     }
 
     // Update zoom in ViewModel for clustering
     LaunchedEffect(cameraPositionState.position.zoom) {
         mapViewModel.updateZoom(cameraPositionState.position.zoom)
+    }
+
+    // Center on a focused post's location. Also covers a *restored* map entry (whose
+    // saved camera ignores the initial position above), so the camera always lands on
+    // the post regardless of whether its marker has loaded yet.
+    LaunchedEffect(mapFocus) {
+        mapFocus?.let {
+            cameraPositionState.animateSafely(
+                CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 16f)
+            )
+        }
+    }
+
+    // Once the focused post shows up in the viewport-loaded posts, select it (popping
+    // its bottom card) and consume the request. Consuming clears [mapFocus] so this
+    // won't re-fire — and a later focus request will select again.
+    LaunchedEffect(mapFocus, uiState.posts) {
+        val focus = mapFocus ?: return@LaunchedEffect
+        val post = uiState.posts.find { it.id == focus.postId } ?: return@LaunchedEffect
+        mapViewModel.setSelectedPost(post, cameraPositionState)
+        mapViewModel.consumeMapFocus()
     }
 
     // Cull markers to the viewport: whenever the camera comes to rest, hand its
@@ -321,7 +357,7 @@ fun MapScreen(
                             }
                             if (target != null) {
                                 userLocation = target
-                                cameraPositionState.animate(
+                                cameraPositionState.animateSafely(
                                     CameraUpdateFactory.newLatLngZoom(target, 14f)
                                 )
                             }

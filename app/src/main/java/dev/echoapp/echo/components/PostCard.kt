@@ -71,6 +71,7 @@ fun PostCard(
     onReport: (() -> Unit)? = null,
     onBlock: (() -> Unit)? = null,
     distanceLabel: String? = null,
+    onLocationClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     // Drives the heart "pop" on tap.
@@ -106,10 +107,18 @@ fun PostCard(
                     )
                     if (distanceLabel != null) {
                         Spacer(Modifier.height(2.dp))
+                        // Tapping the location badge opens this post on the map; the rest
+                        // of the card still opens the detail view. A nested clickable
+                        // consumes the tap before it reaches the card's onClick.
                         Surface(
                             shape = CircleShape,
                             color = WarmAmberBadge,
-                            contentColor = OnWarmAmberBadge
+                            contentColor = OnWarmAmberBadge,
+                            modifier = if (onLocationClick != null) {
+                                Modifier.clickable { onLocationClick() }
+                            } else {
+                                Modifier
+                            }
                         ) {
                             Text(
                                 text = "$distanceLabel · ${formatTimestamp(post.timestamp)}",
