@@ -140,7 +140,7 @@ fun AppNavGraph(
 
         // Settings (appearance, notifications, account)
         composable(Destinations.SETTINGS) {
-            SettingsScreen(navController = navController, authViewModel = authViewModel)
+            SettingsScreen(navController = navController, authViewModel = authViewModel, webClientId = webClientId)
         }
     }
 }

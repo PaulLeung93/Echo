@@ -10,7 +10,7 @@ and comments tied to your neighborhood.
 ## 1. Who we are
 
 Echo is operated by Paul Leung. If you have any questions about this
-policy or your data, contact us at PaulLeung93@gmail.com.
+policy or your data, contact us at devechoapp@gmail.com.
 
 ## 2. Information we collect
 
@@ -104,11 +104,11 @@ You can access and update your profile information in the App at any time.
    your Firebase authentication account.
 2. **On the web:** if you cannot use the App, request deletion at
    https://echo-2b5ba.web.app/delete-account.html (or by emailing
-   PaulLeung93@gmail.com). We will verify your identity and delete your account
+   devechoapp@gmail.com). We will verify your identity and delete your account
    and associated data.
 
 Depending on your location, you may have additional rights (access, correction,
-deletion, portability). To exercise them, contact PaulLeung93@gmail.com.
+deletion, portability). To exercise them, contact devechoapp@gmail.com.
 
 ## 9. Changes to this policy
 
@@ -118,6 +118,6 @@ updated" date above and, where appropriate, notify you in the App.
 ## 10. Contact us
 
 Paul Leung
-PaulLeung93@gmail.com
+devechoapp@gmail.com
 
 This policy is governed by the laws of the State of New York, USA.

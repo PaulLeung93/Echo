@@ -1,5 +1,7 @@
 ﻿package dev.echoapp.echo.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,10 +18,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import dev.echoapp.echo.domain.repository.AuthProvider
 import dev.echoapp.echo.ui.auth.AuthViewModel
 import kotlinx.coroutines.launch
@@ -29,8 +35,10 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     navController: NavHostController,
     authViewModel: AuthViewModel,
+    webClientId: String,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val darkMode by viewModel.darkMode.collectAsStateWithLifecycle()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
     val isDeleting by viewModel.isDeleting.collectAsStateWithLifecycle()
@@ -39,6 +47,33 @@ fun SettingsScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    val googleReauthClient = remember {
+        GoogleSignIn.getClient(
+            context,
+            GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestIdToken(webClientId)
+                .requestEmail()
+                .build()
+        )
+    }
+
+    val googleReauthLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        try {
+            val account = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                .getResult(ApiException::class.java)
+            val idToken = account?.idToken
+            if (idToken != null) {
+                viewModel.deleteAccountWithGoogle(idToken)
+            } else {
+                scope.launch { snackbarHostState.showSnackbar("Google sign-in failed. Please try again.") }
+            }
+        } catch (e: ApiException) {
+            scope.launch { snackbarHostState.showSnackbar("Google sign-in cancelled.") }
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.uiEvent.collect { snackbarHostState.showSnackbar(it) }
@@ -171,10 +206,9 @@ fun SettingsScreen(
                         showDeleteDialog = false
                         when (viewModel.authProvider) {
                             AuthProvider.PASSWORD -> showPasswordDialog = true
-                            else -> scope.launch {
-                                snackbarHostState.showSnackbar(
-                                    "Deleting a Google-linked account isn't available yet. Please contact support."
-                                )
+                            else -> {
+                                googleReauthClient.signOut()
+                                googleReauthLauncher.launch(googleReauthClient.signInIntent)
                             }
                         }
                     }

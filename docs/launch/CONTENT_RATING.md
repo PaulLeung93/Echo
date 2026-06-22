@@ -10,7 +10,7 @@ by IARC; exact wording varies slightly by region, but the substance is below.
 > truthfully as "Yes" — those are the ones that matter.
 
 ## Setup
-- **Email address:** PaulLeung93@gmail.com (receives the rating certificate)
+- **Email address:** devechoapp@gmail.com (receives the rating certificate)
 - **Category:** **Social Networking / Communication / Forums** (not a game)
 
 ## Content questions — answer **No** for all of these
