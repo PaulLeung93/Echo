@@ -50,10 +50,9 @@
     <string name="proximity_guest">Sign in to join the conversation here.</string>
     <string name="poi_photo_desc">Photo of %1$s</string>
 
-    <!-- POI post thread -->
-    <string name="poi_thread_header">Posts</string>
-    <string name="poi_thread_empty">No posts here yet. Be the first to share one.</string>
-    <string name="poi_add_post">Add post</string>
+    <!-- POI echo thread -->
+    <string name="poi_thread_empty">No echoes here yet. Be the first to share one.</string>
+    <string name="poi_add_post">Add echo</string>
     <string name="poi_post_guest_prompt">Sign in to post here.</string>
     <string name="poi_post_out_of_range">You must be within %1$d km of this place to post.</string>
     <string name="poi_post_location_unknown">Enable location to post here.</string>

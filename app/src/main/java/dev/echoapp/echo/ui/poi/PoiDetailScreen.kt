@@ -4,10 +4,12 @@ import android.content.Intent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -34,9 +36,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,7 +58,7 @@ import dev.echoapp.echo.domain.model.Post
 import dev.echoapp.echo.utils.Constants
 import dev.echoapp.echo.utils.formatDistance
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PoiDetailScreen(
     navController: NavHostController,
@@ -64,11 +68,26 @@ fun PoiDetailScreen(
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val density = LocalDensity.current
 
     var reportTarget by remember { mutableStateOf<Post?>(null) }
     var blockTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     val proximityKm = (Constants.PROXIMITY_RADIUS_METERS / 1000).toInt()
+
+    // Drives the collapsing hero: the image (item 0) parallaxes/fades as it scrolls
+    // away, and once it's mostly gone the POI name fades into the top bar.
+    val heroHeightPx = with(density) { 220.dp.toPx() }
+    val collapsed by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 ||
+                listState.firstVisibleItemScrollOffset > heroHeightPx * 0.7f
+        }
+    }
+    val titleBarAlpha by animateFloatAsState(
+        targetValue = if (collapsed) 1f else 0f,
+        label = "poiTitleBarAlpha"
+    )
 
     // Surface transient action errors (failed like/report) as snackbars.
     LaunchedEffect(Unit) {
@@ -82,6 +101,8 @@ fun PoiDetailScreen(
         topBar = {
             PlaceDetailTopBar(
                 onBack = { navController.popBackStack() },
+                title = uiState.poi?.name,
+                titleAlpha = titleBarAlpha,
                 // Enabled only once the POI has loaded.
                 onShare = uiState.poi?.let { poi ->
                     {
@@ -144,10 +165,30 @@ fun PoiDetailScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 16.dp)
                     ) {
-                        item {
-                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        // Hero image (item 0): parallaxes up at half-speed while fading and
+                        // shrinking as it scrolls off, so it glides past the top of the screen.
+                        item(key = "hero") {
+                            Column(
+                                modifier = Modifier.graphicsLayer {
+                                    val offset = if (listState.firstVisibleItemIndex == 0) {
+                                        listState.firstVisibleItemScrollOffset.toFloat()
+                                    } else 0f
+                                    val frac = (offset / heroHeightPx).coerceIn(0f, 1f)
+                                    translationY = offset * 0.5f
+                                    alpha = 1f - frac
+                                    val s = 1f - 0.08f * frac
+                                    scaleX = s
+                                    scaleY = s
+                                }
+                            ) {
                                 Spacer(Modifier.height(8.dp))
-                                HeroImage(poi)
+                                HeroImage(poi, modifier = Modifier.padding(horizontal = 16.dp))
+                            }
+                        }
+
+                        // Place details: scroll away normally beneath the hero.
+                        item(key = "details") {
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 Spacer(Modifier.height(20.dp))
                                 TitleRow(poi)
                                 Spacer(Modifier.height(12.dp))
@@ -158,14 +199,21 @@ fun PoiDetailScreen(
                                 )
                                 Spacer(Modifier.height(20.dp))
                                 ProximityBanner(uiState)
-                                Spacer(Modifier.height(28.dp))
-                                ThreadHeader(
-                                    count = uiState.posts.size,
-                                    sortDescending = uiState.sortDescending,
-                                    onToggleSort = viewModel::toggleSort
-                                )
-                                Spacer(Modifier.height(16.dp))
+                                Spacer(Modifier.height(20.dp))
                             }
+                        }
+
+                        // Echoes count + sort toggle: pins under the top bar so the controls
+                        // stay reachable once the hero/details have scrolled away.
+                        stickyHeader(key = "echoes") {
+                            ThreadHeader(
+                                count = uiState.posts.size,
+                                sortDescending = uiState.sortDescending,
+                                onToggleSort = viewModel::toggleSort,
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.background)
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
                         }
 
                         if (uiState.posts.isEmpty()) {
@@ -236,14 +284,19 @@ fun PoiDetailScreen(
 }
 
 @Composable
-private fun PlaceDetailTopBar(onBack: () -> Unit, onShare: (() -> Unit)?) {
+private fun PlaceDetailTopBar(
+    onBack: () -> Unit,
+    onShare: (() -> Unit)?,
+    title: String? = null,
+    titleAlpha: Float = 0f
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         CircleIconButton(
@@ -251,6 +304,20 @@ private fun PlaceDetailTopBar(onBack: () -> Unit, onShare: (() -> Unit)?) {
             contentDescription = stringResource(R.string.back),
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             onClick = onBack
+        )
+        // POI name fades in only once the hero has collapsed; weight(1f) keeps the
+        // share button pinned to the end whether or not the title is showing.
+        Text(
+            text = title.orEmpty(),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .weight(1f)
+                .graphicsLayer { alpha = titleAlpha }
         )
         CircleIconButton(
             icon = Icons.Filled.Share,
@@ -295,9 +362,9 @@ private fun CircleIconButton(
 }
 
 @Composable
-private fun HeroImage(poi: Poi) {
+private fun HeroImage(poi: Poi, modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(220.dp)
             .clip(RoundedCornerShape(20.dp))
@@ -463,10 +530,11 @@ private fun ProximityRipple(active: Boolean) {
 private fun ThreadHeader(
     count: Int,
     sortDescending: Boolean,
-    onToggleSort: () -> Unit
+    onToggleSort: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -480,7 +548,7 @@ private fun ThreadHeader(
                 tint = MaterialTheme.colorScheme.primary
             )
             Text(
-                text = stringResource(R.string.poi_thread_header),
+                text = stringResource(R.string.echoes_header),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground

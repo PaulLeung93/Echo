@@ -268,7 +268,7 @@ fun MapScreen(
                             // Round disc (no pointer) → anchor at its center, not bottom.
                             anchor = Offset(0.5f, 0.5f),
                             title = poi.name,
-                            snippet = "${poi.description} • ${poi.postCount} posts",
+                            snippet = "${poi.description} • ${poi.postCount} echoes",
                             onClick = {
                                 mapViewModel.setSelectedPoi(poi, cameraPositionState)
                                 true
@@ -648,7 +648,7 @@ private fun PoiPreviewCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.Comment,
-                    contentDescription = "Posts",
+                    contentDescription = "Echoes",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
