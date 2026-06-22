@@ -311,12 +311,22 @@ class PostRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deletePost(postId: String): Unit = withContext(ioDispatcher) {
-        withWriteTimeout {
-            postsCollection.document(postId)
-                .delete()
-                .await()
+        // The feed renders from the Room cache, not a live Firestore listener, and the
+        // server delete below only completes on server ack (and is bounded by a 10s
+        // write timeout). So drop the cached row first — the feed flow re-emits without
+        // it instantly — then delete server-side, restoring the row if that fails.
+        val cached = postDao.getById(postId)
+        postDao.deleteById(postId)
+        try {
+            withWriteTimeout {
+                postsCollection.document(postId)
+                    .delete()
+                    .await()
+            }
+        } catch (e: Exception) {
+            if (cached != null) postDao.upsertAll(listOf(cached))
+            throw e
         }
-        Unit
     }
     
     override suspend fun toggleLike(postId: String): Boolean = withContext(ioDispatcher) {

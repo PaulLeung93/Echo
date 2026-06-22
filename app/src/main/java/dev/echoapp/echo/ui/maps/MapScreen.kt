@@ -35,8 +35,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import dev.echoapp.echo.R
+import dev.echoapp.echo.components.DeletePostDialog
+import dev.echoapp.echo.components.EditPostDialog
 import dev.echoapp.echo.components.PostCard
 import dev.echoapp.echo.domain.model.Coordinates
+import dev.echoapp.echo.domain.model.Post
 import dev.echoapp.echo.navigation.Destinations
 import dev.echoapp.echo.ui.common.TopSnackbarHost
 import dev.echoapp.echo.utils.Constants
@@ -70,6 +73,9 @@ fun MapScreen(
     var showTypeDialog by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
     var filterAttempted by remember { mutableStateOf(false) }
+    // Own posts pending an edit / delete from a map card.
+    var postToEdit by remember { mutableStateOf<Post?>(null) }
+    var postToDelete by remember { mutableStateOf<Post?>(null) }
 
     // A pending "open this post on the map" request from the feed (see MapFocusManager).
     val mapFocus by mapViewModel.mapFocus.collectAsStateWithLifecycle()
@@ -91,6 +97,10 @@ fun MapScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val uiState by mapViewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        mapViewModel.uiEvent.collect { message -> snackbarHostState.showSnackbar(message) }
+    }
 
     // Captured for use inside the GoogleMap content lambda (no MaterialTheme there).
     val rippleColor = MaterialTheme.colorScheme.primary
@@ -229,15 +239,19 @@ fun MapScreen(
                         } else {
                             val post = cluster.posts.first()
                             val isSelected = uiState.selectedPost?.id == post.id
-                            val icon = remember(isSelected) {
-                                bitmapDescriptorFromVector(
-                                    context,
-                                    R.drawable.ic_default,
-                                    scale = if (isSelected) 1.5f else 1.0f
+                            // Same circular-disc convention as POI markers: coral POST
+                            // disc + speech-bubble glyph, zoom-scaled, center-anchored.
+                            val icon = remember(isSelected, zoomBucket) {
+                                val zoomScale = markerScaleForZoom(zoomBucket)
+                                poiPinDescriptor(
+                                    PinCategory.POST,
+                                    scale = if (isSelected) zoomScale * 1.5f else zoomScale
                                 )
                             }
                             Marker(
                                 state = markerState,
+                                // Round disc (no pointer) → anchor at its center.
+                                anchor = Offset(0.5f, 0.5f),
                                 title = post.username,
                                 snippet = post.message,
                                 onClick = {
@@ -387,6 +401,8 @@ fun MapScreen(
                 pageSpacing = 16.dp
             ) { page ->
                 val post = cluster.posts[page]
+                val isOwnPost = !mapViewModel.isGuest && post.authorId.isNotBlank() &&
+                    post.authorId == mapViewModel.currentUserId
                 PostCard(
                     post = post,
                     isLiked = post.likedByCurrentUser,
@@ -399,7 +415,13 @@ fun MapScreen(
                     onTagClick = { tag ->
                         tagInput = tag
                         mapViewModel.setTagFilter(tag, cameraPositionState)
-                    }
+                    },
+                    onEdit = if (isOwnPost) {
+                        { postToEdit = post }
+                    } else null,
+                    onDelete = if (isOwnPost) {
+                        { postToDelete = post }
+                    } else null
                 )
             }
 
@@ -407,6 +429,8 @@ fun MapScreen(
                 mapViewModel.onSelectedPostChanged(cluster.posts[pagerState.currentPage])
             }
         } ?: uiState.selectedPost?.let { post ->
+            val isOwnPost = !mapViewModel.isGuest && post.authorId.isNotBlank() &&
+                post.authorId == mapViewModel.currentUserId
             PostCard(
                 post = post,
                 isLiked = post.likedByCurrentUser,
@@ -420,6 +444,12 @@ fun MapScreen(
                     tagInput = tag
                     mapViewModel.setTagFilter(tag, cameraPositionState)
                 },
+                onEdit = if (isOwnPost) {
+                    { postToEdit = post }
+                } else null,
+                onDelete = if (isOwnPost) {
+                    { postToDelete = post }
+                } else null,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
             )
         } ?: uiState.selectedPoi?.let { poi ->
@@ -443,6 +473,21 @@ fun MapScreen(
         }
 
         TopSnackbarHost(snackbarHostState = snackbarHostState)
+    }
+
+    postToEdit?.let { post ->
+        EditPostDialog(
+            initialText = post.message,
+            onConfirm = { newMessage -> mapViewModel.updatePost(post.id, newMessage) },
+            onDismiss = { postToEdit = null }
+        )
+    }
+
+    postToDelete?.let { post ->
+        DeletePostDialog(
+            onConfirm = { mapViewModel.deletePost(post.id) },
+            onDismiss = { postToDelete = null }
+        )
     }
 
     // --- Tag filter prompt dialog ---

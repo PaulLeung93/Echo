@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import dev.echoapp.echo.di.IoDispatcher
 import dev.echoapp.echo.domain.usecase.user.BIO_MAX_LENGTH
 import dev.echoapp.echo.domain.usecase.user.GetCurrentUserProfileUseCase
+import dev.echoapp.echo.domain.usecase.user.RemoveAvatarUseCase
 import dev.echoapp.echo.domain.usecase.user.UpdateAvatarUseCase
 import dev.echoapp.echo.domain.usecase.user.UpdateUserProfileUseCase
 import dev.echoapp.echo.utils.ImageUtils
@@ -26,6 +27,7 @@ class EditProfileViewModel @Inject constructor(
     private val getCurrentUserProfileUseCase: GetCurrentUserProfileUseCase,
     private val updateUserProfileUseCase: UpdateUserProfileUseCase,
     private val updateAvatarUseCase: UpdateAvatarUseCase,
+    private val removeAvatarUseCase: RemoveAvatarUseCase,
     @ApplicationContext private val context: Context,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
@@ -36,14 +38,28 @@ class EditProfileViewModel @Inject constructor(
         val bio: String = "",
         val username: String = "",
         val photoUrl: String? = null,
+        // A photo the user picked but hasn't saved yet (committed in save()).
+        val pendingAvatarUri: Uri? = null,
+        // The user chose to remove their existing photo (committed in save()).
+        val pendingRemoval: Boolean = false,
         val isLoading: Boolean = true,
         val isSaving: Boolean = false,
-        val isUploadingPhoto: Boolean = false,
         val error: String? = null
     ) {
         val canSave: Boolean
             get() = firstName.isNotBlank() && lastName.isNotBlank() &&
-                !isLoading && !isSaving && !isUploadingPhoto
+                !isLoading && !isSaving
+
+        /**
+         * What the avatar should show right now: the staged pick first, then the
+         * existing photo unless the user has staged a removal.
+         */
+        val displayPhotoUrl: String?
+            get() = pendingAvatarUri?.toString() ?: if (pendingRemoval) null else photoUrl
+
+        /** Whether there's a photo currently shown that "Remove" could clear. */
+        val hasPhoto: Boolean
+            get() = displayPhotoUrl != null
     }
 
     private val _state = MutableStateFlow(State())
@@ -74,29 +90,13 @@ class EditProfileViewModel @Inject constructor(
         }
     }
 
-    /** Compress the picked image off the main thread, upload it, and persist the URL. */
-    fun onAvatarPicked(uri: Uri) {
-        viewModelScope.launch {
-            _state.update { it.copy(isUploadingPhoto = true, error = null) }
-            val bytes = withContext(ioDispatcher) { ImageUtils.compressImageForUpload(context, uri) }
-            if (bytes == null) {
-                _state.update {
-                    it.copy(isUploadingPhoto = false, error = "Couldn't read that image. Try another.")
-                }
-                return@launch
-            }
-            updateAvatarUseCase(bytes)
-                .onSuccess { url -> _state.update { it.copy(isUploadingPhoto = false, photoUrl = url) } }
-                .onFailure { e ->
-                    _state.update {
-                        it.copy(
-                            isUploadingPhoto = false,
-                            error = e.message ?: "Couldn't update your photo. Please try again."
-                        )
-                    }
-                }
-        }
-    }
+    /** Stage a picked image for preview; the upload happens only when the user saves. */
+    fun onAvatarPicked(uri: Uri) =
+        _state.update { it.copy(pendingAvatarUri = uri, pendingRemoval = false, error = null) }
+
+    /** Stage removal of the current photo; committed when the user saves. */
+    fun onRemovePhoto() =
+        _state.update { it.copy(pendingAvatarUri = null, pendingRemoval = true, error = null) }
 
     fun onFirstNameChange(value: String) = _state.update { it.copy(firstName = value) }
     fun onLastNameChange(value: String) = _state.update { it.copy(lastName = value) }
@@ -107,6 +107,31 @@ class EditProfileViewModel @Inject constructor(
         if (!s.canSave) return
         viewModelScope.launch {
             _state.update { it.copy(isSaving = true, error = null) }
+
+            // Commit the photo change first (if any). Bail out before touching the
+            // profile fields if it fails, so the avatar and text can't drift apart.
+            val photoResult: Result<Unit> = when {
+                s.pendingAvatarUri != null -> {
+                    val bytes = withContext(ioDispatcher) {
+                        ImageUtils.compressImageForUpload(context, s.pendingAvatarUri)
+                    }
+                    if (bytes == null) {
+                        Result.failure(IllegalStateException("Couldn't read that image. Try another."))
+                    } else {
+                        updateAvatarUseCase(bytes).map { }
+                    }
+                }
+                s.pendingRemoval -> removeAvatarUseCase()
+                else -> Result.success(Unit)
+            }
+
+            photoResult.onFailure { e ->
+                _state.update {
+                    it.copy(isSaving = false, error = e.message ?: "Couldn't update your photo. Please try again.")
+                }
+                return@launch
+            }
+
             updateUserProfileUseCase(s.firstName, s.lastName, s.bio)
                 .onSuccess {
                     _state.update { it.copy(isSaving = false) }

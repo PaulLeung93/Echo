@@ -11,8 +11,10 @@ import dev.echoapp.echo.domain.repository.AuthRepository
 import dev.echoapp.echo.domain.usecase.comment.AddCommentUseCase
 import dev.echoapp.echo.domain.usecase.comment.DeleteCommentUseCase
 import dev.echoapp.echo.domain.usecase.comment.GetCommentsUseCase
+import dev.echoapp.echo.domain.usecase.post.DeletePostUseCase
 import dev.echoapp.echo.domain.usecase.post.GetPostFlowUseCase
 import dev.echoapp.echo.domain.usecase.post.ToggleLikeUseCase
+import dev.echoapp.echo.domain.usecase.post.UpdatePostUseCase
 import dev.echoapp.echo.domain.usecase.report.SubmitReportUseCase
 import dev.echoapp.echo.domain.usecase.user.BlockUserUseCase
 import dev.echoapp.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
@@ -28,6 +30,8 @@ class PostDetailViewModel @Inject constructor(
     private val getCommentsUseCase: GetCommentsUseCase,
     private val addCommentUseCase: AddCommentUseCase,
     private val deleteCommentUseCase: DeleteCommentUseCase,
+    private val deletePostUseCase: DeletePostUseCase,
+    private val updatePostUseCase: UpdatePostUseCase,
     private val toggleLikeUseCase: ToggleLikeUseCase,
     private val submitReportUseCase: SubmitReportUseCase,
     private val blockUserUseCase: BlockUserUseCase,
@@ -93,6 +97,29 @@ class PostDetailViewModel @Inject constructor(
                 .onFailure { e ->
                     _uiEvent.send(e.message ?: "Couldn't post your comment. Please try again.")
                 }
+        }
+    }
+
+    /**
+     * Delete the post being viewed (owner only). On success the post is gone, so
+     * [onDeleted] lets the screen navigate back rather than show an empty detail.
+     */
+    fun deletePost(onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            deletePostUseCase(postId)
+                .onSuccess { onDeleted() }
+                .onFailure { e ->
+                    _uiEvent.send(e.message ?: "Couldn't delete the post. Please try again.")
+                }
+        }
+    }
+
+    /** Edit the message of the post being viewed (owner only). */
+    fun updatePost(newMessage: String) {
+        viewModelScope.launch {
+            updatePostUseCase(postId, newMessage).onFailure { e ->
+                _uiEvent.send(e.message ?: "Couldn't update the post. Please try again.")
+            }
         }
     }
 

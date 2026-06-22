@@ -51,6 +51,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import dev.echoapp.echo.R
 import dev.echoapp.echo.components.BlockUserDialog
+import dev.echoapp.echo.components.DeletePostDialog
+import dev.echoapp.echo.components.EditPostDialog
 import dev.echoapp.echo.components.PostCard
 import dev.echoapp.echo.components.ReportDialog
 import dev.echoapp.echo.domain.model.Poi
@@ -72,6 +74,8 @@ fun PoiDetailScreen(
 
     var reportTarget by remember { mutableStateOf<Post?>(null) }
     var blockTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var postToEdit by remember { mutableStateOf<Post?>(null) }
+    var postToDelete by remember { mutableStateOf<Post?>(null) }
 
     val proximityKm = (Constants.PROXIMITY_RADIUS_METERS / 1000).toInt()
 
@@ -250,6 +254,12 @@ fun PoiDetailScreen(
                                     onBlock = if (canModerate) {
                                         { blockTarget = post.authorId to post.username }
                                     } else null,
+                                    onEdit = if (isOwnPost) {
+                                        { postToEdit = post }
+                                    } else null,
+                                    onDelete = if (isOwnPost) {
+                                        { postToDelete = post }
+                                    } else null,
                                     modifier = Modifier.padding(horizontal = 16.dp)
                                 )
                                 Spacer(Modifier.height(12.dp))
@@ -279,6 +289,21 @@ fun PoiDetailScreen(
                 viewModel.blockUser(uid)
                 blockTarget = null
             }
+        )
+    }
+
+    postToEdit?.let { post ->
+        EditPostDialog(
+            initialText = post.message,
+            onConfirm = { newMessage -> viewModel.updatePost(post.id, newMessage) },
+            onDismiss = { postToEdit = null }
+        )
+    }
+
+    postToDelete?.let { post ->
+        DeletePostDialog(
+            onConfirm = { viewModel.deletePost(post.id) },
+            onDismiss = { postToDelete = null }
         )
     }
 }

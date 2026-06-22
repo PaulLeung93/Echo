@@ -27,7 +27,7 @@ private const val GLYPH_FRACTION = 0.6f // glyph box side as a fraction of the c
 
 /** Per-category disc fills. Mid-tones chosen for white ring + glyph contrast. */
 enum class PinCategory(val color: Int) {
-    POST(Color.rgb(0xFE, 0x6E, 0x4C)),     // coral (brand) — fallback for unknown types
+    POST(Color.rgb(0xAD, 0x34, 0x18)),     // burnt-coral (M3 primary, #AD3418) — fallback for unknown types
     PARK(Color.rgb(0x2D, 0x5A, 0x35)),     // sage green
     COLLEGE(Color.rgb(0x18, 0x2C, 0x78)),  // deep indigo (distinct from map's water/road blues)
     LANDMARK(Color.rgb(0xE0, 0x8A, 0x1E)); // amber

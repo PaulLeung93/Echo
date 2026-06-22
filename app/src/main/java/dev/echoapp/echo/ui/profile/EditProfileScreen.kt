@@ -106,10 +106,10 @@ fun EditProfileScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             EditableAvatar(
-                photoUrl = state.photoUrl,
+                photoUrl = state.displayPhotoUrl,
                 firstName = state.firstName,
                 lastName = state.lastName,
-                isUploading = state.isUploadingPhoto,
+                isUploading = state.isSaving,
                 onClick = {
                     photoPicker.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -117,10 +117,16 @@ fun EditProfileScreen(
                 }
             )
             Text(
-                text = if (state.isUploadingPhoto) "Uploading photo…" else "Tap to change photo",
+                text = "Tap to change photo",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // Only offer removal when there's a photo to clear. Takes effect on save.
+            if (state.hasPhoto) {
+                TextButton(onClick = viewModel::onRemovePhoto, enabled = !state.isSaving) {
+                    Text("Remove photo", color = MaterialTheme.colorScheme.error)
+                }
+            }
 
             OutlinedTextField(
                 value = state.firstName,

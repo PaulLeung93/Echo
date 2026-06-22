@@ -20,6 +20,16 @@ interface PostDao {
     @Query("DELETE FROM cached_feed_posts")
     suspend fun clear()
 
+    /** Drop a single cached post (e.g. after the user deletes their own) so the feed
+     *  flow re-emits without it instead of showing a stale row. */
+    @Query("DELETE FROM cached_feed_posts WHERE id = :postId")
+    suspend fun deleteById(postId: String)
+
+    /** The cached row for [postId], or null if absent — used to restore an optimistic
+     *  delete when the server write fails. */
+    @Query("SELECT * FROM cached_feed_posts WHERE id = :postId")
+    suspend fun getById(postId: String): CachedPostEntity?
+
     /**
      * Reflect an optimistic like toggle on the cached row so the UI updates instantly
      * (the network write happens separately and a later refresh reconciles the count).

@@ -17,6 +17,8 @@ import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Settings
+import dev.echoapp.echo.components.DeletePostDialog
+import dev.echoapp.echo.components.EditPostDialog
 import dev.echoapp.echo.components.EmptyState
 import dev.echoapp.echo.components.ProfileAvatar
 import dev.echoapp.echo.components.PostCard
@@ -206,47 +208,18 @@ fun ProfileScreen(
 
     // Edit dialog
     postToEdit?.let { post ->
-        var editText by remember(post.id) { mutableStateOf(post.message) }
-        AlertDialog(
-            onDismissRequest = { postToEdit = null },
-            title = { Text("Edit echo") },
-            text = {
-                OutlinedTextField(
-                    value = editText,
-                    onValueChange = { editText = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                    minLines = 3
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (editText.isNotBlank()) viewModel.updatePost(post.id, editText.trim())
-                        postToEdit = null
-                    },
-                    enabled = editText.isNotBlank()
-                ) { Text("Save") }
-            },
-            dismissButton = { TextButton(onClick = { postToEdit = null }) { Text("Cancel") } }
+        EditPostDialog(
+            initialText = post.message,
+            onConfirm = { newMessage -> viewModel.updatePost(post.id, newMessage) },
+            onDismiss = { postToEdit = null }
         )
     }
 
     // Delete confirmation
     postToDelete?.let { post ->
-        AlertDialog(
-            onDismissRequest = { postToDelete = null },
-            title = { Text("Delete echo?") },
-            text = { Text("This can't be undone.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deletePost(post.id)
-                        postToDelete = null
-                    }
-                ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { postToDelete = null }) { Text("Cancel") } }
+        DeletePostDialog(
+            onConfirm = { viewModel.deletePost(post.id) },
+            onDismiss = { postToDelete = null }
         )
     }
 }

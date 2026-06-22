@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import dev.echoapp.echo.components.BlockUserDialog
+import dev.echoapp.echo.components.DeletePostDialog
+import dev.echoapp.echo.components.EditPostDialog
 import dev.echoapp.echo.components.PostCard
 import dev.echoapp.echo.components.CommentCard
 import dev.echoapp.echo.components.EmptyState
@@ -56,6 +58,9 @@ fun PostDetailScreen(
     var reportingComment by remember { mutableStateOf<Comment?>(null) }
     // The user being blocked (uid to username) — set from a post or a comment.
     var blockTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+    // Own-post edit / delete dialog state.
+    var editingPost by remember { mutableStateOf<Post?>(null) }
+    var deletingPost by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.uiEvent.collect { message -> snackbarHostState.showSnackbar(message) }
@@ -107,6 +112,8 @@ fun PostDetailScreen(
                 val post = uiState.post!!
                 val canModeratePost = !viewModel.isGuest && post.authorId.isNotBlank() &&
                     post.authorId != uiState.currentUserId
+                val isOwnPost = !viewModel.isGuest && post.authorId.isNotBlank() &&
+                    post.authorId == uiState.currentUserId
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -127,6 +134,12 @@ fun PostDetailScreen(
                             } else null,
                             onBlock = if (canModeratePost) {
                                 { blockTarget = post.authorId to post.username }
+                            } else null,
+                            onEdit = if (isOwnPost) {
+                                { editingPost = post }
+                            } else null,
+                            onDelete = if (isOwnPost) {
+                                { deletingPost = true }
                             } else null,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
@@ -260,6 +273,21 @@ fun PostDetailScreen(
                             viewModel.blockUser(uid)
                             blockTarget = null
                         }
+                    )
+                }
+
+                editingPost?.let { editPost ->
+                    EditPostDialog(
+                        initialText = editPost.message,
+                        onConfirm = { newMessage -> viewModel.updatePost(newMessage) },
+                        onDismiss = { editingPost = null }
+                    )
+                }
+
+                if (deletingPost) {
+                    DeletePostDialog(
+                        onConfirm = { viewModel.deletePost { navController.popBackStack() } },
+                        onDismiss = { deletingPost = false }
                     )
                 }
             }

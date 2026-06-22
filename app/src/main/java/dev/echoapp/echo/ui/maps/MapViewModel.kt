@@ -5,9 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.echoapp.echo.domain.model.Poi
 import dev.echoapp.echo.domain.model.Post
+import dev.echoapp.echo.domain.repository.AuthRepository
 import dev.echoapp.echo.domain.usecase.poi.GetPoisUseCase
+import dev.echoapp.echo.domain.usecase.post.DeletePostUseCase
 import dev.echoapp.echo.domain.usecase.post.GetPostsUseCase
 import dev.echoapp.echo.domain.usecase.post.ToggleLikeUseCase
+import dev.echoapp.echo.domain.usecase.post.UpdatePostUseCase
 import dev.echoapp.echo.data.preferences.UserPreferencesRepository
 import dev.echoapp.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
 import dev.echoapp.echo.ui.common.MapFocusManager
@@ -17,6 +20,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -26,10 +30,21 @@ class MapViewModel @Inject constructor(
     private val getPostsUseCase: GetPostsUseCase,
     private val getPoisUseCase: GetPoisUseCase,
     private val toggleLikeUseCase: ToggleLikeUseCase,
+    private val deletePostUseCase: DeletePostUseCase,
+    private val updatePostUseCase: UpdatePostUseCase,
     private val userPreferences: UserPreferencesRepository,
     private val mapFocusManager: MapFocusManager,
-    observeHiddenAuthorIdsUseCase: ObserveHiddenAuthorIdsUseCase
+    observeHiddenAuthorIdsUseCase: ObserveHiddenAuthorIdsUseCase,
+    authRepository: AuthRepository
 ) : ViewModel() {
+
+    /** Current user's uid and guest flag, to gate owner-only edit/delete on map cards. */
+    val currentUserId: String? = authRepository.getCurrentUser()?.id
+    val isGuest: Boolean = authRepository.getCurrentUser()?.isAnonymous != false
+
+    /** One-shot messages (e.g. a failed delete/edit) shown as snackbars. */
+    private val _uiEvent = Channel<String>()
+    val uiEvent = _uiEvent.receiveAsFlow()
 
     /** Pending "open this post on the map" request from the feed; null when none. */
     val mapFocus = mapFocusManager.request
@@ -128,14 +143,22 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    /** Posts that can be plotted: located, pass the type filter, and not from a blocked user. */
+    /**
+     * Posts that can be plotted as standalone markers: located, pass the type filter,
+     * and not from a blocked user. POI posts ([Post.poiId] set) are excluded — they
+     * live inside their POI's thread and must never draw their own user marker (their
+     * coordinates are the POI's, so without this they'd pin on top of the POI disc).
+     */
     private val mappablePosts: Flow<List<Post>> = combine(
         postSource,
         activeFilters,
         blockedIds
     ) { posts, filters, blocked ->
         if ("user posts" in filters) {
-            posts.filter { it.latitude != null && it.longitude != null && it.authorId !in blocked }
+            posts.filter {
+                it.latitude != null && it.longitude != null &&
+                    it.poiId == null && it.authorId !in blocked
+            }
         } else {
             emptyList()
         }
@@ -370,6 +393,26 @@ class MapViewModel @Inject constructor(
                 toggleLikeUseCase(postId)
             } catch (e: Exception) {
                 // handle error
+            }
+        }
+    }
+
+    /** Delete one of the current user's own posts, then dismiss the selection card. */
+    fun deletePost(postId: String) {
+        viewModelScope.launch {
+            deletePostUseCase(postId)
+                .onSuccess { clearSelectedPost() }
+                .onFailure { e ->
+                    _uiEvent.send(e.message ?: "Couldn't delete the post. Please try again.")
+                }
+        }
+    }
+
+    /** Edit the message of one of the current user's own posts. */
+    fun updatePost(postId: String, newMessage: String) {
+        viewModelScope.launch {
+            updatePostUseCase(postId, newMessage).onFailure { e ->
+                _uiEvent.send(e.message ?: "Couldn't update the post. Please try again.")
             }
         }
     }

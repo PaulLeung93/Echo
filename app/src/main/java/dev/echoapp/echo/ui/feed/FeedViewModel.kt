@@ -9,9 +9,11 @@ import dev.echoapp.echo.domain.model.ReportReason
 import dev.echoapp.echo.domain.model.ReportType
 import dev.echoapp.echo.domain.repository.AuthRepository
 import dev.echoapp.echo.domain.repository.LocationProvider
+import dev.echoapp.echo.domain.usecase.post.DeletePostUseCase
 import dev.echoapp.echo.domain.usecase.post.GetPostsUseCase
 import dev.echoapp.echo.domain.usecase.post.GetPostsByTagUseCase
 import dev.echoapp.echo.domain.usecase.post.ToggleLikeUseCase
+import dev.echoapp.echo.domain.usecase.post.UpdatePostUseCase
 import dev.echoapp.echo.domain.usecase.report.SubmitReportUseCase
 import dev.echoapp.echo.domain.usecase.user.BlockUserUseCase
 import dev.echoapp.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
@@ -28,6 +30,8 @@ class FeedViewModel @Inject constructor(
     private val getPostsUseCase: GetPostsUseCase,
     private val getPostsByTagUseCase: GetPostsByTagUseCase,
     private val toggleLikeUseCase: ToggleLikeUseCase,
+    private val deletePostUseCase: DeletePostUseCase,
+    private val updatePostUseCase: UpdatePostUseCase,
     private val submitReportUseCase: SubmitReportUseCase,
     private val blockUserUseCase: BlockUserUseCase,
     observeHiddenAuthorIdsUseCase: ObserveHiddenAuthorIdsUseCase,
@@ -204,6 +208,24 @@ class FeedViewModel @Inject constructor(
             blockUserUseCase(post.authorId)
                 .onSuccess { _uiEvent.send("User blocked.") }
                 .onFailure { _uiEvent.send("Couldn't block this user. Please try again.") }
+        }
+    }
+
+    /** Delete one of the current user's own posts. */
+    fun deletePost(postId: String) {
+        viewModelScope.launch {
+            deletePostUseCase(postId).onFailure { e ->
+                _uiEvent.send(e.message ?: "Couldn't delete the post. Please try again.")
+            }
+        }
+    }
+
+    /** Edit the message of one of the current user's own posts. */
+    fun updatePost(postId: String, newMessage: String) {
+        viewModelScope.launch {
+            updatePostUseCase(postId, newMessage).onFailure { e ->
+                _uiEvent.send(e.message ?: "Couldn't update the post. Please try again.")
+            }
         }
     }
 

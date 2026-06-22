@@ -32,6 +32,8 @@ import dev.echoapp.echo.utils.Constants
 import dev.echoapp.echo.utils.distanceMeters
 import dev.echoapp.echo.utils.formatDistance
 import dev.echoapp.echo.components.BlockUserDialog
+import dev.echoapp.echo.components.DeletePostDialog
+import dev.echoapp.echo.components.EditPostDialog
 import dev.echoapp.echo.components.EmptyState
 import dev.echoapp.echo.components.PostCard
 import dev.echoapp.echo.components.PostCardSkeleton
@@ -81,6 +83,9 @@ fun FeedScreen(
     // Posts pending a report / block confirmation (others' posts only).
     var reportTarget by remember { mutableStateOf<Post?>(null) }
     var blockTarget by remember { mutableStateOf<Post?>(null) }
+    // Posts pending an edit / delete (own posts only).
+    var postToEdit by remember { mutableStateOf<Post?>(null) }
+    var postToDelete by remember { mutableStateOf<Post?>(null) }
 
     LaunchedEffect(Unit) {
         feedViewModel.uiEvent.collect { message -> snackbarHostState.showSnackbar(message) }
@@ -285,6 +290,16 @@ fun FeedScreen(
                                             post.authorId != feedViewModel.currentUserId
                                         ) {
                                             { blockTarget = post }
+                                        } else null,
+                                        onEdit = if (!isGuest && post.authorId.isNotBlank() &&
+                                            post.authorId == feedViewModel.currentUserId
+                                        ) {
+                                            { postToEdit = post }
+                                        } else null,
+                                        onDelete = if (!isGuest && post.authorId.isNotBlank() &&
+                                            post.authorId == feedViewModel.currentUserId
+                                        ) {
+                                            { postToDelete = post }
                                         } else null
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
@@ -366,6 +381,21 @@ fun FeedScreen(
                 feedViewModel.blockUser(post)
                 blockTarget = null
             }
+        )
+    }
+
+    postToEdit?.let { post ->
+        EditPostDialog(
+            initialText = post.message,
+            onConfirm = { newMessage -> feedViewModel.updatePost(post.id, newMessage) },
+            onDismiss = { postToEdit = null }
+        )
+    }
+
+    postToDelete?.let { post ->
+        DeletePostDialog(
+            onConfirm = { feedViewModel.deletePost(post.id) },
+            onDismiss = { postToDelete = null }
         )
     }
 }

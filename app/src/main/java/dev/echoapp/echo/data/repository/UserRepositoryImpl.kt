@@ -210,6 +210,22 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun removeAvatar(): Result<Unit> = withContext(ioDispatcher) {
+        val user = auth.currentUser
+            ?: return@withContext Result.failure(IllegalStateException("You must be signed in."))
+        try {
+            // Best-effort delete of the Storage file — a missing object (e.g. the user
+            // never had a photo, or it was already cleared) must not fail the removal.
+            runCatching { storage.reference.child("avatars/${user.uid}.jpg").delete().await() }
+            // Clearing to "" rather than deleting the field keeps the doc shape stable;
+            // toDomain() maps blank → null, so the initials avatar takes over.
+            usersCollection.document(user.uid).update("photoUrl", "").await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override fun observeCurrentUserProfile(): Flow<UserProfile?> = callbackFlow {
         val uid = auth.currentUser?.uid
         if (uid == null) {

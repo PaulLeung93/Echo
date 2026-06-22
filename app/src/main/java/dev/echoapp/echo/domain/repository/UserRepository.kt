@@ -43,6 +43,12 @@ interface UserRepository {
      */
     suspend fun updateAvatar(imageBytes: ByteArray): Result<String>
 
+    /**
+     * Remove the current user's avatar: best-effort delete of the Storage file, then
+     * clear `photoUrl` on their profile so they fall back to the initials avatar.
+     */
+    suspend fun removeAvatar(): Result<Unit>
+
     /** Add [blockedUid] to the current user's blocked list (idempotent). */
     suspend fun blockUser(blockedUid: String): Result<Unit>
 
