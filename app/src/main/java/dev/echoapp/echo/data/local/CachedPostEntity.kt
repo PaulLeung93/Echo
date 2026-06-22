@@ -22,5 +22,7 @@ data class CachedPostEntity(
     val tags: List<String>,
     val likeCount: Int,
     val commentCount: Int,
-    val likedByCurrentUser: Boolean
+    val likedByCurrentUser: Boolean,
+    val poiId: String?,
+    val poiName: String?
 )

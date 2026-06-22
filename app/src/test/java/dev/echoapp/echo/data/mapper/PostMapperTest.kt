@@ -160,6 +160,59 @@ class PostMapperTest {
     }
     
     @Test
+    fun `given poiId and poiName, when toFirestoreMap called, then map carries POI fields`() {
+        // When
+        val result = mapper.toFirestoreMap(
+            authorId = "uid-123",
+            username = "test@test.com",
+            photoUrl = null,
+            message = "Great spot",
+            latitude = 40.0,
+            longitude = -74.0,
+            tags = emptyList(),
+            postId = "p1",
+            poiId = "poi-99",
+            poiName = "Central Park"
+        )
+
+        // Then
+        assertEquals("poi-99", result["poiId"])
+        assertEquals("Central Park", result["poiName"])
+    }
+
+    @Test
+    fun `given no poiId, when toFirestoreMap called, then map omits POI fields`() {
+        // When
+        val result = mapper.toFirestoreMap(
+            "uid-123", "test@test.com", null, "Hello", null, null, emptyList(), "p1"
+        )
+
+        // Then
+        assertFalse(result.containsKey("poiId"))
+        assertFalse(result.containsKey("poiName"))
+    }
+
+    @Test
+    fun `given entity with POI fields, when toDomain called, then POI fields map through`() {
+        // Given
+        val entity = PostEntity(
+            id = "post1",
+            username = "u",
+            message = "m",
+            timestamp = 1L,
+            poiId = "poi-7",
+            poiName = "The Pier"
+        )
+
+        // When
+        val result = mapper.toDomain(entity, null)
+
+        // Then
+        assertEquals("poi-7", result.poiId)
+        assertEquals("The Pier", result.poiName)
+    }
+
+    @Test
     fun `given null location, when toFirestoreMap called, then map does not contain location fields`() {
         // Given
         val authorId = "uid-123"

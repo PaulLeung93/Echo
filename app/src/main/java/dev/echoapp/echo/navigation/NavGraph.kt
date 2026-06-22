@@ -73,8 +73,12 @@ fun AppNavGraph(
             SignUpScreen(navController = navController)
         }
 
-        // Create Post Screen
-        composable(Destinations.CREATE_POST) {
+        // Create Post Screen. Optional `poiId` puts it in POI-thread mode (location
+        // snapped to the POI); absent/blank for an ordinary feed post.
+        composable(
+            route = "${Destinations.CREATE_POST}?poiId={poiId}",
+            arguments = listOf(navArgument("poiId") { defaultValue = "" })
+        ) {
             CreatePostScreen(navController = navController)
         }
 

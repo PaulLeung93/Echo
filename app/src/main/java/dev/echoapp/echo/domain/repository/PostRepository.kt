@@ -70,6 +70,13 @@ interface PostRepository {
      * Get a post by its ID as a Flow for real-time updates.
      */
     fun getPostByIdFlow(postId: String): Flow<Post?>
+
+    /**
+     * Live stream of the posts belonging to a POI's thread (`poiId == poiId`), ordered
+     * by timestamp.
+     * @param descending true for newest-first (default thread order), false for oldest-first.
+     */
+    fun getPostsForPoi(poiId: String, descending: Boolean): Flow<List<Post>>
     
     /**
      * Create a new post.
@@ -83,7 +90,9 @@ interface PostRepository {
         message: String,
         latitude: Double?,
         longitude: Double?,
-        tags: List<String>
+        tags: List<String>,
+        poiId: String? = null,
+        poiName: String? = null
     ): Result<Unit>
     
     /**

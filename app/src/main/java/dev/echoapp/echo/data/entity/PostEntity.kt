@@ -21,5 +21,9 @@ data class PostEntity(
     val tags: List<String> = emptyList(),
     val likeCount: Int? = null,
     val commentCount: Int? = null,
-    val likes: List<String> = emptyList()
+    val likes: List<String> = emptyList(),
+    /** Id of the POI this post belongs to (absent for ordinary feed posts). */
+    val poiId: String? = null,
+    /** Denormalized POI name, copied at create time so the feed needs no POI read. */
+    val poiName: String? = null
 )

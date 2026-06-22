@@ -99,7 +99,7 @@ class PoiRepositoryImpl @Inject constructor(
                 type = type,
                 location = geoPoint,
                 description = doc.getString("description") ?: "",
-                commentCount = doc.getLong("commentCount")?.toInt() ?: 0,
+                postCount = doc.getLong("postCount")?.toInt() ?: 0,
                 imageUrl = doc.getString("imageUrl") ?: ""
             )
         } else {
@@ -126,7 +126,7 @@ class PoiRepositoryImpl @Inject constructor(
                 val type = snapshot.getString("type")
                 val geoPoint = snapshot.getGeoPoint("location")
                 val description = snapshot.getString("description") ?: ""
-                val commentCount = snapshot.getLong("commentCount")?.toInt() ?: 0
+                val postCount = snapshot.getLong("postCount")?.toInt() ?: 0
                 val imageUrl = snapshot.getString("imageUrl") ?: ""
 
                 if (name != null && type != null && geoPoint != null) {
@@ -136,7 +136,7 @@ class PoiRepositoryImpl @Inject constructor(
                         type = type,
                         location = geoPoint,
                         description = description,
-                        commentCount = commentCount,
+                        postCount = postCount,
                         imageUrl = imageUrl
                     )
                     trySend(poiMapper.toDomain(entity))

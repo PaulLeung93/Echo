@@ -30,26 +30,4 @@ interface CommentRepository {
      * @param commentId The ID of the comment to delete.
      */
     suspend fun deleteComment(postId: String, commentId: String)
-
-    /**
-     * Get comments for a specific POI.
-     * @param poiId The ID of the POI.
-     * @return Flow of comments for reactive updates.
-     */
-    fun getCommentsForPoi(poiId: String): Flow<List<Comment>>
-
-    /**
-     * Add a new comment to a POI.
-     * @param poiId The ID of the POI.
-     * @param message The comment message content.
-     * @return The created Comment object.
-     */
-    suspend fun addCommentToPoi(poiId: String, message: String): Comment
-
-    /**
-     * Delete a comment from a POI.
-     * @param poiId The ID of the parent POI.
-     * @param commentId The ID of the comment to delete.
-     */
-    suspend fun deleteCommentFromPoi(poiId: String, commentId: String)
 }

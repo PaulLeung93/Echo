@@ -9,7 +9,8 @@ import androidx.room.TypeConverters
  * the feed), so schema changes drop-and-repopulate rather than ship migrations.
  */
 // v2: added CachedPostEntity.authorPhotoUrl (destructive fallback recreates the cache).
-@Database(entities = [CachedPostEntity::class], version = 2, exportSchema = false)
+// v3: added CachedPostEntity.poiId/poiName for POI post badges.
+@Database(entities = [CachedPostEntity::class], version = 3, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class EchoDatabase : RoomDatabase() {
     abstract fun postDao(): PostDao

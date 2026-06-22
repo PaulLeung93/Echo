@@ -9,6 +9,7 @@ import dev.echoapp.echo.domain.usecase.post.ToggleLikeUseCase
 import dev.echoapp.echo.domain.usecase.report.SubmitReportUseCase
 import dev.echoapp.echo.domain.usecase.user.BlockUserUseCase
 import dev.echoapp.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
+import dev.echoapp.echo.ui.common.MapFocusManager
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -34,6 +35,7 @@ class FeedViewModelTest {
     private val blockUserUseCase: BlockUserUseCase = mockk()
     private val observeBlockedUserIdsUseCase: ObserveHiddenAuthorIdsUseCase = mockk()
     private val locationProvider: LocationProvider = mockk()
+    private val mapFocusManager: MapFocusManager = mockk(relaxed = true)
     private val authRepository: AuthRepository = mockk()
 
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -59,6 +61,7 @@ class FeedViewModelTest {
         blockUserUseCase,
         observeBlockedUserIdsUseCase,
         locationProvider,
+        mapFocusManager,
         authRepository
     )
 

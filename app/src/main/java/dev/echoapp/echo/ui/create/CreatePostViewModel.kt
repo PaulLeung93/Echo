@@ -1,13 +1,16 @@
 ﻿package dev.echoapp.echo.ui.create
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.echoapp.echo.domain.repository.LocationProvider
+import dev.echoapp.echo.domain.repository.PoiRepository
 import dev.echoapp.echo.domain.usecase.post.CreatePostUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -15,11 +18,35 @@ import javax.inject.Inject
 @HiltViewModel
 class CreatePostViewModel @Inject constructor(
     private val createPostUseCase: CreatePostUseCase,
-    private val locationProvider: LocationProvider
+    private val locationProvider: LocationProvider,
+    private val poiRepository: PoiRepository,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CreatePostUiState())
     val uiState: StateFlow<CreatePostUiState> = _uiState.asStateFlow()
+
+    init {
+        // When launched from a POI thread, snap the post's location to the POI: load
+        // the POI's name + coordinates and lock them in (the location toggle is hidden).
+        val poiId = savedStateHandle.get<String>("poiId")?.takeIf { it.isNotBlank() }
+        if (poiId != null) {
+            viewModelScope.launch {
+                val poi = poiRepository.getPoiByIdFlow(poiId).firstOrNull { it != null }
+                if (poi != null) {
+                    _uiState.update {
+                        it.copy(
+                            poiId = poi.id,
+                            poiName = poi.name,
+                            includeLocation = true,
+                            latitude = poi.latitude,
+                            longitude = poi.longitude
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * Toggle attaching the user's location. When turned on, resolves a fix via
@@ -84,7 +111,9 @@ class CreatePostViewModel @Inject constructor(
                 includeLocation = includeLocation,
                 latitude = lat,
                 longitude = lng,
-                tags = tags
+                tags = tags,
+                poiId = state.poiId,
+                poiName = state.poiName
             )
                 .onSuccess {
                     _uiState.update { it.copy(isLoading = false, isSuccess = true) }

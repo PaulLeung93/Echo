@@ -46,8 +46,10 @@ fun CommentCard(
 ) {
     Surface(
         shape = MaterialTheme.shapes.medium,
+        // The "AUTHOR" pill already marks the original poster, so the fill just needs a
+        // faint wash rather than a solid container color.
         color = if (isAuthor) {
-            MaterialTheme.colorScheme.primaryContainer
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
         } else {
             MaterialTheme.colorScheme.surfaceContainerLow
         },

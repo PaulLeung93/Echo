@@ -268,7 +268,7 @@ fun MapScreen(
                             // Round disc (no pointer) → anchor at its center, not bottom.
                             anchor = Offset(0.5f, 0.5f),
                             title = poi.name,
-                            snippet = "${poi.description} • ${poi.commentCount} comments",
+                            snippet = "${poi.description} • ${poi.postCount} echoes",
                             onClick = {
                                 mapViewModel.setSelectedPoi(poi, cameraPositionState)
                                 true
@@ -435,7 +435,7 @@ fun MapScreen(
                 name = poi.name,
                 description = poi.description,
                 type = poi.type,
-                commentCount = poi.commentCount,
+                postCount = poi.postCount,
                 distanceLabel = distanceLabel,
                 onClick = { navController.navigate("${Destinations.POI_DETAILS}/${poi.id}") },
                 modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
@@ -596,7 +596,7 @@ private fun PoiPreviewCard(
     name: String,
     description: String,
     type: String,
-    commentCount: Int,
+    postCount: Int,
     distanceLabel: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -648,13 +648,13 @@ private fun PoiPreviewCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.Comment,
-                    contentDescription = "Comments",
+                    contentDescription = "Echoes",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = commentCount.toString(),
+                    text = postCount.toString(),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

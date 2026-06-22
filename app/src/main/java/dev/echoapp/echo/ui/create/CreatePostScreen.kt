@@ -78,8 +78,13 @@ fun CreatePostScreen(
 
     LaunchedEffect(uiState.isSuccess) {
         if (uiState.isSuccess) {
-            navController.navigate(Destinations.FEED) {
-                popUpTo(Destinations.FEED) { inclusive = true }
+            if (uiState.isPoiPost) {
+                // Return to the POI thread; its live query surfaces the new post.
+                navController.popBackStack()
+            } else {
+                navController.navigate(Destinations.FEED) {
+                    popUpTo(Destinations.FEED) { inclusive = true }
+                }
             }
         }
     }
@@ -158,20 +163,26 @@ fun CreatePostScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // --- Location card ---
-            LocationCard(
-                includeLocation = uiState.includeLocation,
-                isLoading = uiState.isLocationLoading,
-                unavailable = uiState.locationUnavailable,
-                attached = uiState.includeLocation && uiState.latitude != null,
-                onToggle = { checked ->
-                    when {
-                        !checked -> viewModel.setIncludeLocation(false)
-                        locationPermission.status.isGranted -> viewModel.setIncludeLocation(true)
-                        else -> showLocationRationale = true
+            // --- Location ---
+            // POI posts are pinned to the POI, so the user can't choose a location;
+            // show where it's going instead of the location toggle.
+            if (uiState.isPoiPost) {
+                PoiTargetCard(poiName = uiState.poiName ?: "this place")
+            } else {
+                LocationCard(
+                    includeLocation = uiState.includeLocation,
+                    isLoading = uiState.isLocationLoading,
+                    unavailable = uiState.locationUnavailable,
+                    attached = uiState.includeLocation && uiState.latitude != null,
+                    onToggle = { checked ->
+                        when {
+                            !checked -> viewModel.setIncludeLocation(false)
+                            locationPermission.status.isGranted -> viewModel.setIncludeLocation(true)
+                            else -> showLocationRationale = true
+                        }
                     }
-                }
-            )
+                )
+            }
 
             // --- Tags ---
             Text(
@@ -258,6 +269,41 @@ fun CreatePostScreen(
                 TextButton(onClick = { showLocationRationale = false }) { Text("Not now") }
             }
         )
+    }
+}
+
+/** Banner shown for POI posts: this echo is pinned to the given place. */
+@Composable
+private fun PoiTargetCard(poiName: String) {
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.LocationOn,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Posting to $poiName",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "This echo will appear in this place's thread",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 

@@ -12,6 +12,6 @@ data class PoiEntity(
     val type: String = "",
     val location: GeoPoint = GeoPoint(0.0, 0.0),
     val description: String = "",
-    val commentCount: Int = 0,
+    val postCount: Int = 0,
     val imageUrl: String = ""
 )
