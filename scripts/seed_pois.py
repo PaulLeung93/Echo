@@ -149,7 +149,59 @@ pois = [
         "location": firestore.GeoPoint(40.6308, -73.9520),
         "description": "Public college in Flatbush, Brooklyn."
     },
-    
+    # --- Outer-borough colleges ---
+    {
+        "name": "NYU Tandon School of Engineering",
+        "type": "college",
+        "location": firestore.GeoPoint(40.6942, -73.9866),
+        "description": "NYU's engineering school at MetroTech in Downtown Brooklyn.",
+        "wiki": "New York University Tandon School of Engineering"
+    },
+    {
+        "name": "LIU Brooklyn",
+        "type": "college",
+        "location": firestore.GeoPoint(40.6896, -73.9776),
+        "description": "Long Island University's campus in Downtown Brooklyn.",
+        "wiki": "Long Island University"
+    },
+    {
+        "name": "York College",
+        "type": "college",
+        "location": firestore.GeoPoint(40.7003, -73.8005),
+        "description": "CUNY senior college in Jamaica, Queens.",
+        "wiki": "York College, City University of New York"
+    },
+    {
+        "name": "LaGuardia Community College",
+        "type": "college",
+        "location": firestore.GeoPoint(40.7445, -73.9376),
+        "description": "CUNY community college in Long Island City, Queens."
+    },
+    {
+        "name": "Lehman College",
+        "type": "college",
+        "location": firestore.GeoPoint(40.8730, -73.8940),
+        "description": "CUNY senior college in the Bronx."
+    },
+    {
+        "name": "Manhattan College",
+        "type": "college",
+        "location": firestore.GeoPoint(40.8896, -73.8993),
+        "description": "Private college in the Riverdale section of the Bronx."
+    },
+    {
+        "name": "College of Staten Island",
+        "type": "college",
+        "location": firestore.GeoPoint(40.6018, -74.1502),
+        "description": "CUNY senior college in Willowbrook, Staten Island."
+    },
+    {
+        "name": "Wagner College",
+        "type": "college",
+        "location": firestore.GeoPoint(40.6149, -74.0935),
+        "description": "Private college on Grymes Hill, Staten Island."
+    },
+
 
     # Parks
     {
@@ -245,7 +297,59 @@ pois = [
         "location": firestore.GeoPoint(40.7308, -73.9973),
         "description": "Famous park in Greenwich Village."
     },
-    
+    # --- Outer-borough parks (major only) ---
+    {
+        "name": "Brooklyn Bridge Park",
+        "type": "park",
+        "location": firestore.GeoPoint(40.7002, -73.9967),
+        "description": "Waterfront park along Brooklyn's East River shoreline."
+    },
+    {
+        "name": "Marine Park",
+        "type": "park",
+        "location": firestore.GeoPoint(40.5944, -73.9213),
+        "description": "Brooklyn's largest park, with salt marsh and athletic fields.",
+        "wiki": "Marine Park (Brooklyn)"
+    },
+    {
+        "name": "Forest Park",
+        "type": "park",
+        "location": firestore.GeoPoint(40.7016, -73.8569),
+        "description": "Large wooded park spanning central Queens.",
+        "wiki": "Forest Park (Queens)"
+    },
+    {
+        "name": "Astoria Park",
+        "type": "park",
+        "location": firestore.GeoPoint(40.7795, -73.9230),
+        "description": "Riverside Queens park with NYC's largest pool and Hell Gate Bridge views."
+    },
+    {
+        "name": "Alley Pond Park",
+        "type": "park",
+        "location": firestore.GeoPoint(40.7456, -73.7430),
+        "description": "Second-largest park in Queens, with wetlands and trails."
+    },
+    {
+        "name": "Van Cortlandt Park",
+        "type": "park",
+        "location": firestore.GeoPoint(40.8976, -73.8866),
+        "description": "Sprawling park in the northwest Bronx with trails and a lake."
+    },
+    {
+        "name": "Staten Island Greenbelt",
+        "type": "park",
+        "location": firestore.GeoPoint(40.5870, -74.1180),
+        "description": "Vast network of woodland parks and trails in central Staten Island.",
+        "wiki": "Staten Island Greenbelt"
+    },
+    {
+        "name": "Clove Lakes Park",
+        "type": "park",
+        "location": firestore.GeoPoint(40.6175, -74.1057),
+        "description": "Staten Island park with spring-fed lakes and old-growth trees."
+    },
+
 
     # Landmarks
     {
@@ -315,6 +419,76 @@ pois = [
         "type": "landmark",
         "location": firestore.GeoPoint(40.758896, -73.985130),
         "description": "Famous intersection known for its lights and Broadway theaters."
+    },
+    # --- Outer-borough landmarks ---
+    {
+        "name": "Coney Island",
+        "type": "landmark",
+        "location": firestore.GeoPoint(40.5749, -73.9783),
+        "description": "Iconic Brooklyn boardwalk, beach, and amusement area."
+    },
+    {
+        "name": "Brooklyn Museum",
+        "type": "landmark",
+        "location": firestore.GeoPoint(40.6712, -73.9636),
+        "description": "Major art museum beside the Brooklyn Botanic Garden."
+    },
+    {
+        "name": "Barclays Center",
+        "type": "landmark",
+        "location": firestore.GeoPoint(40.6826, -73.9754),
+        "description": "Arena in Downtown Brooklyn, home of the Brooklyn Nets."
+    },
+    {
+        "name": "Grand Army Plaza",
+        "type": "landmark",
+        "location": firestore.GeoPoint(40.6743, -73.9702),
+        "description": "Brooklyn plaza with the Soldiers' and Sailors' Memorial Arch at Prospect Park.",
+        "wiki": "Grand Army Plaza"
+    },
+    {
+        "name": "Unisphere",
+        "type": "landmark",
+        "location": firestore.GeoPoint(40.7466, -73.8447),
+        "description": "Giant steel globe from the 1964 World's Fair in Flushing Meadows, Queens."
+    },
+    {
+        "name": "Citi Field",
+        "type": "landmark",
+        "location": firestore.GeoPoint(40.7571, -73.8458),
+        "description": "Ballpark in Flushing, Queens, home of the New York Mets."
+    },
+    {
+        "name": "Yankee Stadium",
+        "type": "landmark",
+        "location": firestore.GeoPoint(40.8296, -73.9262),
+        "description": "Home of the New York Yankees in the South Bronx."
+    },
+    {
+        "name": "Bronx Zoo",
+        "type": "landmark",
+        "location": firestore.GeoPoint(40.8506, -73.8769),
+        "description": "One of the largest metropolitan zoos in the United States."
+    },
+    {
+        "name": "New York Botanical Garden",
+        "type": "landmark",
+        "location": firestore.GeoPoint(40.8623, -73.8770),
+        "description": "Historic botanical garden and landmark in the Bronx."
+    },
+    {
+        "name": "Staten Island Ferry",
+        "type": "landmark",
+        "location": firestore.GeoPoint(40.6437, -74.0735),
+        "description": "Free ferry to Manhattan; St. George Terminal on Staten Island.",
+        "wiki": "Staten Island Ferry"
+    },
+    {
+        "name": "Snug Harbor Cultural Center",
+        "type": "landmark",
+        "location": firestore.GeoPoint(40.6437, -74.1024),
+        "description": "Historic cultural center and botanical gardens on Staten Island.",
+        "wiki": "Snug Harbor Cultural Center"
     }
 
 ]
