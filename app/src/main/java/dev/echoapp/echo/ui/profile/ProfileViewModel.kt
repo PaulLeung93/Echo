@@ -8,6 +8,8 @@ import dev.echoapp.echo.domain.usecase.post.GetPostsByAuthorIdUseCase
 import dev.echoapp.echo.domain.usecase.post.ToggleLikeUseCase
 import dev.echoapp.echo.domain.usecase.post.UpdatePostUseCase
 import dev.echoapp.echo.domain.usecase.user.ObserveCurrentUserProfileUseCase
+import dev.echoapp.echo.domain.model.Poi
+import dev.echoapp.echo.domain.model.UserProfile
 import dev.echoapp.echo.domain.repository.PoiRepository
 import dev.echoapp.echo.domain.repository.UserRepository
 import dev.echoapp.echo.utils.Constants
@@ -31,31 +33,21 @@ class ProfileViewModel @Inject constructor(
 
     private val user = getCurrentUserUseCase()
 
-    /**
-     * The user's favorited POIs resolved to full [Poi]s, most-recent first. POIs come
-     * from the local cache ([PoiRepository.getPois]), so this costs no extra reads; a
-     * favorite whose POI isn't in the cache is simply skipped.
-     */
-    private val favoritePlaces: Flow<List<FavoritePlace>> =
-        combine(userRepository.observeFavoritePois(), poiRepository.getPois()) { favorites, pois ->
-            val byId = pois.associateBy { it.id }
-            favorites.entries
-                .mapNotNull { (poiId, at) -> byId[poiId]?.let { FavoritePlace(it, at) } }
-                .sortedByDescending { it.favoritedAt }
-        }
-
     val uiState: StateFlow<ProfileUiState> = if (user != null) {
         combine(
             getPostsByAuthorIdUseCase(user.id),
             observeCurrentUserProfileUseCase(),
-            favoritePlaces
-        ) { posts, profile, places ->
+            // Cache-first (0 billed reads); resolves favorite poiIds to full POIs.
+            poiRepository.getPois()
+        ) { posts, profile, pois ->
             ProfileUiState(
                 userPosts = posts,
                 totalLikes = posts.sumOf { it.likeCount },
                 totalComments = posts.sumOf { it.commentCount },
                 userProfile = profile,
-                favoritePlaces = places,
+                // Derive favorites from the profile we're already listening to, rather
+                // than opening a second snapshot listener on the same user doc.
+                favoritePlaces = resolveFavoritePlaces(profile, pois),
                 isLoading = false
             )
         }.catch { e ->
@@ -67,6 +59,19 @@ class ProfileViewModel @Inject constructor(
         )
     } else {
         MutableStateFlow(ProfileUiState(error = "User not logged in")).asStateFlow()
+    }
+
+    /**
+     * Resolve the profile's favorite poiIds to full [Poi]s, most-recent first. A
+     * favorite whose POI isn't in the cached list is skipped (e.g. an unseeded POI).
+     */
+    private fun resolveFavoritePlaces(profile: UserProfile?, pois: List<Poi>): List<FavoritePlace> {
+        val favorites = profile?.favorites.orEmpty()
+        if (favorites.isEmpty()) return emptyList()
+        val byId = pois.associateBy { it.id }
+        return favorites.entries
+            .mapNotNull { (poiId, at) -> byId[poiId]?.let { FavoritePlace(it, at) } }
+            .sortedByDescending { it.favoritedAt }
     }
 
     /** One-shot messages (e.g. a failed delete/edit) shown as snackbars. */
