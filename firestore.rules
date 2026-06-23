@@ -148,12 +148,15 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create, delete: if false; // managed out-of-band, never by clients
 
-      // Only the denormalized postCount may change, by +/-1 (a single post added to or
+      // The denormalized postCount may change by +/-1 (a single post added to or
       // removed from this POI's thread; posting requires a real account, so guests
-      // never reach this).
+      // never reach this). The +1 (new echo) batch also stamps lastPostAt to the
+      // server time so the map can show a "recently active" glow; that timestamp must
+      // equal request.time so it can't be backdated or set to the future.
       allow update: if isNotAnonymous()
-        && changedKeys().hasOnly(['postCount'])
-        && postCountMovedByOne();
+        && changedKeys().hasOnly(['postCount', 'lastPostAt'])
+        && postCountMovedByOne()
+        && (!changedKeys().hasAny(['lastPostAt']) || request.resource.data.lastPostAt == request.time);
     }
 
     // Valid username: 3–20 chars, lowercase letters/digits/underscore, no

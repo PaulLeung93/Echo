@@ -5,7 +5,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
 import android.graphics.RectF
+import android.graphics.Shader
 import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 
@@ -24,6 +26,32 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory
 private const val BASE_RADIUS = 50f
 private const val RING_WIDTH = 8f
 private const val GLYPH_FRACTION = 0.6f // glyph box side as a fraction of the colored disc diameter
+
+/**
+ * A POI counts as "recently active" (and gets a glow) if its newest echo was posted
+ * within this window. Echoes live 24h, so a 24h signal would light up nearly every
+ * POI; 1h instead surfaces places buzzing *right now*. Tweak here to widen/narrow it.
+ */
+const val POI_ACTIVE_WINDOW_MILLIS = 60 * 60 * 1000L
+
+/** True if [lastPostAt] (epoch millis, nullable) falls within [POI_ACTIVE_WINDOW_MILLIS] of [now]. */
+fun isPoiRecentlyActive(lastPostAt: Long?, now: Long = System.currentTimeMillis()): Boolean =
+    lastPostAt != null && now - lastPostAt in 0..POI_ACTIVE_WINDOW_MILLIS
+
+/**
+ * Whether a POI's marker should glow: it has *recent* activity ([isPoiRecentlyActive])
+ * that the user hasn't seen yet — i.e. its newest echo is newer than the last time they
+ * opened its thread ([viewedAt], 0 if never viewed). So the glow clears once viewed and
+ * re-lights only when a newer echo arrives.
+ */
+fun isPoiGlowing(lastPostAt: Long?, viewedAt: Long, now: Long = System.currentTimeMillis()): Boolean =
+    isPoiRecentlyActive(lastPostAt, now) && (lastPostAt ?: 0L) > viewedAt
+
+// Soft halo drawn behind a "recently active" POI disc. The extra radius (in base px,
+// pre-scale) is padded into the bitmap so the glow isn't clipped; the color is a warm
+// gold that reads as "lively" and stays distinct from every category fill.
+private const val GLOW_EXTRA_RADIUS = 22f
+private val GLOW_COLOR = Color.rgb(0xFF, 0xC1, 0x07) // amber-gold
 
 /** Per-category disc fills. Mid-tones chosen for white ring + glyph contrast. */
 enum class PinCategory(val color: Int) {
@@ -62,24 +90,46 @@ fun markerScaleForZoom(zoom: Int): Float = when {
  * POIs of the same type/zoom share one bitmap. Lives for the process — the key space
  * is bounded (4 categories × a few zoom buckets × selected/not).
  */
-private val pinCache = HashMap<Pair<PinCategory, Int>, BitmapDescriptor>()
+private val pinCache = HashMap<Triple<PinCategory, Int, Boolean>, BitmapDescriptor>()
 
-fun poiPinDescriptor(category: PinCategory, scale: Float): BitmapDescriptor {
-    val key = category to (scale * 100).toInt()
+fun poiPinDescriptor(category: PinCategory, scale: Float, glowing: Boolean = false): BitmapDescriptor {
+    val key = Triple(category, (scale * 100).toInt(), glowing)
     pinCache[key]?.let { return it }
-    return BitmapDescriptorFactory.fromBitmap(createPinIcon(category, scale))
+    return BitmapDescriptorFactory.fromBitmap(createPinIcon(category, scale, glowing))
         .also { pinCache[key] = it }
 }
 
-fun createPinIcon(category: PinCategory, scale: Float = 1f): Bitmap {
+fun createPinIcon(category: PinCategory, scale: Float = 1f, glowing: Boolean = false): Bitmap {
     val radius = BASE_RADIUS * scale
     val ring = RING_WIDTH * scale
-    val size = (radius * 2).toInt()
-    val cx = radius
-    val cy = radius
+    // Pad the bitmap by the glow radius (only when glowing) and recenter the disc so
+    // the halo has room and the marker still anchors at its visual center.
+    val glowPad = if (glowing) GLOW_EXTRA_RADIUS * scale else 0f
+    val outer = radius + glowPad
+    val size = (outer * 2).toInt()
+    val cx = outer
+    val cy = outer
 
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
+
+    // Soft gold halo behind the disc for "recently active" POIs: a radial gradient
+    // fading from a semi-opaque ring at the disc edge out to transparent.
+    if (glowing) {
+        val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx, cy, outer,
+                intArrayOf(
+                    Color.argb(140, Color.red(GLOW_COLOR), Color.green(GLOW_COLOR), Color.blue(GLOW_COLOR)),
+                    Color.argb(140, Color.red(GLOW_COLOR), Color.green(GLOW_COLOR), Color.blue(GLOW_COLOR)),
+                    Color.argb(0, Color.red(GLOW_COLOR), Color.green(GLOW_COLOR), Color.blue(GLOW_COLOR))
+                ),
+                floatArrayOf(0f, (radius / outer) * 0.92f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawCircle(cx, cy, outer, glowPaint)
+    }
 
     // White outer ring, then the colored disc inside it.
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)

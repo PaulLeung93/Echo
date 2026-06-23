@@ -13,5 +13,7 @@ data class PoiEntity(
     val location: GeoPoint = GeoPoint(0.0, 0.0),
     val description: String = "",
     val postCount: Int = 0,
-    val imageUrl: String = ""
+    val imageUrl: String = "",
+    /** Epoch millis of the most recent echo here; null if never posted to. */
+    val lastPostAt: Long? = null
 )

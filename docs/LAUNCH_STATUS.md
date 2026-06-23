@@ -62,6 +62,7 @@ Not needed for submission. Captured so they aren't lost.
 - **Push notifications** (FCM) — mirrors Alerts to the system tray
 - **Report / moderation** — report button on posts/comments, abuse policy (may move up to launch requirement — see §3 above)
 - **Map** — clustering tuning, real free-text search (current bar opens tag filter)
+- **POI activity glow** — ✅ implemented: a POI shows a gold glow when it has an echo from the last 1h that the user hasn't seen yet; the glow clears once they open its thread and re-lights if a newer echo arrives. (`lastPostAt` denormalized per POI; window in `CreatePinIcon.POI_ACTIVE_WINDOW_MILLIS`; per-user "viewed" times in DataStore, device-local.) A true animated pulse on the *selected* POI remains a possible future polish.
 - **GeoFire radius** — cap POI visibility + interactions to a configurable distance
 - **Content** — multi-photo posts, event-type posts with RSVP, 24h post expiry
 - **Social** — direct messaging, follow/friend nearby users, bookmarks

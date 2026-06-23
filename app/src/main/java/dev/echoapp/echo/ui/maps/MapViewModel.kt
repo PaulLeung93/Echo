@@ -54,6 +54,14 @@ class MapViewModel @Inject constructor(
 
     private val blockedIds: Flow<Set<String>> = observeHiddenAuthorIdsUseCase()
 
+    /**
+     * Per-POI "last viewed" timestamps (poiId -> millis). The map reads this to clear a
+     * POI's activity glow once its thread has been opened. Kept out of [uiState] so it
+     * doesn't churn the heavy render combine — the screen collects it directly.
+     */
+    val poiViewedAt: StateFlow<Map<String, Long>> = userPreferences.poiViewedAt
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     private val _currentTag = MutableStateFlow<String?>(null)
 
     /**

@@ -43,6 +43,14 @@ class UserPreferencesRepository @Inject constructor(
         val NOTIFICATIONS = booleanPreferencesKey("notifications_enabled")
         val POIS_LAST_SYNC = longPreferencesKey("pois_last_sync")
         val MAP_MARKER_FILTERS = stringSetPreferencesKey("map_marker_filters")
+
+        /**
+         * Prefix for per-POI "last viewed" timestamps (one dynamic key per POI). Used to
+         * clear the map's "recently active" glow once the user has opened that POI's
+         * thread — see [poiViewedAt] / [markPoiViewed].
+         */
+        const val POI_VIEWED_PREFIX = "poi_viewed_"
+        fun poiViewed(poiId: String) = longPreferencesKey("$POI_VIEWED_PREFIX$poiId")
     }
 
     private val prefs: Flow<Preferences> = dataStore.data.catch { e ->
@@ -69,6 +77,18 @@ class UserPreferencesRepository @Inject constructor(
     val mapMarkerFilters: Flow<Set<String>> =
         prefs.map { it[Keys.MAP_MARKER_FILTERS] ?: Constants.DEFAULT_MAP_FILTERS }
 
+    /**
+     * Per-POI epoch-millis of when the user last opened that POI's thread, as a
+     * `poiId -> millis` map. The map's "recently active" glow is suppressed for a POI
+     * once its newest echo is older than this, so a place stops glowing after you've
+     * checked it (and re-lights if a newer echo arrives). Absent POIs were never viewed.
+     */
+    val poiViewedAt: Flow<Map<String, Long>> = prefs.map { p ->
+        p.asMap().entries
+            .filter { it.key.name.startsWith(Keys.POI_VIEWED_PREFIX) }
+            .associate { it.key.name.removePrefix(Keys.POI_VIEWED_PREFIX) to (it.value as Long) }
+    }
+
     suspend fun setDarkMode(enabled: Boolean) {
         dataStore.edit { it[Keys.DARK_MODE] = enabled }
     }
@@ -83,5 +103,10 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setMapMarkerFilters(filters: Set<String>) {
         dataStore.edit { it[Keys.MAP_MARKER_FILTERS] = filters }
+    }
+
+    /** Record that the user opened [poiId]'s thread now, clearing its activity glow. */
+    suspend fun markPoiViewed(poiId: String, at: Long = System.currentTimeMillis()) {
+        dataStore.edit { it[Keys.poiViewed(poiId)] = at }
     }
 }

@@ -294,6 +294,10 @@ class PostRepositoryImpl @Inject constructor(
                     firestore.batch().apply {
                         set(newDocRef, postMap)
                         update(poiRef, "postCount", com.google.firebase.firestore.FieldValue.increment(1))
+                        // Stamp the POI's last-activity time so the map can glow
+                        // "recently active". serverTimestamp keeps it tamper-proof and
+                        // matches the Firestore rule (lastPostAt == request.time).
+                        update(poiRef, "lastPostAt", com.google.firebase.firestore.FieldValue.serverTimestamp())
                     }.commit().await()
                     // Keep the map's cached POI count in step with the write we just
                     // committed, so the marker snippet / preview card reflect the new

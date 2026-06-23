@@ -101,7 +101,8 @@ class PoiRepositoryImpl @Inject constructor(
                 location = geoPoint,
                 description = doc.getString("description") ?: "",
                 postCount = doc.getLong("postCount")?.toInt() ?: 0,
-                imageUrl = doc.getString("imageUrl") ?: ""
+                imageUrl = doc.getString("imageUrl") ?: "",
+                lastPostAt = doc.getTimestamp("lastPostAt")?.toDate()?.time
             )
         } else {
             null
@@ -123,7 +124,14 @@ class PoiRepositoryImpl @Inject constructor(
         cache.update { current ->
             current?.map { poi ->
                 if (poi.id == poiId) {
-                    poi.copy(postCount = (poi.postCount + delta).coerceAtLeast(0))
+                    poi.copy(
+                        postCount = (poi.postCount + delta).coerceAtLeast(0),
+                        // A positive delta means a brand-new echo was just posted here,
+                        // so locally mark the POI active now — the map's "recently
+                        // active" glow lights up immediately instead of waiting for the
+                        // next cache resync to pick up the server's lastPostAt stamp.
+                        lastPostAt = if (delta > 0) System.currentTimeMillis() else poi.lastPostAt
+                    )
                 } else {
                     poi
                 }
@@ -145,6 +153,7 @@ class PoiRepositoryImpl @Inject constructor(
                 val description = snapshot.getString("description") ?: ""
                 val postCount = snapshot.getLong("postCount")?.toInt() ?: 0
                 val imageUrl = snapshot.getString("imageUrl") ?: ""
+                val lastPostAt = snapshot.getTimestamp("lastPostAt")?.toDate()?.time
 
                 if (name != null && type != null && geoPoint != null) {
                     val entity = PoiEntity(
@@ -154,7 +163,8 @@ class PoiRepositoryImpl @Inject constructor(
                         location = geoPoint,
                         description = description,
                         postCount = postCount,
-                        imageUrl = imageUrl
+                        imageUrl = imageUrl,
+                        lastPostAt = lastPostAt
                     )
                     trySend(poiMapper.toDomain(entity))
                 } else {

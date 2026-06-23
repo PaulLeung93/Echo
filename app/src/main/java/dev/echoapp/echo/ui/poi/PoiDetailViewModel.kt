@@ -9,6 +9,7 @@ import dev.echoapp.echo.domain.model.Post
 import dev.echoapp.echo.domain.model.Report
 import dev.echoapp.echo.domain.model.ReportReason
 import dev.echoapp.echo.domain.model.ReportType
+import dev.echoapp.echo.data.preferences.UserPreferencesRepository
 import dev.echoapp.echo.domain.repository.AuthRepository
 import dev.echoapp.echo.domain.repository.LocationProvider
 import dev.echoapp.echo.domain.repository.PoiRepository
@@ -40,6 +41,7 @@ class PoiDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val poiRepository: PoiRepository,
     authRepository: AuthRepository,
+    private val userPreferences: UserPreferencesRepository,
     private val locationProvider: LocationProvider,
     private val getPoiPostsUseCase: GetPoiPostsUseCase,
     private val toggleLikeUseCase: ToggleLikeUseCase,
@@ -77,6 +79,9 @@ class PoiDetailViewModel @Inject constructor(
         loadPoi()
         loadPosts()
         loadUserLocation()
+        // Opening the thread counts as "viewing" this POI: stamp the time so the map's
+        // activity glow clears for it (and only re-lights if a newer echo arrives).
+        viewModelScope.launch { userPreferences.markPoiViewed(poiId) }
     }
 
     private fun loadPoi() {

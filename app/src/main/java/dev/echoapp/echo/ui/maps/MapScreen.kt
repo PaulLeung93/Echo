@@ -113,6 +113,9 @@ fun MapScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val uiState by mapViewModel.uiState.collectAsStateWithLifecycle()
+    // Per-POI "last viewed" times; a POI's activity glow clears once its thread is
+    // opened. Collected here so returning from a POI detail re-renders its marker.
+    val poiViewedAt by mapViewModel.poiViewedAt.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         mapViewModel.uiEvent.collect { message -> snackbarHostState.showSnackbar(message) }
@@ -324,11 +327,16 @@ fun MapScreen(
                         val latLng = LatLng(poi.latitude, poi.longitude)
                         val isSelected = uiState.selectedPoi?.id == poi.id
                         val markerState = rememberUpdatedMarkerState(position = latLng)
-                        val icon = remember(poi.type, isSelected, zoomBucket) {
+                        // Glow if this POI has a recent echo the user hasn't seen yet
+                        // (clears once they've opened its thread). Evaluated per
+                        // (re)composition — refreshes on data/zoom/selection/view changes.
+                        val glowing = isPoiGlowing(poi.lastPostAt, poiViewedAt[poi.id] ?: 0L)
+                        val icon = remember(poi.type, isSelected, zoomBucket, glowing) {
                             val zoomScale = markerScaleForZoom(zoomBucket)
                             poiPinDescriptor(
                                 PinCategory.fromPoiType(poi.type),
-                                scale = if (isSelected) zoomScale * 1.5f else zoomScale
+                                scale = if (isSelected) zoomScale * 1.5f else zoomScale,
+                                glowing = glowing
                             )
                         }
                         Marker(
