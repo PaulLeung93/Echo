@@ -187,6 +187,15 @@ fun MapScreen(
         mapViewModel.updateZoom(cameraPositionState.position.zoom)
     }
 
+    // Re-query viewport posts each time the map regains focus. The post source is a
+    // one-shot viewport query, so without this a post created (or liked/edited/deleted)
+    // on another screen wouldn't appear until the user panned outside the cached bounds.
+    LaunchedEffect(Unit) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            mapViewModel.refresh()
+        }
+    }
+
     // Center on a focused post's location. Also covers a *restored* map entry (whose
     // saved camera ignores the initial position above), so the camera always lands on
     // the post regardless of whether its marker has loaded yet.

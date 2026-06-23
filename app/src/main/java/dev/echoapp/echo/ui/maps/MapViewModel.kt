@@ -69,6 +69,21 @@ class MapViewModel @Inject constructor(
     private val _selectedPoiId = MutableStateFlow<String?>(null)
 
     /**
+     * Posts deleted in this session, hidden from the markers optimistically. The map's
+     * post source is a one-shot viewport query (not a live listener), so without this a
+     * deleted post's marker would linger until the next bounds-triggered re-fetch.
+     * Reverted if the server delete fails.
+     */
+    private val _deletedPostIds = MutableStateFlow<Set<String>>(emptySet())
+
+    /**
+     * Bumped to force [nearbyPosts] to re-run its viewport query even when the bounds
+     * haven't changed — e.g. on returning to the map after creating a post elsewhere,
+     * so the new marker (and any counts mutated off-screen) show up.
+     */
+    private val _refreshKey = MutableStateFlow(0)
+
+    /**
      * Cluster radius (meters) derived from the camera zoom *bucket*, not the raw
      * zoom. The radius only steps at zoom 13/15/17, so collapsing the continuous
      * zoom to its bucket here lets the StateFlow de-dupe identical values — every
@@ -107,10 +122,11 @@ class MapViewModel @Inject constructor(
      */
     private val nearbyPosts: Flow<List<Post>> = combine(
         _visibleBounds,
-        _postsZoomEnabled
-    ) { bounds, zoomEnabled -> bounds to zoomEnabled }
+        _postsZoomEnabled,
+        _refreshKey
+    ) { bounds, zoomEnabled, key -> Triple(bounds, zoomEnabled, key) }
         .distinctUntilChanged()
-        .flatMapLatest { (bounds, zoomEnabled) ->
+        .flatMapLatest { (bounds, zoomEnabled, _) ->
         flow {
             // No query when zoomed out past the threshold, or before the first settle.
             if (bounds == null || !zoomEnabled) {
@@ -152,12 +168,14 @@ class MapViewModel @Inject constructor(
     private val mappablePosts: Flow<List<Post>> = combine(
         postSource,
         activeFilters,
-        blockedIds
-    ) { posts, filters, blocked ->
+        blockedIds,
+        _deletedPostIds
+    ) { posts, filters, blocked, deleted ->
         if ("user posts" in filters) {
             posts.filter {
                 it.latitude != null && it.longitude != null &&
-                    it.poiId == null && it.authorId !in blocked
+                    it.poiId == null && it.authorId !in blocked &&
+                    it.id !in deleted
             }
         } else {
             emptyList()
@@ -387,22 +405,52 @@ class MapViewModel @Inject constructor(
         _selectedPost.value = post
     }
 
+    /**
+     * Re-run the viewport post query without waiting for a camera move. Call when the
+     * map regains focus so a post created (or liked/edited/deleted) on another screen is
+     * reflected, since the post source is a one-shot query rather than a live listener.
+     */
+    fun refresh() {
+        _refreshKey.value++
+    }
+
     fun toggleLike(postId: String) {
+        // The map's post source is a one-shot query, and the selection cards render from
+        // captured Post snapshots — so flip the snapshot optimistically (the heart/count
+        // update instantly), then write through and roll back with a message on failure.
+        val current = findSelectedPost(postId)
+        if (current != null) {
+            val newLiked = !current.likedByCurrentUser
+            val newCount = (current.likeCount + if (newLiked) 1 else -1).coerceAtLeast(0)
+            patchSelectedPost(postId) {
+                it.copy(likedByCurrentUser = newLiked, likeCount = newCount)
+            }
+        }
         viewModelScope.launch {
-            try {
-                toggleLikeUseCase(postId)
-            } catch (e: Exception) {
-                // handle error
+            toggleLikeUseCase(postId).onFailure { e ->
+                if (current != null) {
+                    patchSelectedPost(postId) {
+                        it.copy(
+                            likedByCurrentUser = current.likedByCurrentUser,
+                            likeCount = current.likeCount
+                        )
+                    }
+                }
+                _uiEvent.send(e.message ?: "Couldn't update your like. Please try again.")
             }
         }
     }
 
     /** Delete one of the current user's own posts, then dismiss the selection card. */
     fun deletePost(postId: String) {
+        // Hide the marker immediately (the one-shot source won't drop it on its own) and
+        // dismiss the card; restore it if the server delete fails.
+        _deletedPostIds.update { it + postId }
+        clearSelectedPost()
         viewModelScope.launch {
             deletePostUseCase(postId)
-                .onSuccess { clearSelectedPost() }
                 .onFailure { e ->
+                    _deletedPostIds.update { it - postId }
                     _uiEvent.send(e.message ?: "Couldn't delete the post. Please try again.")
                 }
         }
@@ -411,9 +459,29 @@ class MapViewModel @Inject constructor(
     /** Edit the message of one of the current user's own posts. */
     fun updatePost(postId: String, newMessage: String) {
         viewModelScope.launch {
-            updatePostUseCase(postId, newMessage).onFailure { e ->
-                _uiEvent.send(e.message ?: "Couldn't update the post. Please try again.")
-            }
+            updatePostUseCase(postId, newMessage)
+                .onSuccess {
+                    // Reflect the edit in any open card snapshot right away.
+                    patchSelectedPost(postId) { it.copy(message = newMessage) }
+                }
+                .onFailure { e ->
+                    _uiEvent.send(e.message ?: "Couldn't update the post. Please try again.")
+                }
+        }
+    }
+
+    /** The currently-selected post (single or within the open cluster) matching [postId]. */
+    private fun findSelectedPost(postId: String): Post? =
+        _selectedPost.value?.takeIf { it.id == postId }
+            ?: _selectedCluster.value?.posts?.find { it.id == postId }
+
+    /** Apply [transform] to the matching post in both the single and cluster selections. */
+    private fun patchSelectedPost(postId: String, transform: (Post) -> Post) {
+        _selectedPost.update { post ->
+            if (post?.id == postId) transform(post) else post
+        }
+        _selectedCluster.update { cluster ->
+            cluster?.copy(posts = cluster.posts.map { if (it.id == postId) transform(it) else it })
         }
     }
 
