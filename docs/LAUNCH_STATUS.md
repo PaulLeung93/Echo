@@ -1,6 +1,6 @@
 # Echo — Launch Status
 **Goal:** Ship to Google Play Store
-**Last updated:** 2026-06-22
+**Last updated:** 2026-06-23
 
 ---
 
@@ -48,8 +48,8 @@ Firebase Console → App Check → Apps → Echo → Firestore should show **"En
 
 ## 🟡 Nice-to-have before launch
 
-- **Auth edge cases** — account-exists-with-different-credential, Google cancel, network-loss during auth, password-reset failures
-- **Orphaned-session audit** — confirm account deletion is atomic (Auth user deleted last); the escape hatch (Sign out on Complete Profile) is already fixed
+- **Auth edge cases** — ✅ done: error mapping now dispatches on Firebase exception *type* (locale-stable), covering account-exists-with-different-credential (`FirebaseAuthUserCollisionException`), network loss (`FirebaseNetworkException`), too-many-attempts, weak password, and invalid credentials/email; Google cancel is absorbed silently (RESULT_CANCELED + `SIGN_IN_CANCELLED`/`CANCELED` status codes) while real Google failures show a clean message; password-reset failures route through the same typed mapper (enumeration protection still returns success for unknown emails)
+- **Orphaned-session audit** — ✅ done. Verified deletion order is safe: `deleteAccount` re-authenticates first, then releases username + deletes the profile doc, then deletes the Firebase Auth account **last** — a mid-way failure leaves a recoverable account (routed back to Complete Profile), never orphaned data with no owner. Escape hatch (`DeleteProvisionalAccountUseCase`) runs before any profile/username exists, so nothing to orphan. Closed the content gap the audit found: new `onUserDeleted` Cloud Function cascades a deleted user's posts (reusing `onPostDeleted` for their comments + POI counts), their comments on others' posts (collectionGroup, with `commentCount` fix-up), and their avatar in Storage. Added a collection-group index on `comments.authorId`. **Deployed** to `echo-2b5ba` (functions + indexes) — applies to *future* deletions only. (Deferred minor item: a deleted user's uid may linger in other posts' `likes` arrays.)
 - **Server-side proximity Step 2** — move the 5km POI comment rule into a callable Cloud Function (currently client-side only; Blaze plan is active so this is unblocked)
 
 ---
@@ -70,3 +70,4 @@ Not needed for submission. Captured so they aren't lost.
 - **Server-side proximity Step 3** — cross-check GPS vs IP / mock-location flag / velocity (post-launch luxury)
 - **SMS 2FA** — deferred (cost); App Check already covers the main anti-abuse goal
 - **Admin key rotation** — `scripts/firebase-key.json` is gitignored; rotate if exposure suspected
+- **`firebase-functions` library upgrade** — `functions/package.json` pins `^6.1.0`; the CLI flags it as outdated and warns of **breaking changes** on upgrade. No hard deadline (functions run fine as-is), so do it deliberately: `npm install --save firebase-functions@latest` in `functions/`, then reconcile any API breaks and re-deploy/test. (Runtime is already current — bumped to Node.js 22 on 2026-06-23, so the Oct 30 2026 Node 20 decommission no longer applies.)

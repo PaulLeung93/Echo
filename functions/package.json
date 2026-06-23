@@ -2,7 +2,7 @@
   "name": "echo-functions",
   "description": "Cloud Functions for the Echo app",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "scripts": {

@@ -52,7 +52,7 @@ class AuthRepositoryImpl @Inject constructor(
                     Result.failure(Exception("Authentication failed"))
                 }
             } catch (e: Exception) {
-                Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage), e))
+                Result.failure(Exception(mapFirebaseErrorMessage(e), e))
             }
         }
 
@@ -67,7 +67,7 @@ class AuthRepositoryImpl @Inject constructor(
                     Result.failure(Exception("Registration failed"))
                 }
             } catch (e: Exception) {
-                Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage), e))
+                Result.failure(Exception(mapFirebaseErrorMessage(e), e))
             }
         }
     
@@ -81,7 +81,7 @@ class AuthRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Anonymous sign-in failed"))
             }
         } catch (e: Exception) {
-            Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage), e))
+            Result.failure(Exception(mapFirebaseErrorMessage(e), e))
         }
     }
     
@@ -97,7 +97,7 @@ class AuthRepositoryImpl @Inject constructor(
                     Result.failure(Exception("Google sign-in failed"))
                 }
             } catch (e: Exception) {
-                Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage), e))
+                Result.failure(Exception(mapFirebaseErrorMessage(e), e))
             }
         }
     
@@ -112,7 +112,7 @@ class AuthRepositoryImpl @Inject constructor(
                 // the screen leaks which emails have accounts (enumeration).
                 Result.success(Unit)
             } catch (e: Exception) {
-                Result.failure(Exception(mapFirebaseErrorMessage(e.localizedMessage), e))
+                Result.failure(Exception(mapFirebaseErrorMessage(e), e))
             }
         }
     

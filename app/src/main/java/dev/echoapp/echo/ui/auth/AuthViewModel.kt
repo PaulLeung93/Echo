@@ -189,25 +189,43 @@ class AuthViewModel @Inject constructor(
     }
 
     /**
-     * Legacy support for Google Sign-In helper that doesn't use ID token directly.
+     * Handle the result of the Google Sign-In activity.
+     *
+     * Distinguishes the three meaningful outcomes:
+     *  - user dismissed the chooser (back/tap-outside/explicit cancel) → silent, no error
+     *  - a real failure (network, misconfig, etc.) → a clean, mapped message
+     *  - success with an ID token → hand off to [signInWithGoogle]
+     *
      * Note: In a full refactor, the Google Sign-In logic should be moved to the Repository.
      */
     fun handleGoogleSignInResult(result: androidx.activity.result.ActivityResult) {
-        val data = result.data ?: return
-        val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(data)
+        // Back-press / tap-outside returns RESULT_CANCELED — not worth a snackbar.
+        if (result.resultCode != android.app.Activity.RESULT_OK) return
+
+        val task = com.google.android.gms.auth.api.signin.GoogleSignIn
+            .getSignedInAccountFromIntent(result.data)
         try {
-            val account = task.result
+            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
             val idToken = account?.idToken
             if (idToken != null) {
                 signInWithGoogle(idToken)
             } else {
                 viewModelScope.launch {
-                    _uiEvent.send(AuthUiEvent.ShowError("Google ID Token not found"))
+                    _uiEvent.send(AuthUiEvent.ShowError("Couldn't read your Google account. Please try again."))
                 }
             }
-        } catch (e: Exception) {
-            viewModelScope.launch {
-                _uiEvent.send(AuthUiEvent.ShowError(e.message ?: "Google sign in failed"))
+        } catch (e: com.google.android.gms.common.api.ApiException) {
+            when (e.statusCode) {
+                // User cancelled — silently ignore.
+                com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes.SIGN_IN_CANCELLED,
+                com.google.android.gms.common.api.CommonStatusCodes.CANCELED -> Unit
+                else -> viewModelScope.launch {
+                    val message =
+                        if (e.statusCode == com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes.NETWORK_ERROR)
+                            "Network error. Check your connection and try again."
+                        else "Google sign in failed. Please try again."
+                    _uiEvent.send(AuthUiEvent.ShowError(message))
+                }
             }
         }
     }
