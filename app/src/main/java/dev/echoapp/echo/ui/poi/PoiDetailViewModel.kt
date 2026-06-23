@@ -13,6 +13,8 @@ import dev.echoapp.echo.data.preferences.UserPreferencesRepository
 import dev.echoapp.echo.domain.repository.AuthRepository
 import dev.echoapp.echo.domain.repository.LocationProvider
 import dev.echoapp.echo.domain.repository.PoiRepository
+import dev.echoapp.echo.domain.repository.UserRepository
+import dev.echoapp.echo.utils.Constants
 import dev.echoapp.echo.domain.usecase.post.DeletePostUseCase
 import dev.echoapp.echo.domain.usecase.post.GetPoiPostsUseCase
 import dev.echoapp.echo.domain.usecase.post.ToggleLikeUseCase
@@ -35,12 +37,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val DAY_MILLIS = 24L * 60 * 60 * 1000
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class PoiDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val poiRepository: PoiRepository,
     authRepository: AuthRepository,
+    private val userRepository: UserRepository,
     private val userPreferences: UserPreferencesRepository,
     private val locationProvider: LocationProvider,
     private val getPoiPostsUseCase: GetPoiPostsUseCase,
@@ -79,6 +84,7 @@ class PoiDetailViewModel @Inject constructor(
         loadPoi()
         loadPosts()
         loadUserLocation()
+        observeFavorite()
         // Opening the thread counts as "viewing" this POI: stamp the time so the map's
         // activity glow clears for it (and only re-lights if a newer echo arrives).
         viewModelScope.launch { userPreferences.markPoiViewed(poiId) }
@@ -118,6 +124,21 @@ class PoiDetailViewModel @Inject constructor(
                 .collect { posts ->
                     _uiState.update { it.copy(posts = posts) }
                 }
+        }
+    }
+
+    /** Keep favorite state (this POI + total slots used) in sync with the user's profile. */
+    private fun observeFavorite() {
+        viewModelScope.launch {
+            userRepository.observeFavoritePois().collect { favorites ->
+                _uiState.update {
+                    it.copy(
+                        isFavorited = poiId in favorites,
+                        favoritedAt = favorites[poiId],
+                        favoriteCount = favorites.size
+                    )
+                }
+            }
         }
     }
 
@@ -177,6 +198,54 @@ class PoiDetailViewModel @Inject constructor(
             updatePostUseCase(postId, newMessage).onFailure { e ->
                 _uiEvent.send(e.message ?: "Couldn't update the post. Please try again.")
             }
+        }
+    }
+
+    /**
+     * Toggle this POI as a favorite. Favoriting requires being in range and a free slot;
+     * unfavoriting is blocked until the slot's hold has elapsed. The rules enforce the
+     * same constraints — these checks just give immediate, specific feedback.
+     */
+    fun toggleFavorite() {
+        val state = _uiState.value
+        if (state.isGuest) {
+            viewModelScope.launch { _uiEvent.send("Sign in to favorite places") }
+            return
+        }
+
+        if (state.isFavorited) {
+            val remaining = state.holdRemainingMillis(System.currentTimeMillis())
+            if (remaining > 0) {
+                val days = ((remaining + DAY_MILLIS - 1) / DAY_MILLIS).toInt()
+                viewModelScope.launch {
+                    _uiEvent.send("You can remove this place in $days day${if (days == 1) "" else "s"}.")
+                }
+                return
+            }
+            viewModelScope.launch {
+                userRepository.unfavoritePoi(poiId)
+                    .onSuccess { _uiEvent.send("Removed from your places.") }
+                    .onFailure { _uiEvent.send("Couldn't remove this place. Please try again.") }
+            }
+            return
+        }
+
+        // Adding a new favorite.
+        if (state.atFavoriteCap) {
+            viewModelScope.launch {
+                _uiEvent.send("You've used all ${Constants.MAX_FAVORITE_POIS} of your places — remove one first.")
+            }
+            return
+        }
+        if (!state.withinRange) {
+            val km = (Constants.PROXIMITY_RADIUS_METERS / 1000).toInt()
+            viewModelScope.launch { _uiEvent.send("Get within $km km of this place to favorite it.") }
+            return
+        }
+        viewModelScope.launch {
+            userRepository.favoritePoi(poiId)
+                .onSuccess { _uiEvent.send("Added to your places — you can post here anytime.") }
+                .onFailure { _uiEvent.send("Couldn't favorite this place. Please try again.") }
         }
     }
 

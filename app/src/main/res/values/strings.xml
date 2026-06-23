@@ -48,6 +48,9 @@
     <string name="proximity_locating">Finding your location…</string>
     <string name="proximity_location_unknown">Location unavailable — enable it to post here.</string>
     <string name="proximity_guest">Sign in to join the conversation here.</string>
+    <string name="proximity_favorited">One of your places — post here anytime.</string>
+    <string name="poi_favorite">Add to your places</string>
+    <string name="poi_unfavorite">Remove from your places</string>
     <string name="poi_photo_desc">Photo of %1$s</string>
 
     <!-- POI echo thread -->

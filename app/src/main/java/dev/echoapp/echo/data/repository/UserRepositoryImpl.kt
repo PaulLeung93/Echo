@@ -138,6 +138,38 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun favoritePoi(poiId: String): Result<Unit> = withContext(ioDispatcher) {
+        val user = auth.currentUser
+            ?: return@withContext Result.failure(IllegalStateException("You must be signed in."))
+        if (poiId.isBlank()) {
+            return@withContext Result.failure(IllegalArgumentException("Can't favorite this place."))
+        }
+        try {
+            // serverTimestamp() resolves to request.time on the server, which is exactly
+            // what the rules require for a new slot — so the favorite can't be backdated.
+            usersCollection.document(user.uid)
+                .update("${Constants.FIELD_FAVORITES}.$poiId", FieldValue.serverTimestamp()).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun unfavoritePoi(poiId: String): Result<Unit> = withContext(ioDispatcher) {
+        val user = auth.currentUser
+            ?: return@withContext Result.failure(IllegalStateException("You must be signed in."))
+        try {
+            usersCollection.document(user.uid)
+                .update("${Constants.FIELD_FAVORITES}.$poiId", FieldValue.delete()).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override fun observeFavoritePois(): Flow<Map<String, Long>> =
+        observeCurrentUserProfile().map { it?.favorites ?: emptyMap() }
+
     override suspend fun getProfilesByIds(uids: List<String>): Result<List<UserProfile>> =
         withContext(ioDispatcher) {
             if (uids.isEmpty()) return@withContext Result.success(emptyList())
@@ -346,7 +378,8 @@ class UserRepositoryImpl @Inject constructor(
             lastName = lastName,
             bio = bio,
             photoUrl = photoUrl.ifBlank { null },
-            blockedUserIds = blockedUserIds
+            blockedUserIds = blockedUserIds,
+            favorites = favorites.mapValues { (_, ts) -> ts.toDate().time }
         )
     }
 }

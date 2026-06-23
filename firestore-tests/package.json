@@ -1,0 +1,15 @@
+{
+  "name": "echo-firestore-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Firestore security-rules tests, run against the local emulator.",
+  "scripts": {
+    "test": "mocha --timeout 15000 \"test/**/*.test.js\"",
+    "emulate": "firebase emulators:exec --only firestore --project echo-rules-test --config ../firebase.json \"npm test\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase": "^10.13.2",
+    "mocha": "^10.7.3"
+  }
+}

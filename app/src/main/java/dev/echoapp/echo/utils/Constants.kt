@@ -5,6 +5,22 @@ object Constants {
     /** Max distance (meters) a user may be from a POI/post to comment on it. */
     const val PROXIMITY_RADIUS_METERS = 5_000.0
 
+    // Favorites
+    /**
+     * Max POIs a user may favorite at once. A favorite lets them post to a POI thread
+     * regardless of the proximity radius, so the slots are scarce on purpose.
+     */
+    const val MAX_FAVORITE_POIS = 3
+
+    /**
+     * How long a favorite is "held" before it can be removed (7 days). Combined with
+     * the small slot count, the hold is the real anti-spam lever: it stops a user from
+     * rapidly cycling favorites to interact with arbitrary POIs on a whim. Enforced in
+     * `firestore.rules` (timestamps pinned to request.time so they can't be backdated)
+     * and pre-checked client-side for UX.
+     */
+    const val FAVORITE_HOLD_MILLIS = 7L * 24 * 60 * 60 * 1000
+
     /**
      * User-Agent for hotlinking POI photos from Wikimedia. Their policy blocks
      * generic library UAs (e.g. "okhttp/…" → 403); a descriptive one with
@@ -69,6 +85,7 @@ object Constants {
     const val FIELD_LIKES = "likes"
     const val FIELD_TAGS = "tags"
     const val FIELD_GEOHASH = "geohash"
+    const val FIELD_FAVORITES = "favorites"
 
     // Navigation Routes
     const val ROUTE_FEED = "feed"

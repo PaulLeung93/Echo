@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.Forum
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.outlined.NearMe
 import androidx.compose.material.icons.outlined.Park
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -107,6 +109,11 @@ fun PoiDetailScreen(
                 onBack = { navController.popBackStack() },
                 title = uiState.poi?.name,
                 titleAlpha = titleBarAlpha,
+                // The star shows for signed-in users once the POI has loaded; the
+                // ViewModel handles range/slot/hold eligibility and the messaging.
+                showFavorite = uiState.poi != null && !uiState.isGuest,
+                isFavorited = uiState.isFavorited,
+                onToggleFavorite = viewModel::toggleFavorite,
                 // Enabled only once the POI has loaded.
                 onShare = uiState.poi?.let { poi ->
                     {
@@ -313,7 +320,10 @@ private fun PlaceDetailTopBar(
     onBack: () -> Unit,
     onShare: (() -> Unit)?,
     title: String? = null,
-    titleAlpha: Float = 0f
+    titleAlpha: Float = 0f,
+    showFavorite: Boolean = false,
+    isFavorited: Boolean = false,
+    onToggleFavorite: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -344,6 +354,21 @@ private fun PlaceDetailTopBar(
                 .weight(1f)
                 .graphicsLayer { alpha = titleAlpha }
         )
+        if (showFavorite) {
+            CircleIconButton(
+                icon = if (isFavorited) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                contentDescription = stringResource(
+                    if (isFavorited) R.string.poi_unfavorite else R.string.poi_favorite
+                ),
+                containerColor = if (isFavorited) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerLowest
+                },
+                bordered = !isFavorited,
+                onClick = onToggleFavorite
+            )
+        }
         CircleIconButton(
             icon = Icons.Filled.Share,
             contentDescription = stringResource(R.string.share_place),
@@ -688,6 +713,9 @@ private fun postGateMessage(uiState: PoiDetailUiState, proximityKm: Int): String
 @Composable
 private fun proximityMessage(uiState: PoiDetailUiState): Pair<String, Boolean> = when {
     uiState.isGuest -> stringResource(R.string.proximity_guest) to false
+    // A favorite lets you post regardless of distance, so don't nag a favorited user to
+    // "get closer" — they're always welcome here.
+    uiState.isFavorited -> stringResource(R.string.proximity_favorited) to true
     !uiState.locationChecked -> stringResource(R.string.proximity_locating) to false
     uiState.distanceMeters == null -> stringResource(R.string.proximity_location_unknown) to false
     uiState.withinRange ->

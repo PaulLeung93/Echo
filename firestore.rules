@@ -165,6 +165,28 @@ service cloud.firestore {
       return name is string && name.matches('^[a-z0-9][a-z0-9_]{1,18}[a-z0-9]$');
     }
 
+    // A favorites change is well-formed: the map stays within the cap, and the write
+    // either adds exactly one slot (stamped to request.time so it can't be backdated)
+    // or removes exactly one slot whose 7-day hold has already elapsed. Existing slots'
+    // timestamps are immutable. This keeps favorites scarce + sticky so they can't be
+    // cycled to post into arbitrary POI threads beyond the proximity radius.
+    function favoritesChangeValid() {
+      let before = resource.data.get('favorites', {});
+      let after = request.resource.data.favorites;
+      let added = after.keys().removeAll(before.keys());
+      let removed = before.keys().removeAll(after.keys());
+      return after is map
+        && after.size() <= 3
+        && after.diff(before).changedKeys().size() == 0
+        && (
+             (added.size() == 1 && removed.size() == 0
+               && after[added[0]] == request.time)
+          || (removed.size() == 1 && added.size() == 0
+               && before[removed[0]] is timestamp
+               && before[removed[0]] < request.time - duration.value(7, 'd'))
+           );
+    }
+
     // ----- User profiles -----
     match /users/{uid} {
       // Any signed-in user can read profiles (to show names/usernames).
@@ -198,6 +220,8 @@ service cloud.firestore {
             && request.resource.data.photoUrl is string)
           || (changedKeys().hasOnly(['blockedUserIds'])
             && request.resource.data.blockedUserIds is list)
+          || (changedKeys().hasOnly(['favorites'])
+            && favoritesChangeValid())
         );
 
       // Owner may delete their own profile (account deletion).

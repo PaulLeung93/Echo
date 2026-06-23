@@ -12,11 +12,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Park
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.ui.graphics.vector.ImageVector
 import dev.echoapp.echo.components.DeletePostDialog
 import dev.echoapp.echo.components.EditPostDialog
 import dev.echoapp.echo.components.EmptyState
@@ -155,6 +163,25 @@ fun ProfileScreen(
                 }
             }
 
+            if (uiState.favoritePlaces.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Your places (${uiState.favoritePlaces.size}/${Constants.MAX_FAVORITE_POIS})",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                items(uiState.favoritePlaces, key = { it.poi.id }) { place ->
+                    FavoritePlaceRow(
+                        place = place,
+                        onClick = {
+                            navController.navigate("${Constants.ROUTE_POI_DETAILS}/${place.poi.id}")
+                        },
+                        onRemove = { viewModel.removeFavorite(place.poi.id, place.favoritedAt) }
+                    )
+                }
+            }
+
             item {
                 Text(
                     text = "Your posts",
@@ -222,6 +249,69 @@ fun ProfileScreen(
             onDismiss = { postToDelete = null }
         )
     }
+}
+
+@Composable
+private fun FavoritePlaceRow(
+    place: FavoritePlace,
+    onClick: () -> Unit,
+    onRemove: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = 1.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Icon(
+                    imageVector = poiTypeIcon(place.poi.type),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .size(20.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = place.poi.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Text(
+                    text = place.poi.type.replaceFirstChar { it.uppercase() },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // A filled star both signals "favorited" and removes it on tap (the
+            // ViewModel enforces the 7-day hold and messages if it's still locked).
+            IconButton(onClick = onRemove) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "Remove from your places",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+private fun poiTypeIcon(type: String): ImageVector = when (type.lowercase()) {
+    "park" -> Icons.Outlined.Park
+    "college" -> Icons.Outlined.School
+    "landmark" -> Icons.Outlined.AccountBalance
+    else -> Icons.Outlined.Place
 }
 
 @Composable

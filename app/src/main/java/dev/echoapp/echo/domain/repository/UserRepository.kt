@@ -55,6 +55,22 @@ interface UserRepository {
     /** Remove [blockedUid] from the current user's blocked list (idempotent). */
     suspend fun unblockUser(blockedUid: String): Result<Unit>
 
+    /**
+     * Favorite [poiId] for the current user (stamped server-side). Lets them post to
+     * that POI beyond the proximity radius. The cap + hold are enforced by the rules;
+     * callers should pre-check eligibility for UX. Idempotent if already favorited.
+     */
+    suspend fun favoritePoi(poiId: String): Result<Unit>
+
+    /**
+     * Remove [poiId] from the current user's favorites. The rules reject this until the
+     * slot's hold has elapsed, so callers should pre-check. Idempotent if not favorited.
+     */
+    suspend fun unfavoritePoi(poiId: String): Result<Unit>
+
+    /** Observe the current user's favorited POIs (poiId -> favoritedAt millis). */
+    fun observeFavoritePois(): Flow<Map<String, Long>>
+
     /** Resolve profiles for [uids] (e.g. to show usernames in the blocked list). */
     suspend fun getProfilesByIds(uids: List<String>): Result<List<UserProfile>>
 
