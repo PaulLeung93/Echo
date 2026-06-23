@@ -153,9 +153,16 @@ class PoiDetailViewModel @Inject constructor(
     /** Delete one of the current user's own posts in this thread. */
     fun deletePost(postId: String) {
         viewModelScope.launch {
-            deletePostUseCase(postId).onFailure { e ->
-                _uiEvent.send(e.message ?: "Couldn't delete the post. Please try again.")
-            }
+            deletePostUseCase(postId)
+                .onSuccess {
+                    // The Cloud Function decrements the POI document's postCount on
+                    // delete; mirror that in the map's cached copy so its count drops
+                    // right away rather than lingering until the next cache TTL sync.
+                    poiRepository.adjustCachedPostCount(poiId, -1)
+                }
+                .onFailure { e ->
+                    _uiEvent.send(e.message ?: "Couldn't delete the post. Please try again.")
+                }
         }
     }
 

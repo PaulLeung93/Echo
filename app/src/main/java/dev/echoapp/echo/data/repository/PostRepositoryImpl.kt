@@ -11,6 +11,7 @@ import dev.echoapp.echo.data.withWriteTimeout
 import dev.echoapp.echo.di.ApplicationScope
 import dev.echoapp.echo.di.IoDispatcher
 import dev.echoapp.echo.domain.model.Post
+import dev.echoapp.echo.domain.repository.PoiRepository
 import dev.echoapp.echo.domain.repository.PostRepository
 import dev.echoapp.echo.domain.repository.UserRepository
 import dev.echoapp.echo.utils.Constants
@@ -43,6 +44,7 @@ class PostRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val postMapper: PostMapper,
     private val userRepository: UserRepository,
+    private val poiRepository: PoiRepository,
     private val database: EchoDatabase,
     private val postDao: PostDao,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -293,6 +295,10 @@ class PostRepositoryImpl @Inject constructor(
                         set(newDocRef, postMap)
                         update(poiRef, "postCount", com.google.firebase.firestore.FieldValue.increment(1))
                     }.commit().await()
+                    // Keep the map's cached POI count in step with the write we just
+                    // committed, so the marker snippet / preview card reflect the new
+                    // echo immediately instead of waiting for the next cache TTL sync.
+                    poiRepository.adjustCachedPostCount(poiId, +1)
                 }
             }
             Result.success(Unit)

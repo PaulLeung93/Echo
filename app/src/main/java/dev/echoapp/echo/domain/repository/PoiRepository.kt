@@ -28,4 +28,13 @@ interface PoiRepository {
      * @return Flow of the POI, or null if not found.
      */
     fun getPoiByIdFlow(poiId: String): Flow<Poi?>
+
+    /**
+     * Locally adjust a cached POI's denormalized `postCount` by [delta] so the map
+     * (which serves POIs from a session-long, TTL-gated cache) reflects an in-session
+     * add/delete immediately, without re-reading the collection. The authoritative
+     * count still lives on the POI document in Firestore; this only keeps the cache
+     * in step until the next TTL sync. No-op if the POI isn't currently cached.
+     */
+    fun adjustCachedPostCount(poiId: String, delta: Int)
 }

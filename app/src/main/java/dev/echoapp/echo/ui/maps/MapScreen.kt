@@ -24,7 +24,11 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -48,10 +52,17 @@ import dev.echoapp.echo.utils.formatDistance
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.*
 import com.google.maps.android.compose.*
+import android.os.Looper
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlin.math.roundToInt
@@ -69,6 +80,11 @@ fun MapScreen(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
+    // Guards the one-time auto-center: with live updates streaming in, we must center
+    // only on the *first* fix, or the camera would snap back every update and fight
+    // the user panning around.
+    var hasCenteredOnUser by rememberSaveable { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
     var showTagDialog by remember { mutableStateOf(false) }
     var showTypeDialog by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
@@ -113,25 +129,54 @@ fun MapScreen(
     }
 
 
-    // Get last known location on launch
-    LaunchedEffect(Unit) {
-        if (locationPermissionState.status.isGranted) {
+    // Stream the user's location while the map is in the foreground so the ripple (and
+    // the recenter target) track movement instead of being pinned to the launch fix.
+    // Tied to the STARTED lifecycle state: updates stop when the map is backgrounded or
+    // left, and resume on return. Balanced-power priority keeps the battery cost low.
+    LaunchedEffect(locationPermissionState.status.isGranted) {
+        if (!locationPermissionState.status.isGranted) return@LaunchedEffect
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            // Seed immediately from the last known fix so the ripple appears without
+            // waiting for the first streamed update.
             try {
-                val location = fusedLocationClient.lastLocation.await()
-                if (location != null) {
-                    userLocation = LatLng(location.latitude, location.longitude)
+                fusedLocationClient.lastLocation.await()?.let {
+                    userLocation = LatLng(it.latitude, it.longitude)
                 }
             } catch (e: Exception) {
-                Log.e("MapScreen", "Failed to get location", e)
+                Log.e("MapScreen", "Failed to get last known location", e)
+            }
+
+            val request = LocationRequest.Builder(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                5_000L
+            ).setMinUpdateDistanceMeters(10f).build()
+            val callback = object : LocationCallback() {
+                override fun onLocationResult(result: LocationResult) {
+                    result.lastLocation?.let {
+                        userLocation = LatLng(it.latitude, it.longitude)
+                    }
+                }
+            }
+            try {
+                fusedLocationClient.requestLocationUpdates(
+                    request, callback, Looper.getMainLooper()
+                )
+                awaitCancellation()
+            } catch (e: SecurityException) {
+                Log.e("MapScreen", "Location permission revoked", e)
+            } finally {
+                fusedLocationClient.removeLocationUpdates(callback)
             }
         }
     }
 
-    // Center camera on user location when acquired — unless we were opened to focus on
-    // a specific post, in which case that location wins and shouldn't be overridden.
+    // Center camera on the user's location once, on the first fix — unless we were
+    // opened to focus on a specific post (that location wins). Only the first fix
+    // centers, so subsequent live updates don't yank the camera back while panning.
     LaunchedEffect(userLocation) {
-        if (!openedWithFocus) {
+        if (!openedWithFocus && !hasCenteredOnUser) {
             userLocation?.let {
+                hasCenteredOnUser = true
                 cameraPositionState.animateSafely(CameraUpdateFactory.newLatLngZoom(it, 14f))
             }
         }
@@ -360,15 +405,21 @@ fun MapScreen(
                     .size(48.dp)
                     .clickable {
                         scope.launch {
-                            var target = userLocation
-                            if (target == null && locationPermissionState.status.isGranted) {
-                                target = try {
-                                    fusedLocationClient.lastLocation.await()
-                                        ?.let { LatLng(it.latitude, it.longitude) }
+                            // Request a fresh high-accuracy fix on tap so the recenter
+                            // lands on where the user is *now*, not a stale cached fix
+                            // (e.g. while moving on a train). Fall back to the latest
+                            // streamed location if the one-shot can't resolve in time.
+                            val fresh = if (locationPermissionState.status.isGranted) {
+                                try {
+                                    fusedLocationClient.getCurrentLocation(
+                                        Priority.PRIORITY_HIGH_ACCURACY,
+                                        CancellationTokenSource().token
+                                    ).await()?.let { LatLng(it.latitude, it.longitude) }
                                 } catch (e: Exception) {
                                     null
                                 }
-                            }
+                            } else null
+                            val target = fresh ?: userLocation
                             if (target != null) {
                                 userLocation = target
                                 cameraPositionState.animateSafely(

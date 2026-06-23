@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
@@ -113,6 +114,22 @@ class PoiRepositoryImpl @Inject constructor(
         getPois().map { pois ->
             pois.filter { poi -> poi.type in types }
         }
+
+    override fun adjustCachedPostCount(poiId: String, delta: Int) {
+        // Patch the in-memory cache in place; getPois() emits from it, so the map's
+        // marker snippet and preview card re-render with the new count for free. The
+        // POI document's count is updated separately (on create, or by the Cloud
+        // Function on delete); this just keeps the cached copy aligned this session.
+        cache.update { current ->
+            current?.map { poi ->
+                if (poi.id == poiId) {
+                    poi.copy(postCount = (poi.postCount + delta).coerceAtLeast(0))
+                } else {
+                    poi
+                }
+            }
+        }
+    }
 
     override fun getPoiByIdFlow(poiId: String): Flow<Poi?> = callbackFlow {
         val listener = poisCollection.document(poiId).addSnapshotListener { snapshot, error ->
