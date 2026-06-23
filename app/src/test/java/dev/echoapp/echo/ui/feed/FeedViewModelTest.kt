@@ -3,9 +3,11 @@
 import dev.echoapp.echo.domain.model.Coordinates
 import dev.echoapp.echo.domain.repository.AuthRepository
 import dev.echoapp.echo.domain.repository.LocationProvider
+import dev.echoapp.echo.domain.usecase.post.DeletePostUseCase
 import dev.echoapp.echo.domain.usecase.post.GetPostsUseCase
 import dev.echoapp.echo.domain.usecase.post.GetPostsByTagUseCase
 import dev.echoapp.echo.domain.usecase.post.ToggleLikeUseCase
+import dev.echoapp.echo.domain.usecase.post.UpdatePostUseCase
 import dev.echoapp.echo.domain.usecase.report.SubmitReportUseCase
 import dev.echoapp.echo.domain.usecase.user.BlockUserUseCase
 import dev.echoapp.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
@@ -31,6 +33,8 @@ class FeedViewModelTest {
     private val getPostsUseCase: GetPostsUseCase = mockk()
     private val getPostsByTagUseCase: GetPostsByTagUseCase = mockk()
     private val toggleLikeUseCase: ToggleLikeUseCase = mockk()
+    private val deletePostUseCase: DeletePostUseCase = mockk()
+    private val updatePostUseCase: UpdatePostUseCase = mockk()
     private val submitReportUseCase: SubmitReportUseCase = mockk()
     private val blockUserUseCase: BlockUserUseCase = mockk()
     private val observeBlockedUserIdsUseCase: ObserveHiddenAuthorIdsUseCase = mockk()
@@ -54,15 +58,17 @@ class FeedViewModelTest {
     }
 
     private fun createViewModel() = FeedViewModel(
-        getPostsUseCase,
-        getPostsByTagUseCase,
-        toggleLikeUseCase,
-        submitReportUseCase,
-        blockUserUseCase,
-        observeBlockedUserIdsUseCase,
-        locationProvider,
-        mapFocusManager,
-        authRepository
+        getPostsUseCase = getPostsUseCase,
+        getPostsByTagUseCase = getPostsByTagUseCase,
+        toggleLikeUseCase = toggleLikeUseCase,
+        deletePostUseCase = deletePostUseCase,
+        updatePostUseCase = updatePostUseCase,
+        submitReportUseCase = submitReportUseCase,
+        blockUserUseCase = blockUserUseCase,
+        observeHiddenAuthorIdsUseCase = observeBlockedUserIdsUseCase,
+        locationProvider = locationProvider,
+        mapFocusManager = mapFocusManager,
+        authRepository = authRepository
     )
 
     @After
