@@ -65,6 +65,7 @@ fun PostCard(
     commentCount: Int,
     onLikeClick: () -> Unit,
     onClick: () -> Unit,
+    onAuthorClick: ((String) -> Unit)? = null,
     onTagClick: ((String) -> Unit)? = null,
     onEdit: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
@@ -87,11 +88,22 @@ fun PostCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Author header
+            // Author header. The avatar + name region opens the author's profile when
+            // [onAuthorClick] is provided; a nested clickable consumes the tap before it
+            // reaches the card's onClick (same pattern as the location badge below).
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                val authorModifier = if (onAuthorClick != null && post.authorId.isNotBlank()) {
+                    Modifier.weight(1f).clickable { onAuthorClick(post.authorId) }
+                } else {
+                    Modifier.weight(1f)
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = authorModifier
+                ) {
                 AuthorPhotoAvatar(
                     authorId = post.authorId,
                     name = post.username,
@@ -137,6 +149,7 @@ fun PostCard(
                         )
                     }
                 }
+                } // end author region (avatar + name)
                 if (onEdit != null || onDelete != null || onReport != null || onBlock != null) {
                     PostOverflowMenu(
                         onEdit = onEdit,

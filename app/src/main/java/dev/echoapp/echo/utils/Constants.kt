@@ -76,6 +76,9 @@ object Constants {
     const val COLLECTION_USERS = "users"
     const val COLLECTION_USERNAMES = "usernames"
     const val COLLECTION_REPORTS = "reports"
+    // Subcollections of users/{uid} for the follow graph.
+    const val COLLECTION_FOLLOWING = "following"
+    const val COLLECTION_FOLLOWERS = "followers"
 
 
     // Firestore Fields
@@ -101,4 +104,6 @@ object Constants {
     const val ROUTE_COMPLETE_PROFILE = "complete_profile"
     const val ROUTE_EDIT_PROFILE = "edit_profile"
     const val ROUTE_SETTINGS = "settings"
+    const val ROUTE_USER_PROFILE = "user_profile"
+    const val ROUTE_FOLLOW_LIST = "follow_list"
 }

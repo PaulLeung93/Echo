@@ -202,6 +202,33 @@ class PostRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }.flowOn(ioDispatcher)
 
+    override suspend fun getPostsByAuthors(
+        authorIds: List<String>,
+        limit: Long
+    ): List<Post> = withContext(ioDispatcher) {
+        if (authorIds.isEmpty()) return@withContext emptyList()
+        // Firestore caps an `in` filter at 30 values, so query in chunks and merge.
+        // Each chunk pulls its newest `limit` (with that many followees per chunk the
+        // global newest can't be missed by more than the cap before re-sorting).
+        val entities = authorIds
+            .distinct()
+            .chunked(30)
+            .map { chunk ->
+                postsCollection
+                    .whereIn("authorId", chunk)
+                    .orderBy(Constants.FIELD_TIMESTAMP, Query.Direction.DESCENDING)
+                    .limit(limit)
+                    .get()
+                    .await()
+            }
+            .flatMap { it.documents }
+            .mapNotNull { it.toObject(PostEntity::class.java) }
+            .distinctBy { it.id }
+            .sortedByDescending { it.timestamp }
+            .take(limit.toInt())
+        postMapper.toDomainList(entities, auth.currentUser?.uid)
+    }
+
     override suspend fun getPostById(postId: String): Post? = withContext(ioDispatcher) {
         val doc = postsCollection.document(postId).get().await()
         val entity = doc.toObject(PostEntity::class.java) ?: return@withContext null

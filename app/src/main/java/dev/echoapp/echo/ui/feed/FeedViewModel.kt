@@ -12,6 +12,7 @@ import dev.echoapp.echo.domain.repository.LocationProvider
 import dev.echoapp.echo.domain.usecase.post.DeletePostUseCase
 import dev.echoapp.echo.domain.usecase.post.GetPostsUseCase
 import dev.echoapp.echo.domain.usecase.post.GetPostsByTagUseCase
+import dev.echoapp.echo.domain.usecase.post.GetFollowingFeedUseCase
 import dev.echoapp.echo.domain.usecase.post.ToggleLikeUseCase
 import dev.echoapp.echo.domain.usecase.post.UpdatePostUseCase
 import dev.echoapp.echo.domain.usecase.report.SubmitReportUseCase
@@ -20,15 +21,18 @@ import dev.echoapp.echo.domain.usecase.user.ObserveHiddenAuthorIdsUseCase
 import dev.echoapp.echo.ui.common.MapFocusManager
 import dev.echoapp.echo.utils.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class FeedViewModel @Inject constructor(
     private val getPostsUseCase: GetPostsUseCase,
     private val getPostsByTagUseCase: GetPostsByTagUseCase,
+    private val getFollowingFeedUseCase: GetFollowingFeedUseCase,
     private val toggleLikeUseCase: ToggleLikeUseCase,
     private val deletePostUseCase: DeletePostUseCase,
     private val updatePostUseCase: UpdatePostUseCase,
@@ -89,36 +93,68 @@ class FeedViewModel @Inject constructor(
         viewModelScope.launch { loadPage(reset = true) }
     }
 
-    val uiState: StateFlow<FeedUiState> = _currentTag.flatMapLatest { tag ->
-        if (tag != null) {
-            // The tag view is a short-lived one-shot query (not cached); blocked
-            // authors are still filtered out reactively.
-            combine(
-                getPostsByTagUseCase(tag).catch { emit(emptyList()) },
-                blockedIds
-            ) { posts, blocked ->
+    // Nearby ("neighborhood") vs Following ("people I follow, any distance").
+    private val _feedMode = MutableStateFlow(FeedMode.NEARBY)
+    // Bumped to force the one-shot Following feed to re-read (pull-to-refresh).
+    private val _followingRefresh = MutableStateFlow(0)
+
+    // The Following feed: a one-shot read (not the Room cache), re-read when the set of
+    // followed users changes or the user pulls to refresh. Blocked authors filtered out.
+    private val followingFeedState: Flow<FeedUiState> =
+        _followingRefresh.flatMapLatest {
+            combine(getFollowingFeedUseCase(), blockedIds) { posts, blocked ->
                 FeedUiState(
                     posts = posts.filterNot { it.authorId in blocked },
-                    currentTag = tag,
+                    feedMode = FeedMode.FOLLOWING,
                     isLoading = false
                 )
-            }
-        } else {
-            combine(cachedFeed, _isLoadingFirstPage, blockedIds) { posts, loadingFirst, blocked ->
-                FeedUiState(
-                    posts = posts.filterNot { it.authorId in blocked },
-                    currentTag = null,
-                    // With a warm cache the feed shows instantly; only spin when we have
-                    // nothing cached yet and the first network page is still loading.
-                    isLoading = loadingFirst && posts.isEmpty()
-                )
-            }
+            }.onStart { emit(FeedUiState(feedMode = FeedMode.FOLLOWING, isLoading = true)) }
         }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = FeedUiState(isLoading = true)
-    )
+
+    val uiState: StateFlow<FeedUiState> =
+        combine(_feedMode, _currentTag) { mode, tag -> mode to tag }
+            .flatMapLatest { (mode, tag) ->
+                when (mode) {
+                    FeedMode.FOLLOWING -> followingFeedState
+                    FeedMode.NEARBY -> if (tag != null) {
+                        // The tag view is a short-lived one-shot query (not cached); blocked
+                        // authors are still filtered out reactively.
+                        combine(
+                            getPostsByTagUseCase(tag).catch { emit(emptyList()) },
+                            blockedIds
+                        ) { posts, blocked ->
+                            FeedUiState(
+                                posts = posts.filterNot { it.authorId in blocked },
+                                currentTag = tag,
+                                feedMode = FeedMode.NEARBY,
+                                isLoading = false
+                            )
+                        }
+                    } else {
+                        combine(cachedFeed, _isLoadingFirstPage, blockedIds) { posts, loadingFirst, blocked ->
+                            FeedUiState(
+                                posts = posts.filterNot { it.authorId in blocked },
+                                currentTag = null,
+                                feedMode = FeedMode.NEARBY,
+                                // With a warm cache the feed shows instantly; only spin when we have
+                                // nothing cached yet and the first network page is still loading.
+                                isLoading = loadingFirst && posts.isEmpty()
+                            )
+                        }
+                    }
+                }
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = FeedUiState(isLoading = true)
+            )
+
+    /** Switch between the Nearby and Following feeds. Clears any tag filter on switch. */
+    fun setFeedMode(mode: FeedMode) {
+        if (_feedMode.value == mode) return
+        if (mode == FeedMode.FOLLOWING) _currentTag.value = null
+        _feedMode.value = mode
+    }
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
@@ -127,8 +163,9 @@ class FeedViewModel @Inject constructor(
     private val _uiEvent = Channel<String>()
     val uiEvent = _uiEvent.receiveAsFlow()
 
-    /** Load the next page when the user nears the end of the list (untagged feed only). */
+    /** Load the next page when the user nears the end of the list (untagged Nearby feed only). */
     fun loadMore() {
+        if (_feedMode.value != FeedMode.NEARBY) return
         if (_currentTag.value != null) return
         if (_isLoadingMore.value || _isLoadingFirstPage.value || _endReached.value) return
         viewModelScope.launch { loadPage(reset = false) }
@@ -167,7 +204,12 @@ class FeedViewModel @Inject constructor(
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
-                loadPage(reset = true)
+                if (_feedMode.value == FeedMode.FOLLOWING) {
+                    // Re-trigger the one-shot Following read (the flow re-fetches async).
+                    _followingRefresh.value += 1
+                } else {
+                    loadPage(reset = true)
+                }
             } finally {
                 _isRefreshing.value = false
             }

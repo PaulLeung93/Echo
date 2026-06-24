@@ -226,6 +226,34 @@ service cloud.firestore {
 
       // Owner may delete their own profile (account deletion).
       allow delete: if isNotAnonymous() && uid == request.auth.uid;
+
+      // ----- Follow graph -----
+      // A user manages only their own `following` list (the single source of truth
+      // for an edge). A Cloud Function mirrors the `followers` entry onto the target
+      // and maintains the denormalized follower/following counts, so clients never
+      // write `followers` or the count fields. Self-follow is barred, the target must
+      // exist, and a block either direction prevents the follow.
+      match /following/{targetUid} {
+        allow read: if isSignedIn();
+        allow create: if isNotAnonymous()
+          && uid == request.auth.uid
+          && targetUid != uid
+          && exists(/databases/$(database)/documents/users/$(targetUid))
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt == request.time
+          && !(request.auth.uid in
+               get(/databases/$(database)/documents/users/$(targetUid)).data.get('blockedUserIds', []))
+          && !(targetUid in
+               get(/databases/$(database)/documents/users/$(uid)).data.get('blockedUserIds', []));
+        allow delete: if isNotAnonymous() && uid == request.auth.uid;
+        allow update: if false;
+      }
+
+      // The followers mirror is function-maintained only; clients may read it.
+      match /followers/{followerUid} {
+        allow read: if isSignedIn();
+        allow write: if false;
+      }
     }
 
     // ----- Username reservations (enforce uniqueness) -----
@@ -250,7 +278,7 @@ service cloud.firestore {
       allow read, update, delete: if false;
       allow create: if isNotAnonymous()
         && request.resource.data.reporterId == request.auth.uid
-        && request.resource.data.type in ['post', 'comment']
+        && request.resource.data.type in ['post', 'comment', 'user']
         && request.resource.data.targetId is string
         && request.resource.data.targetId.size() > 0
         && request.resource.data.targetAuthorId is string

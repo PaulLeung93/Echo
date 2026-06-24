@@ -21,5 +21,8 @@ data class UserProfileEntity(
      * timestamps (not millis) because the rules pin each new slot to request.time to
      * stop backdating. Absent on profiles created before this feature.
      */
-    val favorites: Map<String, Timestamp> = emptyMap()
+    val favorites: Map<String, Timestamp> = emptyMap(),
+    /** Denormalized follow counts, maintained by Cloud Functions. Absent on older profiles. */
+    val followerCount: Long = 0,
+    val followingCount: Long = 0
 )

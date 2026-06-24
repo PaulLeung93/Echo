@@ -4,6 +4,7 @@ import dev.echoapp.echo.data.location.LocationProviderImpl
 import dev.echoapp.echo.data.repository.AuthorAvatarResolverImpl
 import dev.echoapp.echo.data.repository.AuthRepositoryImpl
 import dev.echoapp.echo.data.repository.CommentRepositoryImpl
+import dev.echoapp.echo.data.repository.FollowRepositoryImpl
 import dev.echoapp.echo.data.repository.PoiRepositoryImpl
 import dev.echoapp.echo.data.repository.PostRepositoryImpl
 import dev.echoapp.echo.data.repository.ReportRepositoryImpl
@@ -11,6 +12,7 @@ import dev.echoapp.echo.data.repository.UserRepositoryImpl
 import dev.echoapp.echo.domain.repository.AuthRepository
 import dev.echoapp.echo.domain.repository.AuthorAvatarResolver
 import dev.echoapp.echo.domain.repository.CommentRepository
+import dev.echoapp.echo.domain.repository.FollowRepository
 import dev.echoapp.echo.domain.repository.LocationProvider
 import dev.echoapp.echo.domain.repository.PoiRepository
 import dev.echoapp.echo.domain.repository.PostRepository
@@ -60,4 +62,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAuthorAvatarResolver(impl: AuthorAvatarResolverImpl): AuthorAvatarResolver
+
+    @Binds
+    @Singleton
+    abstract fun bindFollowRepository(impl: FollowRepositoryImpl): FollowRepository
 }

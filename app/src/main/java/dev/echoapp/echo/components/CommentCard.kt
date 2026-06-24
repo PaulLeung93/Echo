@@ -1,5 +1,6 @@
 ﻿package dev.echoapp.echo.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,8 +43,13 @@ fun CommentCard(
     onDelete: (() -> Unit)? = null,
     onReport: (() -> Unit)? = null,
     onBlock: (() -> Unit)? = null,
+    onAuthorClick: ((String) -> Unit)? = null,
     isAuthor: Boolean = false
 ) {
+    val authorClick: (() -> Unit)? =
+        if (onAuthorClick != null && comment.authorId.isNotBlank()) {
+            { onAuthorClick(comment.authorId) }
+        } else null
     Surface(
         shape = MaterialTheme.shapes.medium,
         // The "AUTHOR" pill already marks the original poster, so the fill just needs a
@@ -63,7 +69,8 @@ fun CommentCard(
                 authorId = comment.authorId,
                 name = comment.username,
                 fallbackPhotoUrl = comment.authorPhotoUrl,
-                size = 36.dp
+                size = 36.dp,
+                modifier = if (authorClick != null) Modifier.clickable(onClick = authorClick) else Modifier
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -71,7 +78,8 @@ fun CommentCard(
                     Text(
                         text = comment.username.substringBefore("@"),
                         style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = if (authorClick != null) Modifier.clickable(onClick = authorClick) else Modifier
                     )
                     if (isAuthor) {
                         Spacer(Modifier.width(6.dp))

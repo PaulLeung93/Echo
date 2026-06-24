@@ -25,6 +25,7 @@ purpose = **App functionality** and **Account management**.
 | Personal info | **Name** (first/last) | Yes | Required (registered accounts) | Account management |
 | Personal info | **User IDs** (@username, Firebase UID) | Yes | Required (registered accounts) | Account management, App functionality |
 | App activity | **Other user-generated content** (posts, comments, bio, tags, likes) | Yes | Optional | App functionality |
+| App activity | **Other actions** (follow relationships / social connections) | Yes | Optional | App functionality |
 | App info & performance | **Crash logs** | Yes | — | Crash diagnostics (App functionality / Analytics) |
 | App info & performance | **Diagnostics** (Crashlytics performance data) | Yes | — | App functionality |
 
@@ -34,6 +35,12 @@ purpose = **App functionality** and **Account management**.
 - **User-generated content is "Collected, not Shared."** Posts being visible to
   other users is *not* "sharing" under Google's definition (that's about third
   parties), so leave Shared = No.
+- **Follow graph (social connections):** Echo stores who follows whom
+  (`users/{uid}/following` + `followers`). Declare it under **App activity** — Play's
+  taxonomy has no dedicated "social graph" type, so map it to **"Other actions"** (or
+  fold into "Other user-generated content" if you'd rather not add a row; either is
+  defensible). Still **Collected, not Shared** — other users seeing your follower
+  count isn't third-party sharing. Optional (only registered, non-guest users follow).
 - **App Check / Play Integrity:** this attests device/app integrity; it does not
   collect a persistent advertising/device ID for you. Generally **not** declared
   as "Device or other IDs." Only declare that category if you later add analytics

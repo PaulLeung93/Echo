@@ -14,7 +14,9 @@ import dev.echoapp.echo.ui.maps.MapScreen
 import dev.echoapp.echo.ui.poi.PoiDetailScreen
 import dev.echoapp.echo.ui.post.PostDetailScreen
 import dev.echoapp.echo.ui.profile.EditProfileScreen
+import dev.echoapp.echo.ui.profile.FollowListScreen
 import dev.echoapp.echo.ui.profile.ProfileScreen
+import dev.echoapp.echo.ui.profile.UserProfileScreen
 import dev.echoapp.echo.ui.settings.SettingsScreen
 import dev.echoapp.echo.utils.Constants
 
@@ -32,6 +34,8 @@ object Destinations {
     const val COMPLETE_PROFILE = Constants.ROUTE_COMPLETE_PROFILE
     const val EDIT_PROFILE = Constants.ROUTE_EDIT_PROFILE
     const val SETTINGS = Constants.ROUTE_SETTINGS
+    const val USER_PROFILE = Constants.ROUTE_USER_PROFILE
+    const val FOLLOW_LIST = Constants.ROUTE_FOLLOW_LIST
 }
 
 @Composable
@@ -141,6 +145,25 @@ fun AppNavGraph(
         // Settings (appearance, notifications, account)
         composable(Destinations.SETTINGS) {
             SettingsScreen(navController = navController, authViewModel = authViewModel, webClientId = webClientId)
+        }
+
+        // Public profile for any user (reached by tapping an author).
+        composable(
+            route = "${Destinations.USER_PROFILE}/{uid}",
+            arguments = listOf(navArgument("uid") { defaultValue = "" })
+        ) {
+            UserProfileScreen(navController = navController)
+        }
+
+        // Follower / following list for a user (reached by tapping a follow count).
+        composable(
+            route = "${Destinations.FOLLOW_LIST}/{uid}/{type}",
+            arguments = listOf(
+                navArgument("uid") { defaultValue = "" },
+                navArgument("type") { defaultValue = "followers" }
+            )
+        ) {
+            FollowListScreen(navController = navController)
         }
     }
 }

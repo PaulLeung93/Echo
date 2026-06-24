@@ -128,6 +128,11 @@ fun PostDetailScreen(
                             commentCount = post.commentCount,
                             onLikeClick = { viewModel.toggleLike() },
                             onClick = {},
+                            onAuthorClick = if (post.authorId.isNotBlank() &&
+                                post.authorId != uiState.currentUserId
+                            ) {
+                                { navController.navigate("${Destinations.USER_PROFILE}/${post.authorId}") }
+                            } else null,
                             onTagClick = {},
                             onReport = if (canModeratePost) {
                                 { reportingPost = true }
@@ -183,6 +188,9 @@ fun PostDetailScreen(
                                     comment.authorId.isNotEmpty()
                                 ) {
                                     { blockTarget = comment.authorId to comment.username }
+                                } else null,
+                                onAuthorClick = if (comment.authorId.isNotEmpty() && !isOwnComment) {
+                                    { navController.navigate("${Destinations.USER_PROFILE}/${comment.authorId}") }
                                 } else null
                             )
                             Spacer(modifier = Modifier.height(8.dp))

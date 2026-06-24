@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -189,6 +190,26 @@ fun FeedScreen(
                 )
             )
 
+            // --- Nearby / Following toggle (hidden while a tag filter is active) ---
+            if (uiState.currentTag == null) {
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    SegmentedButton(
+                        selected = uiState.feedMode == FeedMode.NEARBY,
+                        onClick = { feedViewModel.setFeedMode(FeedMode.NEARBY) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) { Text("Nearby") }
+                    SegmentedButton(
+                        selected = uiState.feedMode == FeedMode.FOLLOWING,
+                        onClick = { feedViewModel.setFeedMode(FeedMode.FOLLOWING) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) { Text("Following") }
+                }
+            }
+
             // --- Main Feed Content ---
             Box(modifier = Modifier.fillMaxSize()) {
                 if (uiState.isLoading && uiState.posts.isEmpty()) {
@@ -220,14 +241,29 @@ fun FeedScreen(
                         ) {
                             if (uiState.posts.isEmpty()) {
                                 item {
-                                    EmptyState(
-                                        icon = Icons.Outlined.Forum,
-                                        title = "No echoes yet",
-                                        subtitle = "Be the first to share something with your neighborhood.",
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 64.dp)
-                                    )
+                                    if (uiState.feedMode == FeedMode.FOLLOWING) {
+                                        EmptyState(
+                                            icon = Icons.Outlined.Group,
+                                            title = if (isGuest) "Sign in to follow people" else "No echoes yet",
+                                            subtitle = if (isGuest) {
+                                                "Following lets you keep up with people anywhere — sign in to start."
+                                            } else {
+                                                "Follow people to see their echoes here, no matter how far away."
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 64.dp)
+                                        )
+                                    } else {
+                                        EmptyState(
+                                            icon = Icons.Outlined.Forum,
+                                            title = "No echoes yet",
+                                            subtitle = "Be the first to share something with your neighborhood.",
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 64.dp)
+                                        )
+                                    }
                                 }
                             } else {
                                 items(uiState.posts, key = { it.id }) { post ->
@@ -277,6 +313,11 @@ fun FeedScreen(
                                         onClick = {
                                             navController.navigate("${Constants.ROUTE_POST_DETAILS}/${post.id}")
                                         },
+                                        onAuthorClick = if (post.authorId.isNotBlank() &&
+                                            post.authorId != feedViewModel.currentUserId
+                                        ) {
+                                            { navController.navigate("${Constants.ROUTE_USER_PROFILE}/${post.authorId}") }
+                                        } else null,
                                         onTagClick = { tag ->
                                             tagInput = tag
                                             feedViewModel.setTagFilter(tag)

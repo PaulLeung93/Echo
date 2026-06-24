@@ -316,6 +316,22 @@ class UserRepositoryImpl @Inject constructor(
         replay = 1
     )
 
+    override fun observeProfileById(uid: String): Flow<UserProfile?> = callbackFlow {
+        if (uid.isBlank()) {
+            trySend(null)
+            awaitClose { }
+            return@callbackFlow
+        }
+        val listener = usersCollection.document(uid).addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                trySend(null)
+                return@addSnapshotListener
+            }
+            trySend(snapshot?.toObject(UserProfileEntity::class.java)?.toDomain())
+        }
+        awaitClose { listener.remove() }
+    }.flowOn(ioDispatcher)
+
     override fun observeHiddenUserIds(): Flow<Set<String>> = sharedHiddenUserIds
 
     override fun currentAuthProvider(): AuthProvider {
@@ -379,7 +395,9 @@ class UserRepositoryImpl @Inject constructor(
             bio = bio,
             photoUrl = photoUrl.ifBlank { null },
             blockedUserIds = blockedUserIds,
-            favorites = favorites.mapValues { (_, ts) -> ts.toDate().time }
+            favorites = favorites.mapValues { (_, ts) -> ts.toDate().time },
+            followerCount = followerCount.toInt(),
+            followingCount = followingCount.toInt()
         )
     }
 }

@@ -255,6 +255,11 @@ fun PoiDetailScreen(
                                     onClick = {
                                         navController.navigate("${Constants.ROUTE_POST_DETAILS}/${post.id}")
                                     },
+                                    onAuthorClick = if (post.authorId.isNotEmpty() &&
+                                        post.authorId != uiState.currentUserId
+                                    ) {
+                                        { navController.navigate("${Constants.ROUTE_USER_PROFILE}/${post.authorId}") }
+                                    } else null,
                                     onReport = if (canModerate) {
                                         { reportTarget = post }
                                     } else null,

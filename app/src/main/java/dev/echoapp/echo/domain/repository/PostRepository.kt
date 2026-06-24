@@ -61,6 +61,13 @@ interface PostRepository {
     fun getPostsByAuthorId(authorId: String): Flow<List<Post>>
 
     /**
+     * Newest-first posts by any of [authorIds] (the Following feed), ignoring distance.
+     * One-shot read; [authorIds] is chunked to respect Firestore's `in`-query cap and
+     * the merged result is sorted and capped at [limit]. Empty input → empty list.
+     */
+    suspend fun getPostsByAuthors(authorIds: List<String>, limit: Long): List<Post>
+
+    /**
      * Get a single post by ID.
      * @param postId The ID of the post.
      */

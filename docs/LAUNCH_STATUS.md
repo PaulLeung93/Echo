@@ -27,9 +27,8 @@ All core development phases are done. Key milestones:
 ### 2. App Check — ✅ Done (confirm in Firebase Console if unsure)
 Firebase Console → App Check → Apps → Echo → Firestore should show **"Enforced"**.
 
-### 3. Report / flag content mechanism ⚠️
-- [ ] Play policy requires a way to **report objectionable content or users** for any app with UGC + user-to-user communication. Echo has **block** (Settings) but no **report** button.
-- This may be a hard requirement before the listing is approved. Confirm during review — if rejected, add a report flag on posts/comments.
+### 3. Report / flag content mechanism — ✅ Done
+- Play policy requires a way to **report objectionable content or users** for any app with UGC + user-to-user communication. Echo now has both **block** *and* **report**: posts and comments are reportable from their overflow menus, and users are reportable from the public profile's top-bar overflow ("Report user"). Reports are write-only (`reports` collection, triaged in the console); rules cover `type in ['post','comment','user']`. **Deployed** to `echo-2b5ba`.
 
 ### 4. Play Console listing (once account is verified)
 - [ ] **Feature graphic** — 1024×500px banner image (the one asset not yet created)
@@ -65,7 +64,7 @@ Not needed for submission. Captured so they aren't lost.
 - **POI activity glow** — ✅ implemented: a POI shows a gold glow when it has an echo from the last 1h that the user hasn't seen yet; the glow clears once they open its thread and re-lights if a newer echo arrives. (`lastPostAt` denormalized per POI; window in `CreatePinIcon.POI_ACTIVE_WINDOW_MILLIS`; per-user "viewed" times in DataStore, device-local.) A true animated pulse on the *selected* POI remains a possible future polish.
 - **GeoFire radius** — cap POI visibility + interactions to a configurable distance
 - **Content** — multi-photo posts, event-type posts with RSVP, 24h post expiry
-- **Social** — direct messaging, follow/friend nearby users, bookmarks
+- **Social** — follow nearby users (one-way public follow → distance-free "Following" feed). Planned & specced in [`docs/launch/FOLLOW_FEATURE.md`](launch/FOLLOW_FEATURE.md)
 - **User-submitted POIs**
 - **Server-side proximity Step 3** — cross-check GPS vs IP / mock-location flag / velocity (post-launch luxury)
 - **SMS 2FA** — deferred (cost); App Check already covers the main anti-abuse goal

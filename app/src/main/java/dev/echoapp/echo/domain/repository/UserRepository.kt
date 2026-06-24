@@ -93,6 +93,12 @@ interface UserRepository {
     /** Observe the current user's profile (null when signed out or no profile yet). */
     fun observeCurrentUserProfile(): Flow<UserProfile?>
 
+    /**
+     * Observe any user's public profile by [uid] (null when it doesn't exist or on a
+     * read error). Used by the public profile screen to show someone else's info.
+     */
+    fun observeProfileById(uid: String): Flow<UserProfile?>
+
     /** The sign-in provider of the current user (for choosing the re-auth flow). */
     fun currentAuthProvider(): AuthProvider
 

@@ -20,7 +20,11 @@ data class UserProfile(
      * [dev.echoapp.echo.utils.Constants.MAX_FAVORITE_POIS] and each slot is held for
      * [dev.echoapp.echo.utils.Constants.FAVORITE_HOLD_MILLIS] before it can be removed.
      */
-    val favorites: Map<String, Long> = emptyMap()
+    val favorites: Map<String, Long> = emptyMap(),
+    /** Number of users following this profile (denormalized; maintained server-side). */
+    val followerCount: Int = 0,
+    /** Number of users this profile follows (denormalized; maintained server-side). */
+    val followingCount: Int = 0
 ) {
     /** "First Last", trimmed (handles a missing last name gracefully). */
     val fullName: String get() = listOf(firstName, lastName).filter { it.isNotBlank() }.joinToString(" ")

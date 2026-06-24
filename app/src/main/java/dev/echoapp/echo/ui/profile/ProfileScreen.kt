@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import dev.echoapp.echo.components.DeletePostDialog
 import dev.echoapp.echo.components.EditPostDialog
 import dev.echoapp.echo.components.EmptyState
+import dev.echoapp.echo.components.FollowStat
 import dev.echoapp.echo.components.ProfileAvatar
 import dev.echoapp.echo.components.PostCard
 import dev.echoapp.echo.components.PostCardSkeleton
@@ -140,6 +141,22 @@ fun ProfileScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FollowStat(
+                            count = profile?.followerCount ?: 0,
+                            label = "Followers",
+                            onClick = { navController.navigate("${Constants.ROUTE_FOLLOW_LIST}/${currentUser.id}/followers") }
+                        )
+                        FollowStat(
+                            count = profile?.followingCount ?: 0,
+                            label = "Following",
+                            onClick = { navController.navigate("${Constants.ROUTE_FOLLOW_LIST}/${currentUser.id}/following") }
+                        )
+                    }
                     profile?.bio?.takeIf { it.isNotBlank() }?.let { bio ->
                         Spacer(Modifier.height(8.dp))
                         Text(
