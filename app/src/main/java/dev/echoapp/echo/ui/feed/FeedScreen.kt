@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Forum
@@ -98,23 +97,34 @@ fun FeedScreen(
             CenterAlignedTopAppBar(
                 title = {
                     if (uiState.currentTag != null) {
-                        // Show filtered tag in top bar with option to clear
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Filtered: #${uiState.currentTag}",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                            IconButton(
-                                onClick = {
-                                    feedViewModel.clearTagFilter()
-                                    tagInput = ""
-                                },
-                                colors = IconButtonDefaults.iconButtonColors(
-                                    contentColor = Color.White
-                                )
+                        // Show the active tag filter as a chip; only the X clears it
+                        Surface(
+                            shape = RoundedCornerShape(percent = 50),
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(start = 12.dp, end = 4.dp)
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "Clear Filter")
+                                Text(
+                                    text = "#${uiState.currentTag}",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                IconButton(
+                                    onClick = {
+                                        feedViewModel.clearTagFilter()
+                                        tagInput = ""
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Clear filter",
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     } else {
@@ -173,16 +183,6 @@ fun FeedScreen(
                         )
                     ) {
                         Icon(Icons.Default.FilterList, contentDescription = "Filter by Tag")
-                    }
-                    IconButton(
-                        onClick = {
-                            authViewModel.signOut()
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
